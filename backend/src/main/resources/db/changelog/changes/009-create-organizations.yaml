@@ -1,0 +1,160 @@
+# Organizations and the departments that belong to them.
+#
+# Two tables in one changeset because the second is meaningless without the
+# first: a department's organization is NOT NULL, so there is no state of the
+# schema where departments exists and organizations does not.
+databaseChangeLog:
+  - changeSet:
+      id: 009-create-organizations
+      author: dth
+      changes:
+        - createTable:
+            tableName: organizations
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_organizations
+              # The stable handle people quote, as opposed to the id nobody can
+              # remember. Unique, and checked case-insensitively by the service
+              # so that `hq` and `HQ` cannot both exist.
+              - column:
+                  name: code
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_organizations_code
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(500)
+              - column:
+                  name: email
+                  type: varchar(255)
+              - column:
+                  name: phone
+                  type: varchar(64)
+              - column:
+                  name: address
+                  type: varchar(500)
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # The list view sorts by name by default and filters by status.
+        - createIndex:
+            tableName: organizations
+            indexName: idx_organizations_name
+            columns:
+              - column:
+                  name: name
+        - createIndex:
+            tableName: organizations
+            indexName: idx_organizations_status
+            columns:
+              - column:
+                  name: status
+
+        - createTable:
+            tableName: departments
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_departments
+              - column:
+                  name: code
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(500)
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(255)
+              - column:
+                  name: phone
+                  type: varchar(64)
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # RESTRICT, like blog_posts -> categories: an organization that still
+        # has departments is refused rather than silently taking them with it.
+        # That refusal is also what the organization feature relies on instead
+        # of counting departments itself, which would mean reading another
+        # feature's table.
+        - addForeignKeyConstraint:
+            baseTableName: departments
+            baseColumnNames: organization_id
+            constraintName: fk_departments_organization
+            referencedTableName: organizations
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # A code is unique within its organization, not globally: two companies
+        # both having a SALES is the normal case, and a global constraint would
+        # make the second one impossible to name naturally.
+        - addUniqueConstraint:
+            tableName: departments
+            columnNames: organization_id, code
+            constraintName: uq_departments_organization_code
+        - createIndex:
+            tableName: departments
+            indexName: idx_departments_organization_id
+            columns:
+              - column:
+                  name: organization_id
+        - createIndex:
+            tableName: departments
+            indexName: idx_departments_name
+            columns:
+              - column:
+                  name: name
+        - createIndex:
+            tableName: departments
+            indexName: idx_departments_status
+            columns:
+              - column:
+                  name: status

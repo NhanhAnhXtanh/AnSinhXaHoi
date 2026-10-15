@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------------------
+# DTH Framework — monorepo (backend/ Spring Boot, frontend/ Refine + React)
+# ---------------------------------------------------------------------------
+
+### OS / editor ###
+.DS_Store
+Thumbs.db
+.vscode/
+.idea
+*.iws
+*.iml
+*.ipr
+
+### Secrets / local environment ###
+.env
+.env.local
+.env.*.local
+*.local
+CLAUDE.local.md
+docs/asxh/
+
+### Logs ###
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------------------------------------------------------------------------
+# backend/ — Gradle / Java
+# ---------------------------------------------------------------------------
+HELP.md
+.gradle/
+build/
+out/
+bin/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+!**/src/main/**/out/
+!**/src/test/**/out/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### Eclipse / STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+# ---------------------------------------------------------------------------
+# frontend/ — Node / Vite
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+.refine/

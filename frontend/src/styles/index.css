@@ -1,0 +1,444 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./theme.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* --------------------------------------------------------------------------
+   Bridge the semantic CSS variables from styles/theme.css into Tailwind's
+   design system, so `bg-primary`, `text-success`, `rounded-lg`, `shadow-e3`…
+   all resolve to the tokens the theme controls.
+   -------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* The step between the card and the page: table headers, toolbar strips,
+     inset panels. */
+  --color-surface-subtle: var(--surface-subtle);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* Status. Each one is a fill, the text that sits on that fill, a wash, and
+     the label that sits on the wash — see the Status block in theme.css for
+     why one value per status is not enough. */
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-text: var(--destructive-text);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-text: var(--success-text);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-text: var(--warning-text);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-text: var(--info-text);
+
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-subtle: var(--neutral-subtle);
+  --color-neutral-text: var(--neutral-text);
+
+  /* The institutional accent — fixed across presets. */
+  --color-gold-300: var(--gold-300);
+  --color-gold-400: var(--gold-400);
+  --color-gold-500: var(--gold-500);
+  --color-gold-600: var(--gold-600);
+  --color-gold-subtle: var(--gold-subtle);
+  --color-gold-text: var(--gold-text);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Density. Tailwind builds every spacing utility as
+     `calc(var(--spacing) * n)`, so pointing its base unit at the density token
+     rescales the whole shell live when `data-density` changes. */
+  --spacing: var(--density-spacing);
+
+  --radius-sm: max(0px, calc(var(--radius) - 4px));
+  --radius-md: max(0px, calc(var(--radius) - 2px));
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --shadow-e1: var(--elevation-1);
+  --shadow-e2: var(--elevation-2);
+  --shadow-e3: var(--elevation-3);
+  --shadow-e4: var(--elevation-4);
+
+  --ease-settle: var(--ease-settle);
+  --ease-standard: var(--ease-standard);
+
+  /* Inter Variable, self-hosted from `@fontsource-variable/inter` (imported in
+     App.tsx) — bundled with the app, so no request to a third-party host and
+     nothing to fail on a closed network. The system stack behind it is only
+     for the moment before the font file arrives. */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/70;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    /* A business screen takes 14px as its body size, not 16px. Everything in
+       the shell already declares `text-sm`, so this only catches the text
+       nobody sized — a paragraph in a description, a `<td>` written by hand —
+       and stops it from arriving one step larger than the table beside it.
+       `rem` is root-relative, so no spacing or type utility moves. */
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  /* Tabular figures wherever numbers are meant to line up in a column. Set
+     here rather than per component because the places that need it — table
+     cells, pagination, counts, timestamps — are not a component, they are a
+     kind of content. */
+  th,
+  td,
+  time,
+  [data-slot="table-cell"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Headings carry the tighter tracking the dashboard uses throughout. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply tracking-tight;
+  }
+
+  /* Keep the native form controls in step with the active mode. */
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+
+  /* One visible focus ring for the whole application, on the token that owns
+     it. Anything that draws its own focus treatment overrides this; anything
+     that forgot to still gets a ring rather than nothing. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+
+  /* Colour transition when the mode or preset flips. Suppressed while the
+     provider is mid-swap (see `.theme-transition-suppressed`) and for anyone
+     who asked for reduced motion. */
+  body,
+  [data-slot="app-sidebar"],
+  [data-slot="app-header"] {
+    transition: background-color 200ms ease, border-color 200ms ease,
+      color 200ms ease;
+  }
+
+  .theme-transition-suppressed *,
+  .theme-transition-suppressed *::before,
+  .theme-transition-suppressed *::after {
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Utilities
+   -------------------------------------------------------------------------- */
+
+/* The small-caps label: table headers, sidebar section headings, the caption
+   over a group of fields. It is one type style used in three places, so it is
+   a utility rather than three copies of the same four declarations — and when
+   it is a utility, a new screen that needs a group label gets the right one
+   by name instead of inventing an eleventh size. */
+@utility text-overline {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Slim, self-effacing scrollbar for the sidebar and any inner scroll area. */
+@utility scrollbar-fade {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, currentColor 34%, transparent) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: color-mix(in oklab, currentColor 30%, transparent);
+  }
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, currentColor 48%, transparent);
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   The institutional ground.
+
+   The one surface in the application that is not a token but a picture: a deep
+   brand field lit from the top by the gold accent, used behind the screens
+   that sit outside the shell — sign-in, and anything else somebody meets
+   before they have an account to theme.
+
+   Built out of the preset and the gold hue rather than fixed hex, so it
+   repaints with the brand like everything else, and it is dark in both modes
+   on purpose: an auth screen that flips with the OS theme is a login form that
+   looks like two different products.
+   -------------------------------------------------------------------------- */
+
+@utility gradient-hero {
+  background-color: oklch(0.16 calc(var(--preset-sidebar-c) * 0.6) var(--preset-h));
+  background-image:
+    radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      color-mix(in oklab, var(--gold-500) 20%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 60% 80% at 12% 100%,
+      color-mix(
+        in oklab,
+        oklch(0.5 calc(var(--preset-sidebar-c) * 1.4) var(--preset-h)) 42%,
+        transparent
+      ),
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 60% 80% at 88% 100%,
+      color-mix(in oklab, var(--gold-500) 11%, transparent),
+      transparent 62%
+    ),
+    linear-gradient(
+      180deg,
+      oklch(0.14 calc(var(--preset-sidebar-c) * 0.5) var(--preset-h)) 0%,
+      oklch(0.2 calc(var(--preset-sidebar-c) * 0.8) var(--preset-h)) 50%,
+      oklch(0.29 var(--preset-sidebar-c) var(--preset-h)) 100%
+    );
+}
+
+/* A surveyor's grid over the hero — the texture that stops a large flat field
+   from looking like an unpainted div. Both patterns are white at low alpha, so
+   they only read on a dark ground. */
+@utility grid-pattern {
+  background-image:
+    linear-gradient(oklch(1 0 0 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* Gold as a fill, for the one element on a screen that is the seal. */
+@utility gradient-gold {
+  background-image: linear-gradient(
+    135deg,
+    var(--gold-400) 0%,
+    var(--gold-500) 55%,
+    var(--gold-600) 100%
+  );
+}
+
+/* The frosted bar the shell uses for its sticky header. */
+@utility surface-blur {
+  background-color: color-mix(in oklab, var(--card) 86%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* --------------------------------------------------------------------------
+   Screen entrance
+   --------------------------------------------------------------------------
+   Applied by the view wrappers in `shared/components/views/*`, which mount
+   exactly when a screen opens — so this needs no route keys and never forces a
+   remount that would drop table filters or form state.
+
+   Tuned by the motion tokens in `styles/theme.css`. Both animations end on
+   `transform: none`, so nothing is left behind that could trap a `position:
+   fixed` descendant.
+   -------------------------------------------------------------------------- */
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: scale(var(--screen-scale));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes screen-enter-child {
+  from {
+    opacity: 0;
+    transform: translate3d(0, var(--screen-child-lift), 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The frame: a fade and a hair of scale, no travel. */
+@utility screen-enter {
+  animation: screen-enter var(--screen-duration) var(--ease-settle) both;
+}
+
+/* Its direct children lift into place one after another. Anything past the
+   third shares the third's delay — a long list should not take a second to
+   finish arriving. */
+@utility screen-enter-stagger {
+  & > * {
+    animation: screen-enter-child var(--screen-child-duration)
+      var(--ease-settle) both;
+    animation-delay: calc(var(--screen-child-step) * 3);
+  }
+  & > *:nth-child(1) {
+    animation-delay: calc(var(--screen-child-step) * 1);
+  }
+  & > *:nth-child(2) {
+    animation-delay: calc(var(--screen-child-step) * 2);
+  }
+  & > *:nth-child(3) {
+    animation-delay: calc(var(--screen-child-step) * 3);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Print
+   --------------------------------------------------------------------------
+   A business screen gets printed — a record handed to somebody who is not
+   going to open the application. The application frame is not part of that:
+   the rail, the sticky bar and every cluster of buttons carry
+   `data-print="hide"` and come off the page, leaving the record on white A4.
+
+   `box-shadow` goes too. A printer cannot reproduce one; it only muddies the
+   ground behind a card.
+   -------------------------------------------------------------------------- */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
+
+  [data-print="hide"],
+  [data-slot="app-sidebar"],
+  [data-slot="app-header"],
+  [data-sidebar="rail"] {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Do not cut a block in half, and never leave a heading stranded at the
+     foot of a page. */
+  section,
+  article,
+  dl,
+  table,
+  tr,
+  [data-slot="card"] {
+    break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  /* A long table may span pages, but every page repeats its header row. */
+  thead {
+    display: table-header-group;
+  }
+}

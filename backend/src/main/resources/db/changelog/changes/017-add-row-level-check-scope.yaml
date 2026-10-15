@@ -1,0 +1,26 @@
+# A write policy gets its own WITH CHECK clause, independent of USING.
+#
+# Until now one condition served both halves, which is Postgres's *default*
+# (WITH CHECK falls back to USING) but not its whole behaviour -- real RLS lets
+# you write the two separately, and there is a case that needs it.
+#
+# A condition over an ownership field (department, category) wants the same
+# clause on both sides: that is exactly what stops a row being pushed somewhere
+# its writer cannot see. A condition over workflow state does not. "You may edit
+# drafts" applied to the state after the save becomes "you may edit drafts but
+# never publish one" -- the field the rule is about is the field the work
+# changes, so a single condition makes it immutable.
+#
+# Null means "same as the USING clause", so every policy written before this
+# keeps behaving exactly as it did.
+databaseChangeLog:
+  - changeSet:
+      id: 017-add-row-level-check-scope
+      author: dth
+      changes:
+        - addColumn:
+            tableName: row_level_policy
+            columns:
+              - column:
+                  name: check_scope
+                  type: jsonb

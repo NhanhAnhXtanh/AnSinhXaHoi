@@ -1,0 +1,37 @@
+# Marks a permission the application itself relies on.
+#
+# The permission catalogue is read-only over the API, so this flag does not
+# guard an endpoint the way roles.system_role does. It is there for the moment
+# the catalogue stops being read-only, and — until then — so the admin UI can
+# tell a code the code enforces from one somebody added for their own use.
+databaseChangeLog:
+  - changeSet:
+      id: 008-add-permission-system-flag
+      author: dth
+      changes:
+        - addColumn:
+            tableName: permissions
+            columns:
+              - column:
+                  name: system_permission
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+        # Everything in the catalogue up to this point arrived in a migration
+        # alongside the code that checks it, which is exactly what the flag
+        # means. Seeded by code rather than by id, for the same reason the
+        # seeds join on natural keys.
+        - update:
+            tableName: permissions
+            columns:
+              - column:
+                  name: system_permission
+                  valueBoolean: true
+            where: code LIKE 'users:%' OR code LIKE 'roles:%' OR code LIKE 'permissions:%'
+              OR code LIKE 'blog_posts:%' OR code LIKE 'categories:%'
+              OR code LIKE 'notifications:%'
+      rollback:
+        - dropColumn:
+            tableName: permissions
+            columnName: system_permission

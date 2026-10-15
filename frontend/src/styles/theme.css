@@ -1,0 +1,525 @@
+/* ==========================================================================
+   DTH Framework — design tokens
+   --------------------------------------------------------------------------
+   Enterprise dashboard theme for shadcn/ui on Tailwind CSS v4.
+
+   Five independent knobs, all held as state on the <html> element:
+
+     .dark                light / dark mode
+     data-color-preset    brand hue        navy (default) | blue | indigo | ...
+     data-radius          corner rounding  none | sm | md | lg | xl
+     data-sidebar-tone    sidebar surface  dark (default) | light
+     data-density         layout rhythm    compact | comfortable | spacious
+
+   Every preset declares only a handful of numbers. All semantic tokens below
+   are derived from them in OKLCH, so adding a brand colour is a six-line
+   change and never requires touching a component. Density works the same way:
+   one number that the whole spacing scale is built on.
+
+     --preset-h            brand hue angle
+     --preset-c            brand chroma, light mode
+     --preset-c-dark       brand chroma, dark mode
+     --preset-l            brand lightness, light mode
+     --preset-l-dark       brand lightness, dark mode
+     --preset-sidebar-c    chroma of the brand rail. Set per preset to the
+                           most sRGB can hold at the rail's darkest step, so
+                           each hue is as saturated as it can legally be
+     --preset-on           optional: text colour on top of the brand colour,
+                           only needed for light brands such as amber
+
+   Contrast is a floor, not a taste setting. Every pair below is measured
+   against the surface it actually lands on, and the numbers the palette is
+   tuned to are:
+
+     body text on its surface          >= 15:1
+     muted / secondary text            >=  6:1
+     brand, and every status colour,
+       used as text                    >=  4.5:1 in both modes
+     dividers (`--border`)             >=  1.4:1
+     control edges (`--input`)         >=  2.1:1
+
+   That is why `--preset-l` differs from the hue's "natural" lightness on the
+   brighter presets: emerald, teal, rose, orange and amber are all pulled down
+   until `text-primary` clears 4.5:1 on a card. Amber cannot reach it and never
+   will — it carries `--preset-on` instead and is the one preset where the
+   brand colour is a surface, not a label.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Brand presets — the only place raw brand numbers live.
+
+   `navy` is the institutional default and is a literal transcription of the
+   reference system's navy-800 (#0b2e5c): a deep, low-chroma blue that reads
+   as a government/enterprise surface rather than a product accent. Everything
+   neutral in the theme carries a trace of its hue, which is what gives the
+   greys their slate cast instead of a flat camera grey.
+   -------------------------------------------------------------------------- */
+
+:root,
+:root[data-color-preset="navy"] {
+  --preset-h: 257;
+  --preset-c: 0.091;
+  --preset-c-dark: 0.13;
+  --preset-l: 0.306;
+  --preset-l-dark: 0.72;
+  --preset-sidebar-c: 0.091;
+}
+
+:root[data-color-preset="blue"] {
+  --preset-h: 250;
+  --preset-c: 0.175;
+  --preset-c-dark: 0.18;
+  --preset-l: 0.49;
+  --preset-l-dark: 0.7;
+  --preset-sidebar-c: 0.072;
+}
+
+:root[data-color-preset="indigo"] {
+  --preset-h: 277;
+  --preset-c: 0.175;
+  --preset-c-dark: 0.18;
+  --preset-l: 0.46;
+  --preset-l-dark: 0.68;
+  --preset-sidebar-c: 0.156;
+}
+
+:root[data-color-preset="violet"] {
+  --preset-h: 300;
+  --preset-c: 0.185;
+  --preset-c-dark: 0.19;
+  --preset-l: 0.47;
+  --preset-l-dark: 0.7;
+  --preset-sidebar-c: 0.135;
+}
+
+:root[data-color-preset="emerald"] {
+  --preset-h: 162;
+  --preset-c: 0.155;
+  --preset-c-dark: 0.17;
+  --preset-l: 0.48;
+  --preset-l-dark: 0.72;
+  --preset-sidebar-c: 0.055;
+}
+
+:root[data-color-preset="teal"] {
+  --preset-h: 195;
+  --preset-c: 0.13;
+  --preset-c-dark: 0.14;
+  --preset-l: 0.48;
+  --preset-l-dark: 0.74;
+  --preset-sidebar-c: 0.043;
+}
+
+:root[data-color-preset="rose"] {
+  --preset-h: 12;
+  --preset-c: 0.2;
+  --preset-c-dark: 0.2;
+  --preset-l: 0.51;
+  --preset-l-dark: 0.71;
+  --preset-sidebar-c: 0.101;
+}
+
+:root[data-color-preset="orange"] {
+  --preset-h: 45;
+  --preset-c: 0.18;
+  --preset-c-dark: 0.18;
+  --preset-l: 0.55;
+  --preset-l-dark: 0.75;
+  --preset-sidebar-c: 0.072;
+}
+
+:root[data-color-preset="amber"] {
+  --preset-h: 82;
+  --preset-c: 0.15;
+  --preset-c-dark: 0.16;
+  --preset-l: 0.64;
+  --preset-l-dark: 0.84;
+  --preset-sidebar-c: 0.052;
+  /* Amber is too light to carry white text. */
+  --preset-on: oklch(0.2 0.05 82);
+}
+
+:root[data-color-preset="slate"] {
+  --preset-h: 258;
+  --preset-c: 0.025;
+  --preset-c-dark: 0.02;
+  --preset-l: 0.34;
+  --preset-l-dark: 0.82;
+  --preset-sidebar-c: 0.032;
+}
+
+/* --------------------------------------------------------------------------
+   2. The institutional accent — fixed, and deliberately not derived.
+
+   Gold is the one colour in the system that does *not* follow the preset. It
+   is not the brand hue; it is the seal on the letterhead. It appears in three
+   places only — the brand mark, the marker on the active nav row, and the
+   `gold` badge variant — which is exactly why it survives being fixed: a
+   deployment that picks `rose` still gets a gold seal, the way a rebranded
+   department still gets the national emblem.
+
+   Derived from the reference ramp (#f1cf72 / #e5b74c / #d4a72c / #8a6614), so
+   the hue is one number and the four steps are that hue at four lightnesses.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --gold-h: 87;
+
+  --gold-300: oklch(0.865 0.119 var(--gold-h));
+  --gold-400: oklch(0.801 0.134 var(--gold-h));
+  --gold-500: oklch(0.75 0.141 var(--gold-h));
+  --gold-600: oklch(0.533 0.103 var(--gold-h));
+
+  /* Gold as a *label* on a light surface needs the dark step: `--gold-500` on
+     white is 1.9:1 and unreadable, `--gold-600` is 4.9:1. */
+  --gold-subtle: oklch(0.965 0.045 var(--gold-h));
+  --gold-text: var(--gold-600);
+}
+
+.dark {
+  /* On a dark surface the relationship inverts: the light step becomes the
+     label and the fill becomes a deep wash of the same hue. */
+  --gold-subtle: oklch(0.32 0.06 var(--gold-h));
+  --gold-text: var(--gold-400);
+}
+
+/* --------------------------------------------------------------------------
+   3. Light mode — semantic tokens derived from the preset.
+   The neutrals carry a trace of the brand hue, so the whole UI shifts
+   together when the preset changes instead of only the accents.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --radius: 0.5rem;
+
+  /* The page is a tinted surface and a card is white, so a card reads as a
+     sheet laid on a desk rather than a rectangle drawn on the same paper.
+     That separation is what lets the elevation ramp stay as quiet as it is. */
+  --background: oklch(0.968 0.01 var(--preset-h));
+  --foreground: oklch(0.19 0.035 var(--preset-h));
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.19 0.035 var(--preset-h));
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.19 0.035 var(--preset-h));
+
+  /* One step below the card, for a table header, a toolbar strip or an inset
+     panel that has to be told apart from the sheet it sits on. */
+  --surface-subtle: oklch(0.982 0.005 var(--preset-h));
+
+  --primary: oklch(var(--preset-l) var(--preset-c) var(--preset-h));
+  --primary-foreground: var(--preset-on, oklch(0.99 0.002 var(--preset-h)));
+  /* Hover on a solid brand surface: one step lighter, not an opacity fade — a
+     translucent button picks up whatever is behind it, which on a table row is
+     a different colour from the one on a card. */
+  --primary-hover: oklch(
+    calc(var(--preset-l) + 0.08) var(--preset-c) var(--preset-h)
+  );
+
+  --secondary: oklch(0.958 0.008 var(--preset-h));
+  --secondary-foreground: oklch(0.24 0.03 var(--preset-h));
+  --muted: oklch(0.958 0.008 var(--preset-h));
+  --muted-foreground: oklch(0.472 0.03 var(--preset-h));
+  --accent: oklch(0.935 0.012 var(--preset-h));
+  --accent-foreground: oklch(0.24 0.03 var(--preset-h));
+
+  /* ---- Status ------------------------------------------------------------
+     Each status is four tokens, not one, because a status appears in three
+     jobs and one colour cannot do all of them: a solid fill under white text
+     (`--x` / `--x-foreground`), a wash behind a chip (`--x-subtle`), and a
+     label on that wash (`--x-text`). Reading all three off a single value is
+     how status chips end up either shouting or illegible. */
+  --destructive: oklch(0.577 0.215 27.3);
+  --destructive-foreground: oklch(0.99 0.004 27.3);
+  --destructive-subtle: oklch(0.968 0.018 27.3);
+  --destructive-text: oklch(0.505 0.19 27.3);
+
+  --success: oklch(0.508 0.105 165.6);
+  --success-foreground: oklch(0.99 0.01 165.6);
+  --success-subtle: oklch(0.968 0.028 165.6);
+  --success-text: oklch(0.48 0.105 165.6);
+
+  --warning: oklch(0.555 0.146 49);
+  --warning-foreground: oklch(0.99 0.015 49);
+  --warning-subtle: oklch(0.972 0.028 70);
+  --warning-text: oklch(0.525 0.146 49);
+
+  --info: oklch(0.5 0.119 242.7);
+  --info-foreground: oklch(0.99 0.005 242.7);
+  --info-subtle: oklch(0.968 0.022 242.7);
+  --info-text: oklch(0.475 0.119 242.7);
+
+  /* The status colour for "nothing in particular" — a draft, an archived row,
+     a count with no verdict attached. Without it every neutral chip borrows
+     `secondary` and stops being distinguishable from a button. */
+  --neutral: oklch(0.554 0.041 var(--preset-h));
+  --neutral-foreground: oklch(0.99 0.003 var(--preset-h));
+  --neutral-subtle: oklch(0.962 0.009 var(--preset-h));
+  --neutral-text: oklch(0.446 0.037 var(--preset-h));
+
+  /* `--input` sits a step darker than `--border`: a divider only has to be
+     seen, a field edge has to say where the control ends. It is also the
+     unchecked switch track and, at 30%, the dark-mode field fill, so it is
+     tuned to stay a legible grey in all three rather than pushed to the 3:1
+     an edge on its own could take. */
+  --border: oklch(0.888 0.012 var(--preset-h));
+  --input: oklch(0.79 0.016 var(--preset-h));
+  --ring: oklch(var(--preset-l) var(--preset-c) var(--preset-h));
+
+  /* Analogous ramp rotated off the brand hue — stays coherent for any preset. */
+  --chart-1: oklch(0.5 calc(var(--preset-c) + 0.04) var(--preset-h));
+  --chart-2: oklch(0.58 0.145 calc(var(--preset-h) + 60));
+  --chart-3: oklch(0.62 0.155 calc(var(--preset-h) + 130));
+  --chart-4: oklch(0.66 0.165 calc(var(--preset-h) + 200));
+  --chart-5: oklch(0.58 0.175 calc(var(--preset-h) + 285));
+
+  /* The rail is a solid brand surface — a real navy/emerald/rose panel, not a
+     tinted near-black — and stays that way in light mode. Surface, text, hover
+     and borders all derive from the same brand hue, so switching preset
+     repaints the whole rail, not just the active item. */
+  --sidebar: oklch(0.29 var(--preset-sidebar-c) var(--preset-h));
+  --sidebar-foreground: oklch(0.97 calc(var(--preset-sidebar-c) * 0.14) var(--preset-h));
+  --sidebar-accent: oklch(0.4 var(--preset-sidebar-c) var(--preset-h));
+  --sidebar-accent-foreground: oklch(0.985 calc(var(--preset-sidebar-c) * 0.08) var(--preset-h));
+  --sidebar-border: oklch(0.47 calc(var(--preset-sidebar-c) * 0.85) var(--preset-h));
+  /* The seal: fixed gold, on every preset. See §2. */
+  --sidebar-primary: var(--gold-400);
+  --sidebar-primary-foreground: oklch(0.22 calc(var(--preset-sidebar-c) * 1.1) var(--preset-h));
+  --sidebar-ring: var(--gold-400);
+
+  /* Elevation — the shadow has to read as an edge, not a haze, so each step
+     leads with a tight contact shadow and only then spreads. The tint is the
+     ink colour of the reference system (#0a1628) rather than pure black, which
+     is what keeps a stack of cards looking like paper. */
+  --elevation-1: 0 1px 2px 0 oklch(0.2 0.04 258 / 0.07);
+  --elevation-2: 0 1px 2px 0 oklch(0.2 0.04 258 / 0.06),
+    0 4px 12px -2px oklch(0.2 0.04 258 / 0.1);
+  --elevation-3: 0 1px 2px 0 oklch(0.2 0.04 258 / 0.06),
+    0 12px 32px -8px oklch(0.2 0.04 258 / 0.16);
+  --elevation-4: 0 2px 4px -1px oklch(0.2 0.04 258 / 0.1),
+    0 24px 64px -16px oklch(0.17 0.043 255 / 0.3);
+}
+
+/* --------------------------------------------------------------------------
+   4. Dark mode.
+   -------------------------------------------------------------------------- */
+
+.dark {
+  --background: oklch(0.135 0.016 var(--preset-h));
+  --foreground: oklch(0.955 0.008 var(--preset-h));
+
+  --card: oklch(0.185 0.018 var(--preset-h));
+  --card-foreground: oklch(0.955 0.008 var(--preset-h));
+  --popover: oklch(0.21 0.02 var(--preset-h));
+  --popover-foreground: oklch(0.955 0.008 var(--preset-h));
+
+  --surface-subtle: oklch(0.225 0.02 var(--preset-h));
+
+  --primary: oklch(var(--preset-l-dark) var(--preset-c-dark) var(--preset-h));
+  --primary-foreground: oklch(0.14 0.02 var(--preset-h));
+  --primary-hover: oklch(
+    calc(var(--preset-l-dark) + 0.06) var(--preset-c-dark) var(--preset-h)
+  );
+
+  --secondary: oklch(0.26 0.02 var(--preset-h));
+  --secondary-foreground: oklch(0.955 0.008 var(--preset-h));
+  --muted: oklch(0.26 0.02 var(--preset-h));
+  --muted-foreground: oklch(0.735 0.022 var(--preset-h));
+  --accent: oklch(0.3 0.024 var(--preset-h));
+  --accent-foreground: oklch(0.98 0.008 var(--preset-h));
+
+  --destructive: oklch(0.7 0.2 27.3);
+  --destructive-foreground: oklch(0.14 0.02 27.3);
+  --destructive-subtle: oklch(0.3 0.075 27.3);
+  --destructive-text: oklch(0.79 0.14 27.3);
+
+  --success: oklch(0.74 0.16 165.6);
+  --success-foreground: oklch(0.14 0.02 165.6);
+  --success-subtle: oklch(0.29 0.06 165.6);
+  --success-text: oklch(0.82 0.13 165.6);
+
+  --warning: oklch(0.83 0.15 75);
+  --warning-foreground: oklch(0.16 0.03 75);
+  --warning-subtle: oklch(0.31 0.06 60);
+  --warning-text: oklch(0.85 0.13 75);
+
+  --info: oklch(0.73 0.14 242.7);
+  --info-foreground: oklch(0.14 0.02 242.7);
+  --info-subtle: oklch(0.3 0.06 242.7);
+  --info-text: oklch(0.82 0.11 242.7);
+
+  --neutral: oklch(0.66 0.03 var(--preset-h));
+  --neutral-foreground: oklch(0.14 0.02 var(--preset-h));
+  --neutral-subtle: oklch(0.29 0.022 var(--preset-h));
+  --neutral-text: oklch(0.8 0.022 var(--preset-h));
+
+  --border: oklch(0.35 0.02 var(--preset-h));
+  --input: oklch(0.44 0.022 var(--preset-h));
+  --ring: oklch(var(--preset-l-dark) var(--preset-c-dark) var(--preset-h));
+
+  --chart-1: oklch(0.72 var(--preset-c-dark) var(--preset-h));
+  --chart-2: oklch(0.74 0.15 calc(var(--preset-h) + 60));
+  --chart-3: oklch(0.78 0.155 calc(var(--preset-h) + 130));
+  --chart-4: oklch(0.82 0.16 calc(var(--preset-h) + 200));
+  --chart-5: oklch(0.74 0.175 calc(var(--preset-h) + 285));
+
+  /* Same brand rail as light mode, one step darker so it sits calmly against
+     the near-black page background instead of glowing off it. */
+  --sidebar: oklch(0.215 var(--preset-sidebar-c) var(--preset-h));
+  --sidebar-foreground: oklch(0.97 calc(var(--preset-sidebar-c) * 0.14) var(--preset-h));
+  --sidebar-accent: oklch(0.34 var(--preset-sidebar-c) var(--preset-h));
+  --sidebar-accent-foreground: oklch(0.985 calc(var(--preset-sidebar-c) * 0.08) var(--preset-h));
+  --sidebar-border: oklch(0.4 calc(var(--preset-sidebar-c) * 0.85) var(--preset-h));
+  --sidebar-primary: var(--gold-400);
+  --sidebar-primary-foreground: oklch(0.2 calc(var(--preset-sidebar-c) * 1.1) var(--preset-h));
+  --sidebar-ring: var(--gold-400);
+
+  --elevation-1: 0 1px 2px 0 oklch(0 0 0 / 0.5);
+  --elevation-2: 0 1px 2px 0 oklch(0 0 0 / 0.6), 0 4px 12px -2px oklch(0 0 0 / 0.5);
+  --elevation-3: 0 1px 2px 0 oklch(0 0 0 / 0.6), 0 12px 32px -8px oklch(0 0 0 / 0.6);
+  --elevation-4: 0 2px 4px -1px oklch(0 0 0 / 0.6),
+    0 24px 64px -16px oklch(0 0 0 / 0.75);
+}
+
+/* --------------------------------------------------------------------------
+   5. Sidebar tone — opt out of the dark rail and let it match the surface.
+   Declared after the mode blocks so it wins on equal specificity.
+
+   The light rail is the classic institutional shell: a white panel with the
+   active row as a solid brand pill. `--sidebar-primary` reverts to the brand
+   colour there, because a gold pill on white cannot carry white text — on the
+   dark rail gold is a marker on a navy field, which it can.
+   -------------------------------------------------------------------------- */
+
+:root[data-sidebar-tone="light"] {
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.24 0.03 var(--preset-h));
+  --sidebar-accent: oklch(0.958 0.012 var(--preset-h));
+  --sidebar-accent-foreground: oklch(0.24 0.03 var(--preset-h));
+  --sidebar-border: var(--border);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-ring: var(--ring);
+}
+
+.dark[data-sidebar-tone="light"] {
+  --sidebar: oklch(0.165 0.018 var(--preset-h));
+  --sidebar-foreground: var(--foreground);
+  --sidebar-accent: oklch(0.27 0.022 var(--preset-h));
+  --sidebar-accent-foreground: oklch(0.98 0.008 var(--preset-h));
+  --sidebar-border: var(--border);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-ring: var(--ring);
+}
+
+/* --------------------------------------------------------------------------
+   6. Corner rounding.
+
+   `md` is 0.5rem rather than the shadcn 0.625rem: a business screen is mostly
+   rectangles meeting rectangles — table, card, field, chip — and the softer
+   radius reads as consumer software the moment several of them stack up.
+   -------------------------------------------------------------------------- */
+
+:root[data-radius="none"] {
+  --radius: 0rem;
+}
+:root[data-radius="sm"] {
+  --radius: 0.25rem;
+}
+:root[data-radius="md"] {
+  --radius: 0.5rem;
+}
+:root[data-radius="lg"] {
+  --radius: 0.75rem;
+}
+:root[data-radius="xl"] {
+  --radius: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   7. Density — one number that rescales the entire layout rhythm.
+
+   `--density-spacing` is wired to Tailwind's base spacing unit in `index.css`.
+   Every `p-*`, `gap-*`, `h-*` and `size-*` utility compiles to
+   `calc(var(--spacing) * n)`, so changing this single value retunes control
+   heights, table rows, card padding, the header and the nav rows together —
+   no per-component overrides and nothing to keep in sync.
+
+   Type size, borders and the sidebar width stay fixed on purpose: scaling
+   those as well makes compact mode unreadable rather than merely tighter.
+   -------------------------------------------------------------------------- */
+
+:root,
+:root[data-density="comfortable"] {
+  --density-spacing: 0.25rem;
+}
+
+:root[data-density="compact"] {
+  --density-spacing: 0.2125rem;
+}
+
+:root[data-density="spacious"] {
+  --density-spacing: 0.2875rem;
+}
+
+/* The shell gutters — the air around the content column, on all four sides.
+
+   Held here rather than as utility classes on the two components that need
+   them, because the header and the content column have to agree: they are one
+   vertical line down the page, and a stray `px-4` on one of them is visible
+   immediately. Both read these tokens, so they cannot drift.
+
+   `--shell-max-w` only bites on ultra-wide displays. Below it the gutter is
+   the padding alone, which keeps the whole thing density-driven — a viewport-
+   derived `mx-auto` margin stacked on top of the padding is exactly what made
+   the old layout ignore the density setting. */
+:root {
+  --shell-max-w: 1920px;
+  --shell-gutter-x: calc(var(--density-spacing) * 3);
+  --shell-gutter-y: calc(var(--density-spacing) * 3);
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --shell-gutter-x: calc(var(--density-spacing) * 4);
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --shell-gutter-x: calc(var(--density-spacing) * 5);
+    --shell-gutter-y: calc(var(--density-spacing) * 4);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   8. Motion — how a screen arrives.
+
+   A screen settles into place: it fades up a few pixels and stops. Nothing
+   slides across the viewport, nothing bounces, nothing outlasts the click that
+   caused it. The curve decelerates hard, so most of the movement happens in
+   the first third of the duration and the landing is soft — that is what reads
+   as "smooth" rather than "animated".
+
+   The frame carries the fade, its children carry the lift and arrive a beat
+   later. That split is what makes a screen look composed instead of shoved.
+
+   `prefers-reduced-motion` is honoured globally in `index.css`.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The reference system's working curve, for a state change that has to keep
+     up with the pointer rather than arrive. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* The frame. */
+  --screen-duration: 260ms;
+  --screen-scale: 0.995;
+
+  /* Its children. */
+  --screen-child-duration: 260ms;
+  --screen-child-lift: 10px;
+  --screen-child-step: 45ms;
+}

@@ -1,0 +1,90 @@
+# Where an account sits in the company: its organization, and optionally the
+# department inside that organization.
+#
+# Both nullable. An account is a way to sign in before it is a person on an org
+# chart — the seeded administrator, a service account, somebody not placed yet —
+# and requiring either would mean inventing an organization for every row that
+# already exists.
+#
+# The interesting part of this changeset is not the two columns but the three
+# constraints that stop them from disagreeing with each other. See the comments
+# on each.
+databaseChangeLog:
+  - changeSet:
+      id: 011-add-user-placement
+      author: dth
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: organization_id
+                  type: bigint
+              - column:
+                  name: department_id
+                  type: bigint
+
+        # 1. The organization on its own. RESTRICT, like everywhere else in
+        #    this schema: deleting an organization somebody still belongs to is
+        #    refused rather than quietly emptying the field on their account.
+        - addForeignKeyConstraint:
+            baseTableName: users
+            baseColumnNames: organization_id
+            constraintName: fk_users_organization
+            referencedTableName: organizations
+            referencedColumnNames: id
+            onDelete: RESTRICT
+
+        # 2. The pair. This is what holds the invariant "a user's department
+        #    belongs to that user's organization", and it holds it against
+        #    every writer — this application, a second one, a hand-run UPDATE.
+        #
+        #    Postgres needs the referenced columns to carry a unique constraint
+        #    of their own, hence the one added here: (organization_id, id) on a
+        #    table whose id is already the primary key is trivially unique, so
+        #    it costs an index and rules out nothing.
+        #
+        #    It also refuses to move a department to another organization while
+        #    anybody is still in it, which is the case that would otherwise
+        #    leave those accounts pointing across company lines. That refusal
+        #    is deliberate: working it out in the department feature would mean
+        #    reading the user table from a slice with no business doing so.
+        - addUniqueConstraint:
+            tableName: departments
+            columnNames: organization_id, id
+            constraintName: uq_departments_organization_id_id
+        - addForeignKeyConstraint:
+            baseTableName: users
+            baseColumnNames: organization_id, department_id
+            constraintName: fk_users_department_in_organization
+            referencedTableName: departments
+            referencedColumnNames: organization_id, id
+            onDelete: RESTRICT
+
+        # 3. The hole the pair leaves. A composite foreign key defaults to
+        #    MATCH SIMPLE, which skips the check entirely when *any* column is
+        #    NULL. That is what makes (organization, no department) legal, which
+        #    is wanted — but it makes (no organization, department) legal too,
+        #    which is nonsense. MATCH FULL would close it and also forbid the
+        #    case we want, so the check is spelled out instead.
+        - sql:
+            sql: >-
+              ALTER TABLE users ADD CONSTRAINT ck_users_department_needs_organization
+              CHECK (department_id IS NULL OR organization_id IS NOT NULL)
+            rollbackSql: >-
+              ALTER TABLE users DROP CONSTRAINT ck_users_department_needs_organization
+
+        # The user list filters by both, and the foreign keys above are checked
+        # on every delete of an organization or department.
+        - createIndex:
+            tableName: users
+            indexName: idx_users_organization_id
+            columns:
+              - column:
+                  name: organization_id
+        - createIndex:
+            tableName: users
+            indexName: idx_users_department_id
+            columns:
+              - column:
+                  name: department_id

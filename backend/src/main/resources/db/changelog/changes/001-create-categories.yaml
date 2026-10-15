@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-categories
+      author: dth
+      changes:
+        - createTable:
+            tableName: categories
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_categories
+              - column:
+                  name: title
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: categories
+            indexName: idx_categories_title
+            columns:
+              - column:
+                  name: title

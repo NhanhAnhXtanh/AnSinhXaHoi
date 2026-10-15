@@ -1,0 +1,62 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.dth'
+version = '0.0.1-SNAPSHOT'
+description = 'dth-framework'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // Authentication / authorisation. The resource-server starter is what pulls
+    // in Nimbus JOSE, which is how access tokens are signed and verified — see
+    // shared/security/JwtService.
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    // The live channel. STOMP over WebSocket rather than raw frames, because it
+    // is what lets the access token travel in the CONNECT frame -- the browser's
+    // WebSocket constructor cannot set an Authorization header.
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // Row-level security reports two things an operator has to be able to see
+    // without reading logs: whether any policy had to be quarantined at boot
+    // (RowLevelHealthIndicator), and how often the deliberate bypass is used
+    // (the rowlevel.bypass counter). Both need actuator, and it is what brings
+    // Micrometer with it.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // Not runtimeOnly: PostgresEventBus compiles against PGConnection to
+    // hold a LISTEN subscription, which is how permission changes and
+    // notifications reach the other nodes. That is the one place this
+    // application knows which database it is talking to.
+    implementation 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-liquibase-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Source files are UTF-8, and on Windows javac would otherwise read them with
+// the platform charset -- which is silent for comments and javadoc, and turns
+// any non-ASCII character in a *string literal* into mojibake the first time
+// somebody sees it in an API response or a health check.
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

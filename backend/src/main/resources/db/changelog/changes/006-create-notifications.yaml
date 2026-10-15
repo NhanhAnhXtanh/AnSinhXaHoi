@@ -1,0 +1,79 @@
+# Notifications: something the application wants one person to know about.
+#
+# The row is the record and the WebSocket is only the delivery. Anyone offline
+# when a notification is raised finds it here on their next sign-in, which is
+# why this table exists at all rather than the message living solely on the
+# live channel — a message that only ever existed on a socket is gone for
+# whoever was not connected, and that cannot be recovered afterwards.
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-notifications
+      author: dth
+      changes:
+        - createTable:
+            tableName: notifications
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_notifications
+              # Whose notification this is. Every read is scoped to the signed-in
+              # account, so this is the column every query filters on.
+              - column:
+                  name: recipient_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_notifications_recipient
+                    references: users(id)
+                    # CASCADE, unlike user_roles' RESTRICT: a deleted account's
+                    # notifications are meaningless to keep, and refusing the
+                    # delete over them would be absurd.
+                    deleteCascade: true
+              # A coarse kind, for the icon and colour the UI picks. Deliberately
+              # not a per-feature enum: the notification is written by whichever
+              # feature raised it, and this table should not need a migration to
+              # learn about a new one.
+              - column:
+                  name: level
+                  type: varchar(32)
+                  defaultValue: INFO
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: body
+                  type: varchar(2000)
+              # Where clicking it should go, as a frontend route. Null for a
+              # notification with nothing to open.
+              - column:
+                  name: link
+                  type: varchar(500)
+              # Null until read, rather than a boolean, so that "when did they
+              # see it" is answerable without a second column.
+              - column:
+                  name: read_at
+                  type: timestamp with time zone
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        # The bell asks two questions on every page load — the unread count and
+        # the newest few — and both are this index.
+        - createIndex:
+            tableName: notifications
+            indexName: idx_notifications_recipient_created
+            columns:
+              - column:
+                  name: recipient_id
+              - column:
+                  name: created_at
+                  descending: true

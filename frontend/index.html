@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The navy the shell's rail is painted in, so the mobile browser chrome matches it. -->
+    <meta name="theme-color" content="#0b2e5c" />
+    <meta name="description" content="DTH Framework — admin dashboard." />
+
+    <title>DTH Framework</title>
+
+    <!--
+      Theme bootstrap. Runs before the first paint so the shell never flashes
+      the wrong mode or brand colour on reload.
+
+      Keys and defaults must stay in sync with `src/lib/theme.ts`.
+    -->
+    <script>
+      (function () {
+        var d = document.documentElement;
+
+        function read(key, allowed, fallback) {
+          try {
+            var value = localStorage.getItem(key);
+            return allowed.indexOf(value) !== -1 ? value : fallback;
+          } catch (error) {
+            return fallback;
+          }
+        }
+
+        var mode = read("dth-ui-mode", ["light", "dark", "system"], "system");
+        var isDark =
+          mode === "dark" ||
+          (mode === "system" &&
+            typeof matchMedia === "function" &&
+            matchMedia("(prefers-color-scheme: dark)").matches);
+
+        d.classList.toggle("dark", isDark);
+        d.style.colorScheme = isDark ? "dark" : "light";
+
+        d.setAttribute(
+          "data-color-preset",
+          read(
+            "dth-ui-color",
+            [
+              "navy",
+              "blue",
+              "indigo",
+              "violet",
+              "emerald",
+              "teal",
+              "rose",
+              "orange",
+              "amber",
+              "slate",
+            ],
+            "navy"
+          )
+        );
+        d.setAttribute(
+          "data-radius",
+          read("dth-ui-radius", ["none", "sm", "md", "lg", "xl"], "md")
+        );
+        d.setAttribute(
+          "data-sidebar-tone",
+          read("dth-ui-sidebar-tone", ["dark", "light"], "dark")
+        );
+        d.setAttribute(
+          "data-density",
+          read(
+            "dth-ui-density",
+            ["compact", "comfortable", "spacious"],
+            "comfortable"
+          )
+        );
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/app/index.tsx"></script>
+  </body>
+</html>

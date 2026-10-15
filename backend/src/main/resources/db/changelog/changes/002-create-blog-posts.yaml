@@ -1,0 +1,68 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-blog-posts
+      author: dth
+      changes:
+        - createTable:
+            tableName: blog_posts
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_blog_posts
+              - column:
+                  name: title
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: DRAFT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: category_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: blog_posts
+            baseColumnNames: category_id
+            constraintName: fk_blog_posts_category
+            referencedTableName: categories
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # The list view sorts by created_at by default and filters by category
+        # and status, so those are the three worth indexing up front.
+        - createIndex:
+            tableName: blog_posts
+            indexName: idx_blog_posts_created_at
+            columns:
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: blog_posts
+            indexName: idx_blog_posts_category_id
+            columns:
+              - column:
+                  name: category_id
+        - createIndex:
+            tableName: blog_posts
+            indexName: idx_blog_posts_status
+            columns:
+              - column:
+                  name: status

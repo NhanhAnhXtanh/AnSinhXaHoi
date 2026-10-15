@@ -1,0 +1,137 @@
+# Tasks: a unit of work somebody is expected to do.
+#
+# Everything but the title and the two enums is nullable, and deliberately so: a
+# task is usually raised before it is known who will do it, when it is due, or
+# which team owns it.
+databaseChangeLog:
+  - changeSet:
+      id: 013-create-tasks
+      author: dth
+      changes:
+        - createTable:
+            tableName: tasks
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_tasks
+              - column:
+                  name: title
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: text
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: TODO
+                  constraints:
+                    nullable: false
+              - column:
+                  name: priority
+                  type: varchar(32)
+                  defaultValue: MEDIUM
+                  constraints:
+                    nullable: false
+              - column:
+                  name: assignee_id
+                  type: bigint
+              - column:
+                  name: department_id
+                  type: bigint
+              # A date, not a timestamp: a deadline is a day, not a moment.
+              - column:
+                  name: due_date
+                  type: date
+              # Derived from the status by the service and never accepted from a
+              # request, which is what stops the two from disagreeing.
+              - column:
+                  name: completed_at
+                  type: timestamp with time zone
+              - column:
+                  name: created_by_id
+                  type: bigint
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+
+        # RESTRICT on the two that describe the work now: deleting an account or
+        # a department that still has tasks against it should be a decision
+        # somebody makes, not a side effect that silently unassigns them.
+        - addForeignKeyConstraint:
+            baseTableName: tasks
+            baseColumnNames: assignee_id
+            constraintName: fk_tasks_assignee
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: tasks
+            baseColumnNames: department_id
+            constraintName: fk_tasks_department
+            referencedTableName: departments
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # SET NULL on the one that describes the past. Who filed a task is worth
+        # keeping, but not worth refusing to delete a leaver's account over —
+        # and unlike the assignee, nothing is waiting on it.
+        - addForeignKeyConstraint:
+            baseTableName: tasks
+            baseColumnNames: created_by_id
+            constraintName: fk_tasks_created_by
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: SET NULL
+
+        # The list sorts by created_at by default and filters by every one of
+        # these; the two foreign keys above are also checked on every delete of
+        # a user or a department.
+        - createIndex:
+            tableName: tasks
+            indexName: idx_tasks_created_at
+            columns:
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: tasks
+            indexName: idx_tasks_assignee_id
+            columns:
+              - column:
+                  name: assignee_id
+        - createIndex:
+            tableName: tasks
+            indexName: idx_tasks_department_id
+            columns:
+              - column:
+                  name: department_id
+        - createIndex:
+            tableName: tasks
+            indexName: idx_tasks_created_by_id
+            columns:
+              - column:
+                  name: created_by_id
+        - createIndex:
+            tableName: tasks
+            indexName: idx_tasks_status
+            columns:
+              - column:
+                  name: status
+        # The "what is late" question reads both of these together.
+        - createIndex:
+            tableName: tasks
+            indexName: idx_tasks_due_date_status
+            columns:
+              - column:
+                  name: due_date
+              - column:
+                  name: status
