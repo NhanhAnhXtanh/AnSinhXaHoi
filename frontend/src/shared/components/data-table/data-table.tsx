@@ -10,7 +10,7 @@ import {
   ArrowUp,
   ChevronsUpDown,
   Inbox,
-  Loader2,
+  LoaderCircle,
   ShieldOff,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -346,7 +346,7 @@ export function DataTable<TData extends BaseRecord>({
                     colSpan={leafColumns.length}
                     className={cn("absolute", "inset-0", "pointer-events-none")}
                   >
-                    <Loader2
+                    <LoaderCircle
                       className={cn(
                         "absolute",
                         "top-1/2",

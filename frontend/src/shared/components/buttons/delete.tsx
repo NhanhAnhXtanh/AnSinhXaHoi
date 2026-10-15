@@ -6,7 +6,7 @@ import {
   type DeleteOneResponse,
   useDeleteButton,
 } from "@refinedev/core";
-import { Loader2, Trash } from "lucide-react";
+import { LoaderCircle, Trash } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 import {
@@ -120,7 +120,7 @@ export const DeleteButton = React.forwardRef<
           aria-label={rest["aria-label"] ?? (iconOnly ? label : undefined)}
         >
           {loading && (
-            <Loader2
+            <LoaderCircle
               className={cn("h-4 w-4 animate-spin", !iconOnly && "mr-2")}
             />
           )}

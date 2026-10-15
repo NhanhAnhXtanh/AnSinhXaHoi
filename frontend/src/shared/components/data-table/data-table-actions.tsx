@@ -8,7 +8,7 @@ import type { Column } from "@tanstack/react-table";
 import {
   Columns3Icon,
   DownloadIcon,
-  Loader2Icon,
+  LoaderCircleIcon,
   RefreshCwIcon,
 } from "lucide-react";
 
@@ -269,7 +269,7 @@ export function DataTableExport<TData extends BaseRecord>({
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="outline" className={className}>
           {isLoading ? (
-            <Loader2Icon className="animate-spin" />
+            <LoaderCircleIcon className="animate-spin" />
           ) : (
             <DownloadIcon />
           )}

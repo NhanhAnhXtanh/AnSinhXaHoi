@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import { Home } from "lucide-react";
+import { House } from "lucide-react";
 import {
   matchResourceFromRoute,
   useBreadcrumb,
@@ -35,7 +35,7 @@ export function Breadcrumb() {
       Component: (
         <Link to={rootRouteResource.matchedRoute ?? "/"}>
           {rootRouteResource?.resource?.meta?.icon ?? (
-            <Home className="h-4 w-4" />
+            <House className="h-4 w-4" />
           )}
         </Link>
       ),

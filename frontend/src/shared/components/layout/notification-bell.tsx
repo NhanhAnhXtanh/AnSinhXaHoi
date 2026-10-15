@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import {
-  AlertTriangleIcon,
   BellIcon,
   CheckCheckIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   InfoIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 
 import { useNotifications, type Notification } from "@/shared/hooks/use-notifications";
@@ -126,7 +126,7 @@ export function NotificationBell() {
 const LEVEL_ICON = {
   INFO: InfoIcon,
   SUCCESS: CircleCheckIcon,
-  WARNING: AlertTriangleIcon,
+  WARNING: TriangleAlertIcon,
   ERROR: CircleAlertIcon,
 } as const;
 

@@ -1,7 +1,7 @@
 import type { ResourceProps } from "@refinedev/core";
 import {
   Bell,
-  Building2,
+  BuildingComplex,
   LayoutDashboard,
   KeyRound,
   ListChecks,
@@ -138,7 +138,7 @@ export const resources: ResourceProps[] = [
     meta: {
       label: "Organizations",
       canDelete: true,
-      icon: <Building2 className="h-4 w-4" />,
+      icon: <BuildingComplex className="h-4 w-4" />,
       parent: "structure",
     },
   },
