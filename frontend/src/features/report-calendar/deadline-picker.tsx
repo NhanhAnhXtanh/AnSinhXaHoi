@@ -7,7 +7,7 @@ import { Calendar } from "@/shared/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { cn } from "@/shared/lib/utils";
 
-import { addDays, fromIso, toIso } from "./fixtures";
+import { addDays, fromIso, toIso } from "./model";
 
 const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const WEEKDAY_NAMES = [

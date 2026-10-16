@@ -1,49 +1,68 @@
-import { useMemo } from "react";
+import { useList, useOne, useUpdate, type HttpError } from "@refinedev/core";
 import { useNavigate, useParams } from "react-router";
-import { Building } from "lucide-react";
+import { Building, RefreshCw, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
-import { AsxhPage, EmptyState, StatusBadge } from "@/shared/components/asxh";
+import {
+  AsxhPage,
+  EmptyState,
+  LoadingState,
+  StatusBadge,
+} from "@/shared/components/asxh";
 import { Button } from "@/shared/ui/button";
 
 import { UnitAccountsPanel } from "./accounts-panel";
 import {
-  KHOI_LEVEL_LABELS,
-  findUnit,
-  khoiOf,
-  updateUnit,
-  useReportUnits,
-} from "./store";
-import { UnitForm, type UnitFormValues } from "./unit-form";
+  BLOCK_LEVEL_LABELS,
+  TREE_PAGE_SIZE,
+  UNIT_RESOURCE,
+  apiErrorMessage,
+  type ApiError,
+  type ReportUnit,
+  type ReportUnitPayload,
+} from "./model";
+import { UnitForm, showServerError, type UnitFormValues } from "./unit-form";
 
 const LIST_PATH = "/report-units";
 
-/** Sửa đơn vị — Figma 310:35692: form + panel Tài khoản của đơn vị. */
+function toFormValues(unit: ReportUnit): UnitFormValues {
+  return {
+    budgetCode: unit.budgetCode,
+    name: unit.name,
+    parentId: unit.parent ? String(unit.parent.id) : "",
+    unitType: unit.unitType,
+    active: unit.active,
+    receivesReports: unit.receivesReports,
+  };
+}
+
+/**
+ * Sửa đơn vị — Figma 310:35692: form + panel Tài khoản của đơn vị.
+ * `GET` + `PATCH /api/report_units/{id}`; ngừng hoạt động lan xuống cây con do máy chủ làm.
+ */
 export function ReportUnitEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const units = useReportUnits();
-  const unit = findUnit(units, id);
+  const unitId = Number(id);
+  const validId = Number.isInteger(unitId) && unitId > 0;
 
-  // Giá trị ban đầu chỉ lấy một lần theo đơn vị; panel tài khoản đổi kho
-  // đơn vị nhưng không được xoá những gì người dùng đang gõ dở trên form.
-  const defaultValues = useMemo<UnitFormValues | null>(
-    () =>
-      unit
-        ? {
-            code: unit.code,
-            name: unit.name,
-            parentId: unit.parentId ?? "",
-            type: unit.type,
-            active: unit.active,
-            receivesReports: unit.receivesReports,
-          }
-        : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [unit?.id]
-  );
+  const { result: unit, query: unitQuery } = useOne<ReportUnit>({
+    resource: UNIT_RESOURCE,
+    id: unitId,
+    errorNotification: false,
+    queryOptions: { enabled: validId },
+  });
+  const { result: tree, query: treeQuery } = useList<ReportUnit>({
+    resource: UNIT_RESOURCE,
+    pagination: { currentPage: 1, pageSize: TREE_PAGE_SIZE },
+    errorNotification: false,
+  });
+  const { mutateAsync: update } = useUpdate<ReportUnit, HttpError, ReportUnitPayload>();
 
-  if (!unit || !defaultValues) {
+  const notFound =
+    !validId || (unitQuery.isError && (unitQuery.error as ApiError | null)?.statusCode === 404);
+
+  if (notFound) {
     return (
       <AsxhPage title="Sửa đơn vị" backTo={LIST_PATH}>
         <EmptyState
@@ -61,10 +80,47 @@ export function ReportUnitEdit() {
     );
   }
 
-  const parent = findUnit(units, unit.parentId);
+  if (unitQuery.isError || treeQuery.isError) {
+    return (
+      <AsxhPage title="Sửa đơn vị" backTo={LIST_PATH}>
+        <EmptyState
+          variant="page"
+          icon={TriangleAlert}
+          title="Chưa tải được thông tin đơn vị"
+          description={apiErrorMessage(
+            unitQuery.error ?? treeQuery.error,
+            "Không kết nối được máy chủ. Bạn kiểm tra mạng rồi thử lại."
+          )}
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void unitQuery.refetch();
+                void treeQuery.refetch();
+              }}
+            >
+              <RefreshCw aria-hidden />
+              Thử lại
+            </Button>
+          }
+        />
+      </AsxhPage>
+    );
+  }
+
+  // Form chỉ dựng khi đã có bản ghi: giá trị ban đầu của react-hook-form chỉ đọc một lần.
+  if (!unit || unitQuery.isLoading || treeQuery.isLoading) {
+    return (
+      <AsxhPage title="Sửa đơn vị" backTo={LIST_PATH}>
+        <LoadingState variant="page" label="Đang tải thông tin đơn vị…" />
+      </AsxhPage>
+    );
+  }
+
   const subtitle = [
-    parent ? `Thuộc ${parent.name}` : "Đơn vị cao nhất",
-    KHOI_LEVEL_LABELS[khoiOf(unit.type)],
+    unit.parent ? `Thuộc ${unit.parent.name}` : "Đơn vị cao nhất",
+    BLOCK_LEVEL_LABELS[unit.block],
   ].join(" · ");
 
   return (
@@ -80,20 +136,42 @@ export function ReportUnitEdit() {
     >
       <UnitForm
         key={unit.id}
-        units={units}
+        units={tree.data ?? []}
         editing={unit}
-        defaultValues={defaultValues}
+        defaultValues={toFormValues(unit)}
         onCancel={() => navigate(LIST_PATH)}
-        onSubmit={(values) => {
-          updateUnit(unit.id, {
-            name: values.name,
-            type: values.type,
-            parentId: values.parentId,
-            active: values.active,
-            receivesReports: values.receivesReports,
-          });
-          toast.success(`Đã lưu đơn vị ${values.name}.`);
+        onSubmit={async (values, { setFieldError }) => {
+          const deactivating = unit.active && !values.active;
+          try {
+            await update({
+              resource: UNIT_RESOURCE,
+              id: unit.id,
+              // Không gửi mã (bất biến) và khối (máy chủ tự theo loại đơn vị mới).
+              values: {
+                name: values.name,
+                parent: { id: values.parentId },
+                unitType: values.unitType,
+                active: values.active,
+                receivesReports: values.receivesReports,
+              },
+              successNotification: false,
+              errorNotification: false,
+            });
+          } catch (error) {
+            showServerError(
+              error,
+              setFieldError,
+              "Chưa lưu được đơn vị. Bạn thử lại sau ít phút."
+            );
+            return false;
+          }
+          toast.success(
+            deactivating
+              ? `Đã lưu đơn vị ${values.name}. Đơn vị và các đơn vị cấp dưới đã ngừng hoạt động.`
+              : `Đã lưu đơn vị ${values.name}.`
+          );
           navigate(LIST_PATH);
+          return true;
         }}
       />
       <UnitAccountsPanel unit={unit} />

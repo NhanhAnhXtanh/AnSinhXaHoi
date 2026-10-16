@@ -1,7 +1,14 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { CalendarX, TriangleAlert } from "lucide-react";
 
-import { EmptyState, StatusBadge, TwoLineCell, formatDate } from "@/shared/components/asxh";
+import {
+  EmptyState,
+  LoadingState,
+  StatusBadge,
+  TwoLineCell,
+  formatDate,
+} from "@/shared/components/asxh";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import {
   Table,
@@ -13,8 +20,14 @@ import {
 } from "@/shared/ui/table";
 
 import { DeadlinePicker } from "./deadline-picker";
-import { KIND_LABELS, KIND_ORDER, type CalendarPeriod, type PeriodKind } from "./fixtures";
-import { PERIOD_STATUS_LABELS, PERIOD_STATUS_TONES } from "./store";
+import {
+  KIND_LABELS,
+  KIND_ORDER,
+  PERIOD_STATUS_VIEW,
+  deadlineLockReason,
+  type PeriodKind,
+  type PeriodRow,
+} from "./model";
 
 type TabValue = "all" | PeriodKind;
 
@@ -26,19 +39,25 @@ export function PeriodPreviewPanel({
   periods,
   kinds,
   daysValid,
+  loading,
+  error,
   onDeadlineChange,
 }: {
-  periods: CalendarPeriod[];
+  periods: PeriodRow[];
   kinds: PeriodKind[];
   /** Hạn nộp (ngày) hợp lệ — không hợp lệ thì không vẽ xem trước (UC-06 3b). */
   daysValid: boolean;
-  onDeadlineChange: (periodId: string, iso: string) => void;
+  /** Đang tải kỳ đã lưu / khung xem trước lần đầu. */
+  loading?: boolean;
+  /** Câu báo lỗi khi không tải được; kèm nút thử lại nếu có. */
+  error?: { message: string; action?: ReactNode } | null;
+  onDeadlineChange: (slot: string, iso: string) => void;
 }) {
   const [tab, setTab] = useState<TabValue>("all");
   const shownKinds = KIND_ORDER.filter((k) => kinds.includes(k));
   const activeTab: TabValue = tab !== "all" && !kinds.includes(tab) ? "all" : tab;
   const rows = activeTab === "all" ? periods : periods.filter((p) => p.kind === activeTab);
-  const ready = daysValid && kinds.length > 0;
+  const ready = daysValid && kinds.length > 0 && !loading && !error;
 
   return (
     <section className="bg-card text-card-foreground border-border flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border shadow-e1">
@@ -61,6 +80,15 @@ export function PeriodPreviewPanel({
           title="Chưa chọn loại kỳ nào"
           description="Chọn ít nhất một loại kỳ cần sinh ở bên trái để xem các kỳ sẽ tạo."
         />
+      ) : error ? (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Chưa xem được các kỳ"
+          description={error.message}
+          action={error.action}
+        />
+      ) : loading ? (
+        <LoadingState label="Đang tải các kỳ…" />
       ) : (
         <>
           <div className="shrink-0 px-6 pt-4 pb-3">
@@ -90,30 +118,28 @@ export function PeriodPreviewPanel({
               </TableHeader>
               <TableBody>
                 {rows.map((p) => {
-                  const locked = p.status === "da-chot";
+                  const view = PERIOD_STATUS_VIEW[p.status] ?? PERIOD_STATUS_VIEW.draft;
                   return (
-                    <TableRow key={p.id}>
+                    <TableRow key={p.slot}>
                       <TableCell className="ps-6">
                         <TwoLineCell
                           primary={p.name}
-                          secondary={`${formatDate(p.from)} – ${formatDate(p.to)}`}
+                          secondary={`${formatDate(p.fromDate)} – ${formatDate(p.toDate)}`}
                         />
                       </TableCell>
                       <TableCell>{KIND_LABELS[p.kind]}</TableCell>
                       <TableCell>
                         <DeadlinePicker
                           value={p.deadline}
-                          periodEnd={p.to}
+                          periodEnd={p.toDate}
                           periodName={p.name}
-                          disabled={locked}
-                          disabledReason="Kỳ đã chốt nên không sửa được hạn nộp."
-                          onChange={(iso) => onDeadlineChange(p.id, iso)}
+                          disabled={!p.editable}
+                          disabledReason={deadlineLockReason(p.status)}
+                          onChange={(iso) => onDeadlineChange(p.slot, iso)}
                         />
                       </TableCell>
                       <TableCell className="pe-6">
-                        <StatusBadge tone={PERIOD_STATUS_TONES[p.status]}>
-                          {PERIOD_STATUS_LABELS[p.status]}
-                        </StatusBadge>
+                        <StatusBadge tone={view.tone}>{view.label}</StatusBadge>
                       </TableCell>
                     </TableRow>
                   );

@@ -7,7 +7,8 @@ import java.util.List;
 /**
  * Tóm tắt một lần cập nhật lịch cho hộp xác nhận "Cập nhật lịch báo cáo" (UC-21 bước 3):
  * thêm loại kỳ X (tạo mới N kỳ), bỏ loại kỳ Y (xoá N kỳ chưa gán), hạn nộp a → b ngày
- * (tính lại cho N kỳ chưa gán), các kỳ đã gán giữ hạn cũ. {@code empty = true} thì hiện
+ * (tính lại cho N kỳ chưa gán), các kỳ đã gán giữ hạn cũ, các kỳ đã sửa tay hạn nộp
+ * ({@code manualDeadlineCodes}) cũng giữ nguyên. {@code empty = true} thì hiện
  * "Không có thay đổi nào để cập nhật."
  */
 public record CalendarUpdatePlanResponse(
@@ -19,6 +20,7 @@ public record CalendarUpdatePlanResponse(
         int newDeadlineDays,
         int rescheduledPeriods,
         List<String> keptDeadlineCodes,
+        List<String> manualDeadlineCodes,
         boolean empty) {
 
     public static CalendarUpdatePlanResponse from(ReportCalendarService.UpdatePlan plan) {
@@ -31,6 +33,7 @@ public record CalendarUpdatePlanResponse(
                 plan.newDeadlineDays(),
                 plan.rescheduledPeriods(),
                 plan.keptDeadlineCodes(),
+                plan.manualDeadlineCodes(),
                 plan.isEmpty());
     }
 }

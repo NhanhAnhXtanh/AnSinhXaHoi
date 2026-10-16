@@ -1,7 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useWarnAboutChange } from "@refinedev/core";
+import { LoaderCircle } from "lucide-react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { ConfirmDialog } from "@/shared/components/asxh";
@@ -29,70 +32,115 @@ import { Switch } from "@/shared/ui/switch";
 import {
   UNIT_TYPES,
   UNIT_TYPE_LABELS,
+  apiErrorMessage,
+  apiFieldErrors,
+  childIndex,
+  descendantIds,
   type ReportUnit,
   type UnitType,
-} from "./fixtures";
-import { childrenOf, descendantIds } from "./store";
+} from "./model";
 
 /** Giá trị của ô Đơn vị cấp trên khi để trống — Select không nhận value rỗng. */
 const NO_PARENT = "__none__";
 
 export type UnitFormValues = {
-  code: string;
+  budgetCode: string;
   name: string;
-  /** "" = không có cấp trên. */
+  /** "" = không có cấp trên; còn lại là id dạng chuỗi (Select chỉ nhận chuỗi). */
   parentId: string;
   /** "" = chưa chọn. */
-  type: string;
+  unitType: string;
   active: boolean;
   receivesReports: boolean;
 };
 
 export type UnitFormResult = {
-  code: string;
+  budgetCode: string;
   name: string;
-  parentId: string | null;
-  type: UnitType;
+  parentId: number | null;
+  unitType: UnitType;
   active: boolean;
   receivesReports: boolean;
 };
 
+/** Tên ô của form — để trang gắn lỗi máy chủ trả về vào đúng ô. */
+export type UnitFormField = keyof UnitFormValues;
+
+export type UnitFormHelpers = {
+  setFieldError: (field: UnitFormField, message: string) => void;
+};
+
+/** Tên trường máy chủ → ô của form. */
+const SERVER_FIELDS: Record<string, UnitFormField> = {
+  budgetCode: "budgetCode",
+  name: "name",
+  parent: "parentId",
+  unitType: "unitType",
+};
+
+/**
+ * Đặt lỗi máy chủ trả về vào đúng ô (mã trùng, cấp trên tạo vòng, lỗi kiểm tra
+ * từng ô); lỗi không thuộc ô nào thì hiện thông báo nổi.
+ */
+export function showServerError(
+  error: unknown,
+  setFieldError: UnitFormHelpers["setFieldError"],
+  fallback: string
+) {
+  let placed = false;
+  for (const [key, message] of Object.entries(apiFieldErrors(error))) {
+    const field = SERVER_FIELDS[key];
+    if (field) {
+      setFieldError(field, message);
+      placed = true;
+    }
+  }
+  if (placed) return;
+  const message = apiErrorMessage(error, fallback);
+  if (/^Mã đơn vị/.test(message)) setFieldError("budgetCode", message);
+  else if (/^Đơn vị cha/.test(message)) setFieldError("parentId", message);
+  else toast.error(message);
+}
+
 function buildSchema(units: ReportUnit[], editing: ReportUnit | undefined) {
+  const index = childIndex(units);
   const blockedParents = editing
-    ? new Set([editing.id, ...descendantIds(units, editing.id)])
-    : new Set<string>();
+    ? new Set([editing.id, ...descendantIds(index, editing.id)])
+    : new Set<number>();
+  const takenCodes = new Set(units.map((u) => u.budgetCode.toLocaleLowerCase("vi")));
 
   return z
     .object({
-      code: z
+      budgetCode: z
         .string()
         .trim()
         .min(1, "Hãy nhập mã quan hệ ngân sách.")
-        .regex(/^\d{7}$/, "Mã quan hệ ngân sách gồm 7 chữ số, ví dụ 1052345."),
+        .max(32, "Mã quan hệ ngân sách dài quá 32 ký tự.")
+        .regex(
+          /^[A-Za-z0-9._-]+$/,
+          "Mã chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang, ví dụ 1052345."
+        ),
       name: z
         .string()
         .trim()
         .min(1, "Hãy nhập tên đơn vị.")
         .max(255, "Tên đơn vị dài quá 255 ký tự. Hãy rút gọn lại."),
       parentId: z.string(),
-      type: z
+      unitType: z
         .string()
         .refine((v) => (UNIT_TYPES as string[]).includes(v), "Hãy chọn loại đơn vị."),
       active: z.boolean(),
       receivesReports: z.boolean(),
     })
     .superRefine((v, ctx) => {
-      if (
-        !editing &&
-        units.some((u) => u.code === v.code.trim())
-      ) {
+      if (!editing && takenCodes.has(v.budgetCode.trim().toLocaleLowerCase("vi"))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["code"],
-          message: "Mã này đã có đơn vị khác dùng. Hãy nhập mã khác.",
+          path: ["budgetCode"],
+          message: "Mã đơn vị này đã tồn tại. Vui lòng nhập mã khác.",
         });
       }
-      if (v.parentId && blockedParents.has(v.parentId)) {
+      if (v.parentId && blockedParents.has(Number(v.parentId))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["parentId"],
@@ -125,6 +173,10 @@ const ITEM_CLASS = "gap-1.5";
 /**
  * Form Đơn vị, dùng chung cho Thêm và Sửa. Lưới 3 cột đều theo Figma
  * (310:31992 / 310:35692): Mã | Tên | Cấp trên ; Loại | Trạng thái | Phiếu báo cáo.
+ *
+ * Rời trang khi còn thay đổi chưa lưu: form báo cho Refine qua `setWarnWhen`, và
+ * `UnsavedChangesGuard` của khung ứng dụng hỏi bằng hộp thoại của ứng dụng (CLAUDE.md
+ * "Leaving a form with unsaved edits"). Nút Huỷ điều hướng bình thường nên cũng được hỏi.
  */
 export function UnitForm({
   units,
@@ -133,11 +185,13 @@ export function UnitForm({
   onSubmit,
   onCancel,
 }: {
+  /** Cả cây đơn vị — để dựng ô cấp trên và kiểm mã trùng. */
   units: ReportUnit[];
   /** Đơn vị đang sửa; bỏ trống = thêm mới. */
   editing?: ReportUnit;
   defaultValues: UnitFormValues;
-  onSubmit: (values: UnitFormResult) => void;
+  /** Trả `true` khi đã lưu (trang tự chuyển đi), `false` khi máy chủ từ chối. */
+  onSubmit: (values: UnitFormResult, helpers: UnitFormHelpers) => Promise<boolean>;
   onCancel: () => void;
 }) {
   const schema = useMemo(() => buildSchema(units, editing), [units, editing]);
@@ -145,42 +199,65 @@ export function UnitForm({
     resolver: zodResolver(schema),
     defaultValues,
   });
+  const { setWarnWhen } = useWarnAboutChange();
+  const isDirty = form.formState.isDirty;
+
+  useEffect(() => {
+    setWarnWhen(isDirty);
+  }, [isDirty, setWarnWhen]);
 
   const [askCascade, setAskCascade] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const index = useMemo(() => childIndex(units), [units]);
 
   /** Đơn vị cấp dưới đang hoạt động — để hỏi trước khi tắt (UC-02). */
   const activeDescendants = useMemo(() => {
     if (!editing) return 0;
-    const ids = descendantIds(units, editing.id);
+    const ids = descendantIds(index, editing.id);
     return units.filter((u) => ids.has(u.id) && u.active).length;
-  }, [units, editing]);
+  }, [units, index, editing]);
 
   /** Danh sách chọn cấp trên: dạng cây, bỏ chính nó và cấp dưới của nó. */
   const parentOptions = useMemo(() => {
     const blocked = editing
-      ? new Set([editing.id, ...descendantIds(units, editing.id)])
-      : new Set<string>();
+      ? new Set([editing.id, ...descendantIds(index, editing.id)])
+      : new Set<number>();
     const out: { unit: ReportUnit; level: number }[] = [];
-    const walk = (parentId: string | null, level: number) => {
-      for (const u of childrenOf(units, parentId)) {
+    const walk = (parentId: number | null, level: number) => {
+      for (const u of index.get(parentId) ?? []) {
         if (blocked.has(u.id)) continue;
-        if (u.active || u.id === defaultValues.parentId) out.push({ unit: u, level });
+        if (u.active || String(u.id) === defaultValues.parentId) out.push({ unit: u, level });
         walk(u.id, level + 1);
       }
     };
     walk(null, 0);
     return out;
-  }, [units, editing, defaultValues.parentId]);
+  }, [index, editing, defaultValues.parentId]);
 
-  function submit(values: UnitFormValues) {
-    onSubmit({
-      code: values.code.trim(),
-      name: values.name.trim(),
-      parentId: values.parentId || null,
-      type: values.type as UnitType,
-      active: values.active,
-      receivesReports: values.receivesReports,
-    });
+  async function submit(values: UnitFormValues) {
+    // Tắt cảnh báo trước khi gửi: trang chuyển về danh sách ngay khi lưu xong.
+    setWarnWhen(false);
+    setSaving(true);
+    try {
+      const ok = await onSubmit(
+        {
+          budgetCode: values.budgetCode.trim(),
+          name: values.name.trim(),
+          parentId: values.parentId ? Number(values.parentId) : null,
+          unitType: values.unitType as UnitType,
+          active: values.active,
+          receivesReports: values.receivesReports,
+        },
+        {
+          setFieldError: (field, message) =>
+            form.setError(field, { type: "server", message }, { shouldFocus: true }),
+        }
+      );
+      if (!ok) setWarnWhen(form.formState.isDirty);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -192,7 +269,7 @@ export function UnitForm({
             <div className="grid gap-x-6 gap-y-4 md:grid-cols-3">
               <FormField
                 control={form.control}
-                name="code"
+                name="budgetCode"
                 render={({ field }) => (
                   <FormItem className={ITEM_CLASS}>
                     <FormLabel className={LABEL_CLASS}>
@@ -205,7 +282,11 @@ export function UnitForm({
                         autoComplete="off"
                         placeholder="Ví dụ: 1052345"
                         disabled={Boolean(editing)}
-                        className={editing ? "bg-muted disabled:opacity-100 text-muted-foreground" : undefined}
+                        className={
+                          editing
+                            ? "bg-muted disabled:opacity-100 text-muted-foreground"
+                            : undefined
+                        }
                       />
                     </FormControl>
                     <FieldHint>
@@ -260,7 +341,7 @@ export function UnitForm({
                         {parentOptions.map(({ unit, level }) => (
                           <SelectItem
                             key={unit.id}
-                            value={unit.id}
+                            value={String(unit.id)}
                             style={{
                               paddingInlineStart: `calc(var(--spacing) * ${2 + level * 4})`,
                             }}
@@ -283,7 +364,7 @@ export function UnitForm({
             <div className="grid gap-x-6 gap-y-4 md:grid-cols-3">
               <FormField
                 control={form.control}
-                name="type"
+                name="unitType"
                 render={({ field }) => (
                   <FormItem className={ITEM_CLASS}>
                     <FormLabel className={LABEL_CLASS}>
@@ -368,10 +449,11 @@ export function UnitForm({
           </section>
 
           <FormActions>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
+            <Button type="submit" disabled={saving}>
+              {saving && <LoaderCircle aria-hidden className="animate-spin" />}
               Lưu
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
               Huỷ
             </Button>
           </FormActions>
@@ -382,7 +464,7 @@ export function UnitForm({
         open={askCascade}
         onOpenChange={setAskCascade}
         title="Ngừng hoạt động đơn vị này?"
-        description={`Đơn vị này có ${activeDescendants} đơn vị cấp dưới đang hoạt động. Khi lưu, toàn bộ đơn vị cấp dưới và tài khoản của chúng sẽ ngừng hoạt động theo. Khi kích hoạt lại, các đơn vị cấp dưới không tự hoạt động lại.`}
+        description={`Đơn vị này có ${activeDescendants} đơn vị cấp dưới đang hoạt động. Khi lưu, toàn bộ đơn vị cấp dưới sẽ ngừng hoạt động theo. Khi kích hoạt lại, các đơn vị cấp dưới không tự hoạt động lại.`}
         confirmLabel="Ngừng hoạt động"
         cancelLabel="Quay lại"
         onConfirm={() => {

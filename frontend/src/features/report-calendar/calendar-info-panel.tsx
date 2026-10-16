@@ -29,12 +29,12 @@ import {
   KIND_LABELS,
   KIND_ORDER,
   type PeriodKind,
-} from "./fixtures";
+} from "./model";
 
 export type CalendarFormValues = {
   deadlineDays: string;
   kinds: PeriodKind[];
-  /** Hạn nộp sửa tay theo id kỳ (yyyy-MM-dd). */
+  /** Hạn nộp sửa tay theo khoá (loại kỳ, số thứ tự) — `slotKey` — giá trị yyyy-MM-dd. */
   overrides: Record<string, string>;
 };
 

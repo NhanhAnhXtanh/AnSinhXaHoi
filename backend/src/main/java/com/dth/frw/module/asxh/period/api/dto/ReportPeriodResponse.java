@@ -23,6 +23,7 @@ public record ReportPeriodResponse(
         LocalDate toDate,
         LocalDate openFrom,
         LocalDate deadline,
+        boolean deadlineManual,
         PeriodStatus status,
         Instant createdAt,
         Instant updatedAt) {
@@ -48,6 +49,7 @@ public record ReportPeriodResponse(
                 period.getToDate(),
                 period.getOpenFrom(),
                 period.getDeadline(),
+                period.isDeadlineManual(),
                 period.getStatus(),
                 period.getCreatedAt(),
                 period.getUpdatedAt());

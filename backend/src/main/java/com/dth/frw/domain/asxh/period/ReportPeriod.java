@@ -79,6 +79,14 @@ public class ReportPeriod {
     @Column(name = "deadline")
     private LocalDate deadline;
 
+    /**
+     * Hạn nộp do người dùng chọn tay ở màn lịch (changelog 104). Kỳ có cờ này giữ
+     * nguyên hạn khi lịch đổi số ngày hạn nộp (UC-21) — chỉ kỳ hệ thống tự tính mới
+     * được tính lại.
+     */
+    @Column(name = "deadline_manual", nullable = false)
+    private boolean deadlineManual = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private PeriodStatus status = PeriodStatus.DRAFT;
@@ -185,6 +193,14 @@ public class ReportPeriod {
 
     public void setDeadline(LocalDate deadline) {
         this.deadline = deadline;
+    }
+
+    public boolean isDeadlineManual() {
+        return deadlineManual;
+    }
+
+    public void setDeadlineManual(boolean deadlineManual) {
+        this.deadlineManual = deadlineManual;
     }
 
     public PeriodStatus getStatus() {

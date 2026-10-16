@@ -132,6 +132,11 @@ public class ReportUnitService {
             unit.setName(request.name().trim());
         }
         if (request.unitType() != null) {
+            // Đổi loại mà không nói khối thì khối đi theo loại mới (BR-01.4) — form đơn vị
+            // không có ô Khối, để khối cũ lại sẽ lọc sai ở ma trận thiết lập và Tổng hợp.
+            if (request.block() == null && request.unitType() != unit.getUnitType()) {
+                unit.setBlock(request.unitType().defaultBlock());
+            }
             unit.setUnitType(request.unitType());
         }
         if (request.block() != null) {
@@ -163,8 +168,8 @@ public class ReportUnitService {
         initializeParent(unit);
 
         if (repository.existsByParentId(unit.getId())) {
-            throw new ConflictException(
-                    "Không thể xoá đơn vị còn đơn vị cấp dưới. Hãy chuyển hoặc xoá các đơn vị cấp dưới trước.");
+            throw new ConflictException("Không xoá được đơn vị " + unit.getName()
+                    + " vì còn đơn vị cấp dưới. Hãy chuyển hoặc xoá các đơn vị cấp dưới trước.");
         }
 
         repository.remove(unit);
@@ -173,9 +178,11 @@ public class ReportUnitService {
             // báo lỗi ở đây, đổi được thành thông báo tiếng Việt thay cho câu chung của base.
             repository.flush();
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException(
-                    "Không thể xoá đơn vị đang được sử dụng (thiết lập kỳ, phiếu nhập…). "
-                            + "Hãy chuyển đơn vị sang ngừng hoạt động.");
+            // BR-03.1: đơn vị đã được thiết lập biểu cho kỳ, đã có phiếu hoặc số liệu đã
+            // lưu thì giữ lại để tra cứu — chỉ cho ngừng hoạt động.
+            throw new ConflictException("Không xoá được đơn vị " + unit.getName()
+                    + " vì đơn vị đã được thiết lập biểu cho kỳ báo cáo hoặc đã có phiếu báo cáo. "
+                    + "Bạn có thể chọn Ngừng hoạt động thay cho xoá.");
         }
         return unit;
     }

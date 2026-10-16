@@ -74,11 +74,14 @@ public class ReportCalendarService {
      * @param newDeadlineDays    hạn nộp mới
      * @param rescheduledPeriods số kỳ chưa dùng được tính lại hạn nộp
      * @param keptDeadlineCodes  mã kỳ đã dùng giữ hạn cũ (chỉ khi đổi hạn nộp)
+     * @param manualDeadlineCodes mã kỳ chưa dùng nhưng hạn nộp đã sửa tay, giữ nguyên
+     *                           (chỉ khi đổi hạn nộp)
      */
     public record UpdatePlan(List<PeriodKind> addedKinds, int createdPeriods,
                              List<PeriodKind> removedKinds, int removedPeriods,
                              int oldDeadlineDays, int newDeadlineDays,
-                             int rescheduledPeriods, List<String> keptDeadlineCodes) {
+                             int rescheduledPeriods, List<String> keptDeadlineCodes,
+                             List<String> manualDeadlineCodes) {
 
         public boolean deadlineChanged() {
             return oldDeadlineDays != newDeadlineDays;
@@ -249,10 +252,23 @@ public class ReportCalendarService {
     // ------------------------------------------------------------------
 
     private UpdatePlan plan(ReportCalendar calendar, Collection<PeriodKind> requestedKinds, Integer requestedDeadline) {
+        return planFor(calendar, periodService.listByCalendar(calendar.getId()), requestedKinds, requestedDeadline);
+    }
+
+    /**
+     * Kế hoạch cập nhật tính thuần từ lịch và các kỳ hiện có — không chạm database, để
+     * kiểm thử được mà không cần Spring.
+     *
+     * @param requestedKinds    loại kỳ muốn có; {@code null} = giữ như hiện tại
+     * @param requestedDeadline số ngày hạn nộp mới; {@code null} = giữ như hiện tại
+     * @throws IllegalArgumentException hạn nộp ngoài 1–365 ngày hoặc không chọn loại kỳ nào
+     * @throws ConflictException         định bỏ loại kỳ đã có kỳ được dùng
+     */
+    static UpdatePlan planFor(ReportCalendar calendar, List<ReportPeriod> periods,
+                              Collection<PeriodKind> requestedKinds, Integer requestedDeadline) {
         int newDeadline = requestedDeadline == null ? calendar.getDeadlineDays() : requestedDeadline;
         PeriodPlanner.requireValidDeadline(newDeadline);
 
-        List<ReportPeriod> periods = periodService.listByCalendar(calendar.getId());
         Set<PeriodKind> current = periods.stream()
                 .map(ReportPeriod::getKind)
                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(PeriodKind.class)));
@@ -289,14 +305,20 @@ public class ReportCalendarService {
                 .sorted(Comparator.comparing(ReportPeriod::getKind).thenComparingInt(ReportPeriod::getSeq))
                 .toList();
         int rescheduled = deadlineChanged
-                ? (int) remaining.stream().filter(period -> !ReportPeriodService.isUsed(period)).count()
+                ? (int) remaining.stream().filter(ReportPeriodService::followsCalendarDeadline).count()
                 : 0;
         List<String> kept = deadlineChanged
                 ? remaining.stream().filter(ReportPeriodService::isUsed).map(ReportPeriod::getCode).toList()
                 : List.of();
+        List<String> manual = deadlineChanged
+                ? remaining.stream()
+                        .filter(period -> !ReportPeriodService.isUsed(period) && period.isDeadlineManual())
+                        .map(ReportPeriod::getCode)
+                        .toList()
+                : List.of();
 
         return new UpdatePlan(added, created, removed, removedCount,
-                calendar.getDeadlineDays(), newDeadline, rescheduled, kept);
+                calendar.getDeadlineDays(), newDeadline, rescheduled, kept, manual);
     }
 
     private static void requireYearInRange(int year) {

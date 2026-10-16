@@ -1,5 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import {
+  useDelete,
+  useList,
+  useUpdate,
+  type CrudFilter,
+  type HttpError,
+} from "@refinedev/core";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,6 +19,7 @@ import {
   Search,
   SlidersHorizontal,
   Trash,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +29,7 @@ import {
   ConfirmDialog,
   EmptyState,
   HeaderActions,
+  LoadingState,
   RowActions,
   StatusBadge,
   TwoLineCell,
@@ -49,26 +58,23 @@ import {
 import { cn } from "@/shared/lib/utils";
 
 import {
+  BLOCKS,
+  BLOCK_LABELS,
+  BLOCK_SHORT,
+  TREE_PAGE_SIZE,
+  UNIT_RESOURCE,
   UNIT_TYPES,
   UNIT_TYPE_LABELS,
-  type ReportUnit,
-  type UnitType,
-} from "./fixtures";
-import {
-  KHOI_LABELS,
-  childrenOf,
-  deleteBlocker,
-  deleteUnit,
+  apiErrorMessage,
+  childIndex,
   descendantIds,
-  findUnit,
-  khoiOf,
-  setUnitActive,
-  useReportUnits,
-  type Khoi,
-} from "./store";
+  type ReportUnit,
+  type UnitBlock,
+  type UnitType,
+} from "./model";
 
 type StatusFilter = "all" | "active" | "inactive";
-type KhoiFilter = "all" | Khoi;
+type BlockFilter = "all" | UnitBlock;
 type TypeFilter = "all" | UnitType;
 
 type FlatRow = {
@@ -84,81 +90,138 @@ type PendingConfirm =
 
 const PAGE_SIZES = [10, 20, 50];
 
-/** Nhãn trong ô lọc "Khối: …". */
-const KHOI_SHORT: Record<Khoi, string> = { tinh: "Tỉnh", huyen: "Huyện", xa: "Xã" };
+const LOAD_ERROR = "Không kết nối được máy chủ. Bạn kiểm tra mạng rồi thử lại.";
 
+/** Giá trị trễ một nhịp gõ — tìm kiếm gửi lên máy chủ khi người dùng ngừng gõ. */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+/**
+ * Danh sách đơn vị dạng cây — `GET /api/report_units`.
+ *
+ * Cây được tải đủ một lần (một trang lớn, xếp theo mã). Khi tìm hoặc lọc, máy chủ trả
+ * các đơn vị khớp (`q`, `unitType`, `block`, `active`); màn giữ dạng cây bằng cách
+ * hiện thêm mọi cấp trên của chúng từ cây đã tải.
+ */
 export function ReportUnitList() {
   const navigate = useNavigate();
-  const units = useReportUnits();
 
   const [search, setSearch] = useState("");
-  const [khoi, setKhoi] = useState<KhoiFilter>("all");
+  const [block, setBlock] = useState<BlockFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [type, setType] = useState<TypeFilter>("all");
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(childrenOf(units, null).map((u) => u.id))
-  );
+  // null = mặc định (mở sẵn các đơn vị gốc), có từ khi người dùng bấm mở/thu gọn.
+  const [expanded, setExpanded] = useState<Set<number> | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [refreshing, setRefreshing] = useState(false);
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   // Giữ `pending` khi hộp đang đóng dần, để chữ trong hộp không biến mất giữa chừng.
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  function ask(next: PendingConfirm) {
-    setPending(next);
-    setDialogOpen(true);
-  }
-
-  const term = search.trim().toLocaleLowerCase("vi");
+  const term = useDebouncedValue(search.trim(), 300);
   const filtering =
-    term !== "" || khoi !== "all" || status !== "all" || type !== "all";
+    term !== "" || block !== "all" || status !== "all" || type !== "all";
+
+  const { result: treeResult, query: treeQuery } = useList<ReportUnit>({
+    resource: UNIT_RESOURCE,
+    pagination: { currentPage: 1, pageSize: TREE_PAGE_SIZE },
+    sorters: [{ field: "budgetCode", order: "asc" }],
+    errorNotification: false,
+  });
+  const units = useMemo(() => treeResult.data ?? [], [treeResult.data]);
+
+  const filters = useMemo<CrudFilter[]>(() => {
+    const out: CrudFilter[] = [];
+    if (term !== "") out.push({ field: "q", operator: "eq", value: term });
+    if (block !== "all") out.push({ field: "block", operator: "eq", value: block });
+    if (type !== "all") out.push({ field: "unitType", operator: "eq", value: type });
+    if (status !== "all") {
+      out.push({ field: "active", operator: "eq", value: status === "active" });
+    }
+    return out;
+  }, [term, block, type, status]);
+
+  const { result: matchResult, query: matchQuery } = useList<ReportUnit>({
+    resource: UNIT_RESOURCE,
+    pagination: { currentPage: 1, pageSize: TREE_PAGE_SIZE },
+    filters,
+    errorNotification: false,
+    queryOptions: {
+      enabled: filtering,
+      // Giữ kết quả lần lọc trước trong lúc chờ lần mới, để bảng không nháy trắng.
+      placeholderData: (previous) => previous,
+    },
+  });
+
+  const { mutateAsync: updateUnit } = useUpdate<ReportUnit, HttpError, { active: boolean }>();
+  const { mutateAsync: deleteUnit } = useDelete<ReportUnit>();
+
+  const index = useMemo(() => childIndex(units), [units]);
+  const byId = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
+
+  const openSet = useMemo(
+    () => expanded ?? new Set((index.get(null) ?? []).map((u) => u.id)),
+    [expanded, index]
+  );
 
   /** Khi đang lọc: đơn vị khớp + mọi cấp trên của nó (để giữ dạng cây). */
   const included = useMemo(() => {
     if (!filtering) return null;
-    const out = new Set<string>();
-    for (const u of units) {
-      const match =
-        (term === "" || u.name.toLocaleLowerCase("vi").includes(term)) &&
-        (khoi === "all" || khoiOf(u.type) === khoi) &&
-        (type === "all" || u.type === type) &&
-        (status === "all" || (status === "active") === u.active);
-      if (!match) continue;
-      let cur: ReportUnit | undefined = u;
+    const out = new Set<number>();
+    for (const match of matchResult.data ?? []) {
+      let cur: ReportUnit | undefined = byId.get(match.id);
       while (cur && !out.has(cur.id)) {
         out.add(cur.id);
-        cur = findUnit(units, cur.parentId);
+        cur = cur.parent ? byId.get(cur.parent.id) : undefined;
       }
     }
     return out;
-  }, [units, filtering, term, khoi, type, status]);
+  }, [filtering, matchResult.data, byId]);
 
   const rows = useMemo(() => {
     const out: FlatRow[] = [];
-    const walk = (parentId: string | null, level: number) => {
-      for (const unit of childrenOf(units, parentId)) {
+    const walk = (parentId: number | null, level: number) => {
+      for (const unit of index.get(parentId) ?? []) {
         if (included && !included.has(unit.id)) continue;
-        const kids = childrenOf(units, unit.id).filter(
+        const kids = (index.get(unit.id) ?? []).filter(
           (k) => !included || included.has(k.id)
         );
         // Đang lọc thì mở hết nhánh có kết quả — người tìm cần thấy ngay chỗ khớp.
-        const isOpen = included ? true : expanded.has(unit.id);
+        const isOpen = included ? true : openSet.has(unit.id);
         out.push({ unit, level, hasChildren: kids.length > 0, expanded: isOpen });
         if (kids.length > 0 && isOpen) walk(unit.id, level + 1);
       }
     };
     walk(null, 0);
     return out;
-  }, [units, included, expanded]);
+  }, [index, included, openSet]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
   const pageRows = rows.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
-  function toggle(id: string) {
+  const loading = treeQuery.isLoading || (filtering && matchQuery.isLoading);
+  const loadError = treeQuery.isError
+    ? treeQuery.error
+    : filtering && matchQuery.isError
+      ? matchQuery.error
+      : null;
+  const refreshing = !loading && (treeQuery.isFetching || (filtering && matchQuery.isFetching));
+
+  function ask(next: PendingConfirm) {
+    setPending(next);
+    setDialogOpen(true);
+  }
+
+  function toggle(id: number) {
     setExpanded((prev) => {
-      const next = new Set(prev);
+      const next = new Set(prev ?? openSet);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
@@ -167,26 +230,49 @@ export function ReportUnitList() {
 
   function clearFilters() {
     setSearch("");
-    setKhoi("all");
+    setBlock("all");
     setStatus("all");
     setType("all");
     setPage(0);
   }
 
   function refresh() {
-    setRefreshing(true);
-    window.setTimeout(() => setRefreshing(false), 600);
+    void treeQuery.refetch();
+    if (filtering) void matchQuery.refetch();
   }
 
   function askDeactivate(unit: ReportUnit) {
-    const ids = descendantIds(units, unit.id);
+    const ids = descendantIds(index, unit.id);
     const activeDescendants = units.filter((u) => ids.has(u.id) && u.active).length;
     ask({ kind: "deactivate", unit, activeDescendants });
   }
 
-  function reactivate(unit: ReportUnit) {
-    setUnitActive(unit.id, true);
-    const hasInactiveChild = childrenOf(units, unit.id).some((u) => !u.active);
+  async function setActive(unit: ReportUnit, active: boolean): Promise<boolean> {
+    try {
+      await updateUnit({
+        resource: UNIT_RESOURCE,
+        id: unit.id,
+        values: { active },
+        successNotification: false,
+        errorNotification: false,
+      });
+      return true;
+    } catch (error) {
+      toast.error(
+        apiErrorMessage(
+          error,
+          active
+            ? `Chưa kích hoạt lại được đơn vị ${unit.name}. Bạn thử lại sau ít phút.`
+            : `Chưa ngừng hoạt động được đơn vị ${unit.name}. Bạn thử lại sau ít phút.`
+        )
+      );
+      return false;
+    }
+  }
+
+  async function reactivate(unit: ReportUnit) {
+    if (!(await setActive(unit, true))) return;
+    const hasInactiveChild = (index.get(unit.id) ?? []).some((u) => !u.active);
     toast.success(
       hasInactiveChild
         ? `Đã kích hoạt lại đơn vị ${unit.name}. Các đơn vị cấp dưới vẫn đang ngừng hoạt động — bạn kích hoạt lại từng đơn vị nếu cần.`
@@ -194,31 +280,43 @@ export function ReportUnitList() {
     );
   }
 
-  function confirmPending() {
+  async function confirmPending() {
     if (!pending) return;
-    const { unit } = pending;
-    if (pending.kind === "deactivate") {
-      setUnitActive(unit.id, false);
+    const current = pending;
+    setDialogOpen(false);
+    const { unit } = current;
+
+    if (current.kind === "deactivate") {
+      if (!(await setActive(unit, false))) return;
       toast.success(
-        pending.activeDescendants > 0
-          ? `Đã ngừng hoạt động đơn vị ${unit.name} và ${pending.activeDescendants} đơn vị cấp dưới.`
+        current.activeDescendants > 0
+          ? `Đã ngừng hoạt động đơn vị ${unit.name} và ${current.activeDescendants} đơn vị cấp dưới.`
           : `Đã ngừng hoạt động đơn vị ${unit.name}.`
       );
-    } else {
-      const blocker = deleteBlocker(units, unit.id);
-      if (blocker) {
-        toast.error(
-          `Chưa xoá được đơn vị ${unit.name} vì ${blocker}. Bạn có thể chọn Ngừng hoạt động thay cho xoá.`
-        );
-      } else {
-        deleteUnit(unit.id);
-        toast.success(`Đã xoá đơn vị ${unit.name}.`);
-      }
+      return;
     }
-    setDialogOpen(false);
+
+    try {
+      await deleteUnit({
+        resource: UNIT_RESOURCE,
+        id: unit.id,
+        successNotification: false,
+        errorNotification: false,
+      });
+      toast.success(`Đã xoá đơn vị ${unit.name}.`);
+    } catch (error) {
+      // 409 tiếng Việt từ máy chủ: còn cấp dưới, đã thiết lập biểu hoặc đã có phiếu.
+      toast.error(
+        apiErrorMessage(
+          error,
+          `Chưa xoá được đơn vị ${unit.name}. Bạn có thể chọn Ngừng hoạt động thay cho xoá.`
+        )
+      );
+    }
   }
 
   function rowItems(unit: ReportUnit): ActionItem[] {
+    const hasChildren = (index.get(unit.id)?.length ?? 0) > 0;
     return [
       {
         key: "edit",
@@ -237,7 +335,7 @@ export function ReportUnitList() {
             key: "reactivate",
             label: "Kích hoạt lại",
             icon: Power,
-            onSelect: () => reactivate(unit),
+            onSelect: () => void reactivate(unit),
           },
       {
         key: "delete",
@@ -245,17 +343,20 @@ export function ReportUnitList() {
         icon: Trash,
         destructive: true,
         separatorBefore: true,
+        disabled: hasChildren,
+        reason: hasChildren
+          ? "Còn đơn vị cấp dưới nên chưa xoá được. Hãy chuyển hoặc xoá các đơn vị cấp dưới trước."
+          : undefined,
         onSelect: () => ask({ kind: "delete", unit }),
       },
     ];
   }
 
-  function secondaryLine(row: FlatRow): string {
-    const { unit } = row;
-    if (row.hasChildren || childrenOf(units, unit.id).length > 0) {
-      return `${formatNumber(descendantIds(units, unit.id).size)} đơn vị trực thuộc`;
+  function secondaryLine(unit: ReportUnit): string {
+    if ((index.get(unit.id)?.length ?? 0) > 0) {
+      return `${formatNumber(descendantIds(index, unit.id).size)} đơn vị trực thuộc`;
     }
-    const parent = findUnit(units, unit.parentId);
+    const parent = unit.parent ? byId.get(unit.parent.id) ?? unit.parent : undefined;
     return parent ? `Thuộc ${parent.name}` : "Đơn vị cao nhất";
   }
 
@@ -314,9 +415,9 @@ export function ReportUnitList() {
             </div>
 
             <Select
-              value={khoi}
+              value={block}
               onValueChange={(v) => {
-                setKhoi(v as KhoiFilter);
+                setBlock(v as BlockFilter);
                 setPage(0);
               }}
             >
@@ -328,9 +429,9 @@ export function ReportUnitList() {
               </SelectTrigger>
               <SelectContent align="end">
                 <SelectItem value="all">Tất cả</SelectItem>
-                {(Object.keys(KHOI_LABELS) as Khoi[]).map((k) => (
+                {BLOCKS.map((k) => (
                   <SelectItem key={k} value={k}>
-                    {KHOI_SHORT[k]}
+                    {BLOCK_SHORT[k]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -400,7 +501,7 @@ export function ReportUnitList() {
               aria-label="Làm mới"
               title="Làm mới"
               onClick={refresh}
-              disabled={refreshing}
+              disabled={refreshing || loading}
             >
               <RefreshCw aria-hidden className={cn(refreshing && "animate-spin")} />
             </Button>
@@ -436,7 +537,21 @@ export function ReportUnitList() {
         </div>
 
         {/* Bảng cây */}
-        {rows.length === 0 ? (
+        {loading ? (
+          <LoadingState label="Đang tải danh sách đơn vị…" />
+        ) : loadError ? (
+          <EmptyState
+            icon={TriangleAlert}
+            title="Chưa tải được danh sách đơn vị"
+            description={apiErrorMessage(loadError, LOAD_ERROR)}
+            action={
+              <Button type="button" variant="outline" onClick={refresh}>
+                <RefreshCw aria-hidden />
+                Thử lại
+              </Button>
+            }
+          />
+        ) : rows.length === 0 ? (
           <EmptyState
             icon={filtering ? FunnelX : Search}
             title={filtering ? "Không có đơn vị nào khớp" : "Chưa có đơn vị nào"}
@@ -508,14 +623,15 @@ export function ReportUnitList() {
                       )}
                       <TwoLineCell
                         primary={row.unit.name}
-                        secondary={secondaryLine(row)}
+                        secondary={secondaryLine(row.unit)}
                       />
                     </div>
                   </TableCell>
-                  <TableCell>{UNIT_TYPE_LABELS[row.unit.type]}</TableCell>
-                  <TableCell>{KHOI_LABELS[khoiOf(row.unit.type)]}</TableCell>
-                  <TableCell align="right">
-                    {formatNumber(row.unit.accounts.length)}
+                  <TableCell>{UNIT_TYPE_LABELS[row.unit.unitType] ?? "—"}</TableCell>
+                  <TableCell>{BLOCK_LABELS[row.unit.block] ?? "—"}</TableCell>
+                  <TableCell align="right" title="Chưa gắn tài khoản với đơn vị">
+                    {/* Tài khoản chưa gắn được với đơn vị báo cáo (xem accounts-panel.tsx). */}
+                    {formatNumber(null)}
                   </TableCell>
                   <TableCell>
                     <StatusBadge tone={row.unit.active ? "success" : "neutral"}>
@@ -532,7 +648,7 @@ export function ReportUnitList() {
         )}
 
         {/* Phân trang */}
-        {rows.length > 0 && (
+        {!loading && !loadError && rows.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
             <p className="text-muted-foreground text-sm tabular-nums">
               Hiển thị {formatNumber(from)}–{formatNumber(to)} trong{" "}
@@ -602,13 +718,13 @@ export function ReportUnitList() {
         title="Xoá đơn vị này?"
         description={
           pending?.kind === "delete"
-            ? `Đơn vị “${pending.unit.name}” sẽ bị xoá và không khôi phục được. Nếu đơn vị còn đơn vị cấp dưới, tài khoản hoặc phiếu báo cáo thì chưa xoá được — khi đó bạn có thể chọn Ngừng hoạt động.`
+            ? `Đơn vị “${pending.unit.name}” sẽ bị xoá và không khôi phục được. Nếu đơn vị đã được thiết lập biểu cho kỳ báo cáo hoặc đã có phiếu báo cáo thì chưa xoá được — khi đó bạn có thể chọn Ngừng hoạt động.`
             : ""
         }
         confirmLabel="Xoá đơn vị"
         cancelLabel="Quay lại"
         destructive
-        onConfirm={confirmPending}
+        onConfirm={() => void confirmPending()}
       />
 
       <ConfirmDialog
@@ -618,13 +734,13 @@ export function ReportUnitList() {
         description={
           pending?.kind === "deactivate"
             ? pending.activeDescendants > 0
-              ? `Đơn vị “${pending.unit.name}” có ${pending.activeDescendants} đơn vị cấp dưới đang hoạt động. Toàn bộ đơn vị cấp dưới và tài khoản của chúng sẽ ngừng hoạt động theo. Khi kích hoạt lại, các đơn vị cấp dưới không tự hoạt động lại.`
-              : `Đơn vị “${pending.unit.name}” sẽ không nhận phiếu báo cáo và tài khoản của đơn vị không đăng nhập được nữa. Bạn có thể kích hoạt lại sau.`
+              ? `Đơn vị “${pending.unit.name}” có ${pending.activeDescendants} đơn vị cấp dưới đang hoạt động. Toàn bộ đơn vị cấp dưới sẽ ngừng hoạt động theo. Khi kích hoạt lại, các đơn vị cấp dưới không tự hoạt động lại.`
+              : `Đơn vị “${pending.unit.name}” sẽ không nhận phiếu báo cáo nữa. Bạn có thể kích hoạt lại sau.`
             : ""
         }
         confirmLabel="Ngừng hoạt động"
         cancelLabel="Quay lại"
-        onConfirm={confirmPending}
+        onConfirm={() => void confirmPending()}
       />
     </AsxhPage>
   );

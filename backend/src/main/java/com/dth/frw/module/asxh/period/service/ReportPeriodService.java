@@ -13,6 +13,7 @@ import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.rowlevel.Action;
 import com.dth.frw.shared.web.ListParams;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -158,11 +159,31 @@ public class ReportPeriodService {
         LocalDate openFrom = request.openFrom() != null ? request.openFrom() : period.getOpenFrom();
         LocalDate deadline = request.deadline() != null ? request.deadline() : period.getDeadline();
         requireOrdered("Cửa sổ nhận nhập liệu", openFrom, deadline);
+        if (request.deadline() != null && request.deadline().isBefore(period.getToDate())) {
+            // Hạn nộp trước ngày cuối kỳ thì đơn vị chưa có đủ số liệu để nộp.
+            throw new IllegalArgumentException("Hạn nộp của kỳ " + period.getName()
+                    + " không được trước ngày cuối kỳ (" + vnDate(period.getToDate()) + ").");
+        }
 
         period.setOpenFrom(openFrom);
-        period.setDeadline(deadline);
+        if (request.deadline() != null) {
+            period.setDeadline(deadline);
+            // Chọn đúng hạn hệ thống tự tính thì coi như bỏ sửa tay: lần đổi số ngày
+            // hạn nộp của lịch sau đó lại được tính lại bình thường.
+            period.setDeadlineManual(!deadline.equals(defaultDeadline(period)));
+        }
         rowLevel.checkWritable(period);
         return repository.persist(period);
+    }
+
+    /** Hạn nộp hệ thống tự tính cho kỳ theo số ngày hạn nộp hiện tại của lịch. */
+    static LocalDate defaultDeadline(ReportPeriod period) {
+        return PeriodPlanner.deadlineFor(period.getToDate(), period.getCalendar().getDeadlineDays());
+    }
+
+    /** Kỳ được tính lại hạn nộp khi lịch đổi số ngày: chưa dùng và không sửa tay. */
+    public static boolean followsCalendarDeadline(ReportPeriod period) {
+        return !isUsed(period) && !period.isDeadlineManual();
     }
 
     /** Chỉ xoá được kỳ chưa thiết lập; kỳ đã gán đơn vị bị khoá ngoại chặn. */
@@ -242,7 +263,8 @@ public class ReportPeriodService {
 
     /**
      * Tính lại hạn nộp {@code = ngày cuối kỳ + số ngày} cho kỳ CHƯA dùng của lịch; kỳ đã
-     * dùng giữ hạn cũ — hạn đó đã báo cho đơn vị (BR-21.2).
+     * dùng giữ hạn cũ — hạn đó đã báo cho đơn vị (BR-21.2). Kỳ có hạn nộp sửa tay
+     * (changelog 104) cũng giữ nguyên.
      *
      * @return số kỳ được tính lại
      */
@@ -251,7 +273,7 @@ public class ReportPeriodService {
         PeriodPlanner.requireValidDeadline(deadlineDays);
         int count = 0;
         for (ReportPeriod period : repository.findByCalendarId(calendarId)) {
-            if (isUsed(period) || skipKinds.contains(period.getKind())) {
+            if (!followsCalendarDeadline(period) || skipKinds.contains(period.getKind())) {
                 continue;
             }
             period.setDeadline(PeriodPlanner.deadlineFor(period.getToDate(), deadlineDays));
@@ -356,9 +378,16 @@ public class ReportPeriodService {
     /** BR-20.2: ngày kết thúc không được trước ngày bắt đầu. */
     private static void requireOrdered(String label, LocalDate from, LocalDate to) {
         if (from != null && to != null && to.isBefore(from)) {
-            throw new IllegalArgumentException(label + " không hợp lệ: ngày kết thúc (" + to
-                    + ") trước ngày bắt đầu (" + from + ").");
+            throw new IllegalArgumentException(label + " không hợp lệ: ngày kết thúc (" + vnDate(to)
+                    + ") trước ngày bắt đầu (" + vnDate(from) + ").");
         }
+    }
+
+    private static final DateTimeFormatter VN_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    /** Ngày viết kiểu Việt Nam cho thông báo lỗi. */
+    static String vnDate(LocalDate date) {
+        return date == null ? "" : VN_DATE.format(date);
     }
 
     /**
