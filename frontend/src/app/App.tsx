@@ -1,4 +1,4 @@
-import { Refine } from "@refinedev/core";
+import { Refine, type NotificationProvider } from "@refinedev/core";
 import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 
@@ -26,7 +26,27 @@ import { ReportYearProvider } from "@/shared/components/asxh";
 import "@fontsource-variable/inter";
 import "@/styles/index.css";
 
+/**
+ * The notification provider, minus the one toast the login screen replaces.
+ *
+ * `useLogin` opens a "login-error" toast on every failed sign-in, titled with
+ * the error's `name`, and has no option to skip it. The login form already
+ * shows the same sentence under the password field, so the toast is dropped
+ * here rather than flashed and closed a frame later.
+ */
+function useAppNotificationProvider(): NotificationProvider {
+  const base = useNotificationProvider();
+  return {
+    ...base,
+    open: (params) => {
+      if (params.key === "login-error") return;
+      base.open?.(params);
+    },
+  };
+}
+
 function App() {
+  const notificationProvider = useAppNotificationProvider();
   return (
     <BrowserRouter>
       <RefineKbarProvider>
@@ -42,7 +62,7 @@ function App() {
               // the menu and the action buttons only offer what this account
               // can actually do. The API re-checks all of it.
               accessControlProvider={accessControlProvider}
-              notificationProvider={useNotificationProvider()}
+              notificationProvider={notificationProvider}
               routerProvider={routerProvider}
               resources={resources}
               options={{

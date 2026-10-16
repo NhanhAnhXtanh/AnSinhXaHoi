@@ -15,11 +15,11 @@ import { Button } from "@/shared/ui/button";
  * leads to. The API refuses the same request independently, so this is a
  * courtesy, not the boundary.
  *
- * `resource` is still accepted so the routes keep compiling, but it is no
- * longer printed: it is an internal data name (`blog_posts`), and the page is
- * read by people who should never have to see one (`trang-thai-chung.md` §7).
+ * It takes no props. It used to accept the resource name, but never printed
+ * it: that is an internal data name (`blog_posts`), and the page is read by
+ * people who should never have to see one (`trang-thai-chung.md` §7).
  */
-export function Forbidden(_props: { resource?: string }) {
+export function Forbidden() {
   const go = useGo();
 
   return (

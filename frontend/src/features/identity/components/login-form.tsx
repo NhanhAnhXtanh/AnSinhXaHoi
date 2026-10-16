@@ -7,34 +7,28 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { cn } from "@/shared/lib/utils";
+import { vietnameseOr } from "@/shared/lib/user-message";
 
-const WRONG_CREDENTIALS = "Tên đăng nhập hoặc mật khẩu chưa đúng. Bạn thử lại.";
+const WRONG_CREDENTIALS = "Tên đăng nhập hoặc mật khẩu không đúng.";
 
 /**
- * Lời báo lỗi bằng tiếng Việt cho người dùng.
+ * Lời báo lỗi cho cán bộ đọc.
  *
- * `authProvider.login` trả về câu tiếng Anh; ở đây chỉ đổi sang lời cho cán bộ
- * đọc, không đụng tới cách đăng nhập. Hai trường hợp không phải sai mật khẩu
- * (mất mạng, không tải được quyền) được nhận ra theo câu gốc của provider.
+ * `authProvider.login` đã trả câu tiếng Việt cho từng trường hợp (sai mật khẩu,
+ * tài khoản ngừng hoạt động, mất mạng, không tải được quyền); đây chỉ là lưới
+ * an toàn để một câu tiếng Anh lọt qua không bao giờ hiện ra.
  */
 function toVietnamese(message: string | undefined): string {
-  const m = message ?? "";
-  if (m.startsWith("Could not reach")) {
-    return "Không kết nối được tới hệ thống. Bạn kiểm tra mạng rồi thử lại.";
-  }
-  if (m.startsWith("Signed in, but")) {
-    return "Đăng nhập được nhưng chưa tải được quyền sử dụng. Bạn thử lại.";
-  }
-  return WRONG_CREDENTIALS;
+  return vietnameseOr(message, WRONG_CREDENTIALS);
 }
 
 /**
  * Màn đăng nhập.
  *
- * Logic giữ nguyên như bản cũ (`sign-in-form.tsx`): `useLogin` của Refine gọi
- * `authProvider.login` với tên đăng nhập (hoặc email) và mật khẩu. Chỉ khác:
- * lỗi hiện ngay dưới ô mật khẩu thay cho thông báo nổi tiếng Anh, và khi đường
- * dẫn có `?expired=1` thì báo phiên trước đã hết hạn ở đầu thẻ.
+ * `useLogin` của Refine gọi `authProvider.login` với tên đăng nhập (hoặc email)
+ * và mật khẩu. Lỗi hiện ngay dưới ô mật khẩu thay cho thông báo nổi, và khi
+ * đường dẫn có `?expired=1` (authProvider.onError đặt khi phiên hết hạn giữa
+ * chừng) thì báo phiên trước đã hết hạn ở đầu thẻ.
  *
  * Không có đăng ký hay quên mật khẩu: tài khoản do quản trị viên cấp và đặt lại.
  */
@@ -58,8 +52,8 @@ export const LoginForm = () => {
       {
         onSuccess: (data) => {
           if (!data.success) {
-            // `useLogin` đã mở thông báo nổi "login-error" bằng câu tiếng Anh;
-            // lỗi đã hiện ngay trên form nên đóng thông báo đó đi.
+            // `useLogin` tự mở thông báo nổi "login-error"; App.tsx đã chặn nó
+            // (lỗi hiện ngay trên form), đóng thêm ở đây cho chắc.
             close?.("login-error");
             setError(toVietnamese(data.error?.message));
           }

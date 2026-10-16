@@ -142,6 +142,18 @@ export type EmptyStateContent = {
   action?: ReactNode;
 };
 
+/**
+ * Kiểu chữ tiêu đề cột theo Figma (khung "Tiêu đề cột", 309:15521): 12px, đậm
+ * 600, chữ thường như khi viết — KHÔNG in hoa, không giãn chữ — cao 40px.
+ *
+ * `TableHead` (`shared/ui/table.tsx`) còn gắn `text-overline` (11px, in hoa,
+ * giãn chữ). Thứ tự hai lớp tiện ích tự định nghĩa với lớp sẵn có của Tailwind
+ * trong file CSS không đảm bảo lớp nào thắng, nên ở đây dùng dấu `!` cho chắc.
+ * Khi `TableHead` bỏ `text-overline` thì có thể bỏ dấu `!`.
+ */
+const COLUMN_HEAD_TYPE =
+  "text-xs! leading-4! font-semibold! normal-case! tracking-normal!";
+
 export function DataTable<TData extends BaseRecord>({
   table,
   toolbar,
@@ -279,7 +291,11 @@ export function DataTable<TData extends BaseRecord>({
                           isOverflowing: isOverflowing,
                         }),
                       }}
-                      className={getPinnedClasses({ column: header.column })}
+                      className={cn(
+                        "h-10",
+                        COLUMN_HEAD_TYPE,
+                        getPinnedClasses({ column: header.column })
+                      )}
                     >
                       {isPlaceholder ? null : header.column.getCanSort() ? (
                         // `getToggleSortingHandler` rather than a hand-rolled
@@ -293,12 +309,10 @@ export function DataTable<TData extends BaseRecord>({
                           className={cn(
                             "group/sort -mx-1 flex max-w-full items-center gap-1",
                             "rounded px-1 py-0.5 text-inherit",
-                            // Preflight resets `text-transform` on `button`,
-                            // so the header's own `text-overline` stops at the
-                            // element boundary and a sortable column comes out
-                            // in sentence case beside its unsortable
-                            // neighbours. Restate it on the button.
-                            "text-overline",
+                            // Restate the header's type on the button: a
+                            // sortable column must read exactly like its
+                            // unsortable neighbours.
+                            COLUMN_HEAD_TYPE,
                             "transition-colors hover:text-foreground",
                             "focus-visible:outline-none focus-visible:ring-2",
                             "focus-visible:ring-ring/50",

@@ -185,7 +185,7 @@ export function RowActions({
       {primary && (
         <ActionButton
           action={primary}
-          variant="subtle"
+          variant="secondary"
           size="sm"
           className="w-32 justify-center"
           iconClassName="size-3.5"

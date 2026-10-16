@@ -8,8 +8,8 @@ import { cn } from "@/shared/lib/utils";
  * Two conventions here are the whole difference between a business table and
  * a styled `<table>`:
  *
- * **The header is a label, not a heading.** `text-overline` — 11px, uppercase,
- * semibold, tracked out — on `--surface-subtle`, one step off the card. It is
+ * **The header is a label, not a heading.** 12px semibold in sentence case
+ * (as the Figma frames draw it) on `--surface-subtle`, one step off the card. It is
  * deliberately quieter than the data underneath it, because in a table of
  * forty rows the column names are read once and the values are read forty
  * times, and the band is what keeps the labels from being mistaken for a first
@@ -126,8 +126,8 @@ function TableHead({
     <th
       data-slot="table-head"
       className={cn(
-        "text-overline text-muted-foreground bg-surface-subtle",
-        "h-11 px-3 align-middle whitespace-nowrap",
+        "text-xs leading-4 font-semibold text-muted-foreground bg-surface-subtle",
+        "h-10 px-3 align-middle whitespace-nowrap",
         "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         ALIGN[align],
         className

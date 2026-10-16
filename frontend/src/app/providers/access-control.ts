@@ -54,7 +54,7 @@ export const accessControlProvider: AccessControlProvider = {
     }
 
     if (!permissions.includes(required)) {
-      return { can: false, reason: `You need the ${required} permission` };
+      return { can: false, reason: "Tài khoản của bạn chưa được cấp quyền này." };
     }
 
     // Row-level scope. Two layers, asked in order: the permission above decides
@@ -76,7 +76,7 @@ export const accessControlProvider: AccessControlProvider = {
       // refusing here would hide a button that works.
       const allowed = record._can[rowAction];
       if (allowed === false) {
-        return { can: false, reason: "This record is outside your data scope" };
+        return { can: false, reason: "Bản ghi này nằm ngoài phạm vi dữ liệu của bạn." };
       }
     }
 

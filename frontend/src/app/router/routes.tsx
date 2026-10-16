@@ -129,7 +129,7 @@ export function AppRoutes() {
             <CanAccess
               resource="tasks"
               action="list"
-              fallback={<Forbidden resource="tasks" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -153,7 +153,7 @@ export function AppRoutes() {
             <CanAccess
               resource="organizations"
               action="list"
-              fallback={<Forbidden resource="organizations" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -170,7 +170,7 @@ export function AppRoutes() {
             <CanAccess
               resource="departments"
               action="list"
-              fallback={<Forbidden resource="departments" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -198,7 +198,7 @@ export function AppRoutes() {
             <CanAccess
               resource="users"
               action="list"
-              fallback={<Forbidden resource="users" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -215,7 +215,7 @@ export function AppRoutes() {
             <CanAccess
               resource="roles"
               action="list"
-              fallback={<Forbidden resource="roles" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -232,7 +232,7 @@ export function AppRoutes() {
             <CanAccess
               resource="row_level_policies"
               action="list"
-              fallback={<Forbidden resource="row_level_policies" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -249,7 +249,7 @@ export function AppRoutes() {
             <CanAccess
               resource="permissions"
               action="list"
-              fallback={<Forbidden resource="permissions" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -270,25 +270,101 @@ export function AppRoutes() {
         <Route path="/notifications" element={<NotificationList />} />
 
         {/*
-          Màn nghiệp vụ ASXH. Đang dùng dữ liệu mẫu trong từng feature nên chưa
-          bọc <CanAccess>; thêm guard khi nối API và seed quyền.
+          Màn nghiệp vụ ASXH — gọi API thật, nên bọc <CanAccess> như các màn
+          quản trị: thanh bên đã ẩn mục không có quyền, guard này lo đường dẫn
+          gõ tay hoặc đánh dấu sẵn. Mã quyền của từng màn (kể cả màn mang tên
+          khác tên resource backend) nằm ở `shared/lib/permissions.ts`.
         */}
-        <Route path="/input-reports" element={<InputReportList />} />
-        <Route path="/input-reports/:id" element={<InputReportWork />} />
-        <Route path="/report-review" element={<ReviewList />} />
-        <Route path="/report-review/:id" element={<ReviewWork />} />
-        <Route path="/period-setup" element={<PeriodSetup />} />
-        <Route path="/publication-history" element={<PublicationHistoryList />} />
-        <Route path="/summary" element={<SummaryPage />} />
-        <Route path="/annual-review" element={<AnnualReviewList />} />
-        <Route path="/annual-review/history" element={<AnnualSubmissionHistory />} />
-        <Route path="/annual-review/:id" element={<AnnualReviewWork />} />
-        <Route path="/report-units" element={<ReportUnitList />} />
-        <Route path="/report-units/create" element={<ReportUnitCreate />} />
-        <Route path="/report-units/edit/:id" element={<ReportUnitEdit />} />
-        <Route path="/report-calendar" element={<ReportCalendar />} />
-        <Route path="/templates" element={<TemplateSets />} />
-        <Route path="/templates/designer/:id" element={<TemplateDesigner />} />
+        <Route
+          path="/input-reports"
+          element={
+            <CanAccess resource="input_reports" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<InputReportList />} />
+          <Route path=":id" element={<InputReportWork />} />
+        </Route>
+        <Route
+          path="/report-review"
+          element={
+            <CanAccess resource="report_review" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<ReviewList />} />
+          <Route path=":id" element={<ReviewWork />} />
+        </Route>
+        <Route
+          path="/period-setup"
+          element={
+            <CanAccess resource="period_setup" action="list" fallback={<Forbidden />}>
+              <PeriodSetup />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/publication-history"
+          element={
+            <CanAccess resource="publication_history" action="list" fallback={<Forbidden />}>
+              <PublicationHistoryList />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/summary"
+          element={
+            <CanAccess resource="summary" action="list" fallback={<Forbidden />}>
+              <SummaryPage />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/annual-review"
+          element={
+            <CanAccess resource="annual_review" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<AnnualReviewList />} />
+          {/* `history` đứng trước `:id` cho dễ đọc; react-router vẫn ưu tiên đoạn cố định. */}
+          <Route path="history" element={<AnnualSubmissionHistory />} />
+          <Route path=":id" element={<AnnualReviewWork />} />
+        </Route>
+        <Route
+          path="/report-units"
+          element={
+            <CanAccess resource="report_units" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<ReportUnitList />} />
+          <Route path="create" element={<ReportUnitCreate />} />
+          <Route path="edit/:id" element={<ReportUnitEdit />} />
+        </Route>
+        <Route
+          path="/report-calendar"
+          element={
+            <CanAccess resource="report_calendar" action="list" fallback={<Forbidden />}>
+              <ReportCalendar />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <CanAccess resource="templates" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<TemplateSets />} />
+          <Route path="designer/:id" element={<TemplateDesigner />} />
+        </Route>
 
         {/* Not a resource: no list of "my accounts", no id in the URL. */}
         <Route path="/profile" element={<Profile />} />

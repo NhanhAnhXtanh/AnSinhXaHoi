@@ -64,9 +64,18 @@ export const resources: ResourceProps[] = [
     meta: { label: "Trang chủ", icon: <House className="h-4 w-4" /> },
   },
 
-  // Màn nghiệp vụ ASXH. Các màn đang chạy trên dữ liệu mẫu (chưa có API) nằm
-  // trong UNGUARDED_RESOURCES ở `shared/lib/permissions.ts`; gỡ khỏi đó khi nối
-  // API và seed quyền tương ứng.
+  // Màn nghiệp vụ ASXH. Mã quyền mở từng màn:
+  //   input_reports       → input_reports:write     (cán bộ đơn vị nhập, nộp)
+  //   report_review       → input_reports:approve   (cán bộ Sở duyệt, trả lại)
+  //   period_setup        → period_assignments:read
+  //   summary             → summary:read
+  //   annual_review       → annual_reports:read
+  //   templates           → templates:read          (trùng tên, suy ra thẳng)
+  //   report_calendar     → report_calendars:read
+  //   publication_history → publications:read
+  //   report_units        → report_units:read       (trùng tên, suy ra thẳng)
+  // Màn nào mang tên khác resource backend thì khai trong SCREEN_PERMISSIONS ở
+  // `shared/lib/permissions.ts` — đổi một bên phải đổi bên kia.
   { name: "bao_cao", meta: { label: "Báo cáo", group: true } },
   {
     name: "input_reports",

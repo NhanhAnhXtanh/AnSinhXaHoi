@@ -8,19 +8,59 @@
  * component in `shared/` may not import from `app/`.
  */
 
+/** The suffixes the API grants: the three every resource has, plus `approve`. */
+export type PermissionSuffix = "read" | "write" | "delete" | "approve";
+
 /**
  * Refine's six actions, mapped onto the three the API grants.
  *
  * `clone` needs `write` rather than `read` even though it opens a form
  * pre-filled from an existing record: what it produces is a create.
+ *
+ * `approve` is not a Refine action but a custom one a screen asks about with
+ * `useCan({ resource, action: "approve" })` — the ASXH workflows separate the
+ * officer who submits from the one who approves (`input_reports:approve`,
+ * `annual_reports:approve`). It maps onto itself.
  */
-export const ACTION_TO_PERMISSION: Record<string, "read" | "write" | "delete"> = {
+export const ACTION_TO_PERMISSION: Record<string, PermissionSuffix> = {
   list: "read",
   show: "read",
   create: "write",
   edit: "write",
   clone: "write",
   delete: "delete",
+  approve: "approve",
+};
+
+/**
+ * Màn ASXH mà tên resource ở frontend khác tên resource REST ở backend.
+ *
+ * Quy tắc chung vẫn là "suy ra, không tra bảng": `report_units:read` là đúng
+ * tên resource. Bảng này chỉ dành cho các màn nghiệp vụ không phải CRUD của một
+ * resource — "Duyệt phiếu nhập" là một cách nhìn khác của `input_reports`,
+ * "Thiết lập & điều hành" làm việc trên `period_assignments`… Giữ bảng ngắn: màn
+ * nào trùng tên resource backend thì KHÔNG thêm vào đây.
+ *
+ * - `resource`: nửa đầu mã quyền backend.
+ * - `read`: hậu tố cần để MỞ màn (list/show), khi khác `read`. "Nhập liệu báo
+ *   cáo" mở bằng `input_reports:write` để cán bộ Sở chỉ có quyền xem/duyệt
+ *   không thấy mục nhập; "Duyệt phiếu nhập" mở bằng `input_reports:approve`.
+ *   Các hành động còn lại (create/edit/delete/approve) vẫn theo hậu tố chuẩn.
+ *
+ * Mã quyền thật seed ở `backend/.../db/changelog/changes/` (101, 103, 111, 122,
+ * 165) và kiểm bằng `@PreAuthorize` trong `module/asxh/<slice>/security/<Tên>Permissions.java`.
+ */
+const SCREEN_PERMISSIONS: Record<
+  string,
+  { resource: string; read?: PermissionSuffix }
+> = {
+  input_reports: { resource: "input_reports", read: "write" },
+  report_review: { resource: "input_reports", read: "approve" },
+  period_setup: { resource: "period_assignments" },
+  publication_history: { resource: "publications" },
+  report_calendar: { resource: "report_calendars" },
+  summary: { resource: "summary" },
+  annual_review: { resource: "annual_reports" },
 };
 
 /**
@@ -41,20 +81,7 @@ export const ACTION_TO_PERMISSION: Record<string, "read" | "write" | "delete"> =
  * are `useList` calls that carry their own permission checks, and the tiles
  * around them need gating with `useCan` rather than an entry here.
  */
-const UNGUARDED_RESOURCES = new Set([
-  "dashboard",
-  // TẠM: màn ASXH đang chạy trên dữ liệu mẫu trong feature, chưa gọi API nào.
-  // Khi nối API thì bỏ tên khỏi đây và seed quyền `<tên>:read|write|delete`.
-  "input_reports",
-  "report_review",
-  "period_setup",
-  "summary",
-  "annual_review",
-  "templates",
-  "report_calendar",
-  "publication_history",
-  "report_units",
-]);
+const UNGUARDED_RESOURCES = new Set(["dashboard"]);
 
 /**
  * The permission code a resource and action need, or `null` where no code
@@ -72,5 +99,9 @@ export function permissionFor(
 ): string | null {
   if (!resource || UNGUARDED_RESOURCES.has(resource)) return null;
   const suffix = ACTION_TO_PERMISSION[action];
-  return suffix ? `${resource}:${suffix}` : null;
+  if (!suffix) return null;
+
+  const screen = SCREEN_PERMISSIONS[resource];
+  if (!screen) return `${resource}:${suffix}`;
+  return `${screen.resource}:${suffix === "read" ? (screen.read ?? "read") : suffix}`;
 }
