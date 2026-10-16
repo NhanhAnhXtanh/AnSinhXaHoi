@@ -62,7 +62,7 @@ export function DataTableRefresh<TData extends BaseRecord>({
           type="button"
           variant="outline"
           size="icon"
-          aria-label="Refresh"
+          aria-label="Làm mới"
           disabled={isFetching}
           onClick={() => void tableQuery.refetch()}
           className={className}
@@ -70,7 +70,7 @@ export function DataTableRefresh<TData extends BaseRecord>({
           <RefreshCwIcon className={cn(isFetching && "animate-spin")} />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Refresh</TooltipContent>
+      <TooltipContent>Làm mới</TooltipContent>
     </Tooltip>
   );
 }
@@ -113,7 +113,7 @@ export function DataTableColumnToggle<TData extends BaseRecord>({
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="outline" className={className}>
           <Columns3Icon />
-          Columns
+          Cột hiển thị
           {hidden > 0 && (
             <span className="text-muted-foreground tabular-nums">
               ({columns.length - hidden}/{columns.length})
@@ -122,7 +122,7 @@ export function DataTableColumnToggle<TData extends BaseRecord>({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-80 w-52 overflow-y-auto">
-        <DropdownMenuLabel>Columns shown</DropdownMenuLabel>
+        <DropdownMenuLabel>Cột đang hiện</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {columns.map((column) => (
           <DropdownMenuCheckboxItem
@@ -144,7 +144,7 @@ export function DataTableColumnToggle<TData extends BaseRecord>({
                 columns.forEach((column) => column.toggleVisibility(true))
               }
             >
-              Show all
+              Hiện tất cả cột
             </DropdownMenuItem>
           </>
         )}
@@ -273,17 +273,17 @@ export function DataTableExport<TData extends BaseRecord>({
           ) : (
             <DownloadIcon />
           )}
-          Export
+          Xuất Excel
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Download as CSV</DropdownMenuLabel>
+        <DropdownMenuLabel>Tải về tệp mở bằng Excel</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={exportPage}>
           <span className="flex flex-col">
-            <span>This page</span>
+            <span>Trang đang xem</span>
             <span className="text-muted-foreground text-xs">
-              The rows and columns on screen
+              Các dòng và cột đang hiện trên màn hình
             </span>
           </span>
         </DropdownMenuItem>
@@ -292,9 +292,9 @@ export function DataTableExport<TData extends BaseRecord>({
           onSelect={() => void triggerExport()}
         >
           <span className="flex flex-col">
-            <span>All rows</span>
+            <span>Tất cả các dòng</span>
             <span className="text-muted-foreground text-xs">
-              Every match for the current filters
+              Mọi dòng khớp bộ lọc đang chọn
             </span>
           </span>
         </DropdownMenuItem>

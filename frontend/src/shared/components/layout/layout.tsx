@@ -48,7 +48,7 @@ export function Layout({ children }: PropsWithChildren) {
           "focus:text-sm focus:font-medium focus:text-primary-foreground"
         )}
       >
-        Skip to content
+        Tới nội dung chính
       </a>
 
       <Sidebar />

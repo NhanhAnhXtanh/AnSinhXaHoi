@@ -87,7 +87,7 @@ function navRowClass({
           "[&_svg]:text-sidebar-primary",
           // The tick in the gutter. It is what survives the row being read
           // peripherally, when the fill is too quiet to register.
-          "before:absolute before:inset-y-1.5 before:left-0 before:w-[3px]",
+          "before:absolute before:inset-y-2 before:left-0 before:w-[3px]",
           "before:rounded-r-full before:bg-sidebar-primary",
           isCollapsed && "before:inset-y-2",
         ]
@@ -167,7 +167,7 @@ export function Sidebar() {
 
       <ShadcnSidebarContent
         className={cn(
-          "scrollbar-fade gap-3 overflow-x-hidden border-r border-sidebar-border py-4",
+          "scrollbar-fade gap-3 overflow-x-hidden border-r border-sidebar-border py-3",
           isCollapsed ? "px-2" : "px-3"
         )}
       >
@@ -189,6 +189,12 @@ export function Sidebar() {
 /* --------------------------------------------------------------------------
    Brand block — mirrors the header height so the two rules line up.
    -------------------------------------------------------------------------- */
+
+/**
+ * Dòng phụ dưới tên hệ thống: cơ quan dùng hệ thống. Viết thường ở đây;
+ * `text-overline` in hoa khi hiển thị, nên trình đọc màn hình vẫn đọc đúng chữ.
+ */
+const BRAND_UNIT = "Sở Tài chính";
 
 function SidebarBrand() {
   const { title } = useRefineOptions();
@@ -217,8 +223,8 @@ function SidebarBrand() {
             <span className="truncate text-sm font-bold tracking-tight text-sidebar-foreground">
               {title.text}
             </span>
-            <span className="text-overline text-sidebar-foreground/55">
-              Dashboard
+            <span className="text-overline text-sidebar-foreground/60">
+              {BRAND_UNIT}
             </span>
           </div>
 
@@ -226,7 +232,7 @@ function SidebarBrand() {
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            aria-label="Collapse sidebar"
+            aria-label="Thu gọn menu"
             className={cn(
               "size-8 shrink-0 rounded-lg text-sidebar-foreground/60",
               "hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -254,7 +260,7 @@ function BrandMark({
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-lg",
         "bg-sidebar-primary text-sidebar-primary-foreground",
-        "[&_svg]:size-4"
+        "[&_svg]:size-[18px]"
       )}
     >
       {icon}
@@ -269,13 +275,13 @@ function BrandMark({
         <button
           type="button"
           onClick={onExpand}
-          aria-label="Expand sidebar"
+          aria-label="Mở rộng menu"
           className="rounded-lg transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
           {mark}
         </button>
       </TooltipTrigger>
-      <TooltipContent side="right">Expand sidebar</TooltipContent>
+      <TooltipContent side="right">Mở rộng menu</TooltipContent>
     </Tooltip>
   );
 }
@@ -525,7 +531,7 @@ function SidebarUser({ isCollapsed }: { isCollapsed: boolean }) {
           {!isCollapsed && (
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-medium text-sidebar-foreground">
-                {name || "Account"}
+                {name || "Tài khoản"}
               </span>
               {user?.email && (
                 <span className="truncate text-xs text-sidebar-foreground/60">
@@ -542,7 +548,7 @@ function SidebarUser({ isCollapsed }: { isCollapsed: boolean }) {
           <DropdownMenuItem asChild>
             <Link to="/profile">
               <UserRoundIcon className="size-4" />
-              <span>Your account</span>
+              <span>Tài khoản của tôi</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -551,7 +557,7 @@ function SidebarUser({ isCollapsed }: { isCollapsed: boolean }) {
             className="text-destructive focus:text-destructive"
           >
             <LogOutIcon className="size-4" />
-            <span>{isLoggingOut ? "Logging out…" : "Log out"}</span>
+            <span>{isLoggingOut ? "Đang đăng xuất…" : "Đăng xuất"}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

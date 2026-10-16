@@ -62,20 +62,13 @@ type DeleteButtonProps = {
   onSuccess?: (value: DeleteOneResponse) => void;
 } & Omit<React.ComponentProps<typeof Button>, "onSuccess">;
 
+const DELETE_LABEL = "Xoá";
+
 export const DeleteButton = React.forwardRef<
   React.ComponentRef<typeof Button>,
   DeleteButtonProps
 >(({ resource, recordItemId, accessControl, meta, children, iconOnly, onSuccess, ...rest }, ref) => {
-  const {
-    hidden,
-    disabled,
-    loading,
-    onConfirm,
-    label,
-    confirmTitle: defaultConfirmTitle,
-    confirmOkLabel: defaultConfirmOkLabel,
-    cancelLabel: defaultCancelLabel,
-  } = useDeleteButton({
+  const { hidden, disabled, loading, onConfirm } = useDeleteButton({
     resource,
     id: recordItemId,
     accessControl,
@@ -89,9 +82,13 @@ export const DeleteButton = React.forwardRef<
 
   if (isHidden) return null;
 
-  const confirmCancelText = defaultCancelLabel;
-  const confirmOkText = defaultConfirmOkLabel;
-  const confirmTitle = defaultConfirmTitle;
+  // Refine's labels are English ("Delete", "Are you sure?", "Cancel") with no
+  // i18n provider configured. "Quay lại" rather than "Huỷ" for the way out:
+  // "huỷ" next to "xoá" reads as one more way of destroying something.
+  const label = DELETE_LABEL;
+  const confirmCancelText = "Quay lại";
+  const confirmOkText = DELETE_LABEL;
+  const confirmTitle = "Xoá bản ghi này?";
 
   const trigger = (
     <PopoverTrigger asChild>
@@ -150,7 +147,7 @@ export const DeleteButton = React.forwardRef<
       )}
       <PopoverContent className="w-auto" align="start">
         <div className="flex flex-col gap-2">
-          <p className="text-sm">{confirmTitle}</p>
+          <p className="text-sm font-medium">{confirmTitle}</p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
               {confirmCancelText}

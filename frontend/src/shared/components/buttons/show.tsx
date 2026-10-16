@@ -42,6 +42,9 @@ type ShowButtonProps = {
   iconOnly?: boolean;
 } & React.ComponentProps<typeof Button>;
 
+/** Refine's label is English with no i18n provider; the wording is fixed here. */
+const SHOW_LABEL = "Xem";
+
 export const ShowButton = React.forwardRef<
   React.ComponentRef<typeof Button>,
   ShowButtonProps
@@ -59,13 +62,14 @@ export const ShowButton = React.forwardRef<
     },
     ref
   ) => {
-    const { hidden, disabled, LinkComponent, to, label } = useShowButton({
+    const { hidden, disabled, LinkComponent, to } = useShowButton({
       resource,
       id: recordItemId,
       accessControl,
       meta,
     });
 
+    const label = SHOW_LABEL;
     const isDisabled = disabled || rest.disabled;
     const isHidden = hidden || rest.hidden;
 

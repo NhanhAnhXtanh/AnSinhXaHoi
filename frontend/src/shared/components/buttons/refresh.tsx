@@ -36,11 +36,7 @@ export const RefreshButton = React.forwardRef<
     { resource, recordItemId, dataProviderName, meta, children, ...rest },
     ref
   ) => {
-    const {
-      onClick: refresh,
-      loading,
-      label,
-    } = useRefreshButton({
+    const { onClick: refresh, loading } = useRefreshButton({
       resource,
       id: recordItemId,
       dataProviderName,
@@ -69,7 +65,7 @@ export const RefreshButton = React.forwardRef<
                 "animate-spin": loading,
               })}
             />
-            <span>{label ?? "Refresh"}</span>
+            <span>Làm mới</span>
           </div>
         )}
       </Button>

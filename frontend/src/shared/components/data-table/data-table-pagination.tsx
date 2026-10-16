@@ -6,7 +6,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 
 import {
   Select,
@@ -35,6 +35,8 @@ export function DataTablePagination({
   setPageSize,
   total,
 }: DataTablePaginationProps) {
+  const pageSizeLabelId = useId();
+
   const pageSizeOptions = useMemo(() => {
     const baseOptions = [10, 20, 30, 40, 50];
     const optionsSet = new Set(baseOptions);
@@ -58,9 +60,11 @@ export function DataTablePagination({
       )}
     >
       {/*
-        The range, not the count. "137 row(s)" leaves somebody on page four
-        working out which rows they are looking at; "Showing 61–80 of 137"
+        The range, not the count. "137 dòng" leaves somebody on page four
+        working out which rows they are looking at; "Hiển thị 61–80 trong 137"
         answers it, and it is the same two numbers the table already holds.
+        Numbers take the Vietnamese thousands dot (1.234), like every figure
+        elsewhere on screen.
 
         The last page is short, so the upper bound is clamped to the total
         rather than computed from the page size — otherwise the final page of
@@ -77,30 +81,38 @@ export function DataTablePagination({
       >
         {typeof total === "number" ? (
           total === 0 ? (
-            "No rows"
+            "Không có dòng nào"
           ) : (
             <>
-              Showing{" "}
+              Hiển thị{" "}
               <span className="text-foreground font-medium">
-                {(currentPage - 1) * pageSize + 1}&ndash;
-                {Math.min(currentPage * pageSize, total)}
+                {formatCount((currentPage - 1) * pageSize + 1)}&ndash;
+                {formatCount(Math.min(currentPage * pageSize, total))}
               </span>{" "}
-              of{" "}
-              <span className="text-foreground font-medium">{total}</span>
+              trong{" "}
+              <span className="text-foreground font-medium">
+                {formatCount(total)}
+              </span>
             </>
           )
         ) : null}
       </div>
       <div className={cn("flex", "items-center", "flex-wrap", "gap-2")}>
         <div className={cn("flex", "items-center", "gap-2")}>
-          <span className={cn("text-sm", "text-muted-foreground")}>
-            Rows per page
+          <span
+            id={pageSizeLabelId}
+            className={cn("text-sm", "text-muted-foreground")}
+          >
+            Số dòng
           </span>
           <Select
             value={`${pageSize}`}
             onValueChange={(v) => setPageSize(Number(v))}
           >
-            <SelectTrigger className={cn("h-8", "w-[70px]")}>
+            <SelectTrigger
+              aria-labelledby={pageSizeLabelId}
+              className={cn("h-8", "w-[70px]")}
+            >
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">
@@ -124,7 +136,7 @@ export function DataTablePagination({
               "whitespace-nowrap"
             )}
           >
-            Page {currentPage} of {pageCount}
+            Trang {formatCount(currentPage)} / {formatCount(pageCount)}
           </div>
           <div className={cn("flex", "items-center", "gap-2")}>
             <Button
@@ -133,7 +145,7 @@ export function DataTablePagination({
               className={cn("hidden", "lg:flex")}
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              aria-label="Go to first page"
+              aria-label="Trang đầu"
             >
               <ChevronsLeft />
             </Button>
@@ -142,7 +154,7 @@ export function DataTablePagination({
               size="icon-sm"
               onClick={() => setCurrentPage(currentPage - 1)}
               disabled={currentPage === 1}
-              aria-label="Go to previous page"
+              aria-label="Trang trước"
             >
               <ChevronLeft />
             </Button>
@@ -151,7 +163,7 @@ export function DataTablePagination({
               size="icon-sm"
               onClick={() => setCurrentPage(currentPage + 1)}
               disabled={currentPage === pageCount}
-              aria-label="Go to next page"
+              aria-label="Trang sau"
             >
               <ChevronRight />
             </Button>
@@ -161,7 +173,7 @@ export function DataTablePagination({
               className={cn("hidden", "lg:flex")}
               onClick={() => setCurrentPage(pageCount)}
               disabled={currentPage === pageCount}
-              aria-label="Go to last page"
+              aria-label="Trang cuối"
             >
               <ChevronsRight />
             </Button>
@@ -170,6 +182,11 @@ export function DataTablePagination({
       </div>
     </div>
   );
+}
+
+/** 1234 -> "1.234": the thousands dot used for every number on screen. */
+function formatCount(value: number) {
+  return value.toLocaleString("vi-VN");
 }
 
 DataTablePagination.displayName = "DataTablePagination";

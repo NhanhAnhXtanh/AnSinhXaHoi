@@ -25,11 +25,17 @@ type CreateButtonProps = {
   meta?: Record<string, unknown>;
 } & React.ComponentProps<typeof Button>;
 
+/**
+ * Refine's own label is the English "Create" (no i18n provider is configured),
+ * so the Vietnamese wording is fixed here, where every screen picks it up.
+ */
+const CREATE_LABEL = "Thêm mới";
+
 export const CreateButton = React.forwardRef<
   React.ComponentRef<typeof Button>,
   CreateButtonProps
 >(({ resource, accessControl, meta, children, onClick, ...rest }, ref) => {
-  const { hidden, disabled, LinkComponent, to, label } = useCreateButton({
+  const { hidden, disabled, LinkComponent, to } = useCreateButton({
     resource,
     accessControl,
     meta,
@@ -59,7 +65,7 @@ export const CreateButton = React.forwardRef<
         {children ?? (
           <div className="flex items-center gap-2 font-semibold">
             <Plus className="w-4 h-4" />
-            <span>{label ?? "Create"}</span>
+            <span>{CREATE_LABEL}</span>
           </div>
         )}
       </LinkComponent>

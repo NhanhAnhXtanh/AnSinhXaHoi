@@ -3,15 +3,20 @@
 import type { HttpError, BaseRecord } from "@refinedev/core";
 import { useResourceParams } from "@refinedev/core";
 import type { UseTableReturnType } from "@refinedev/react-table";
-import type { Column } from "@tanstack/react-table";
+import type { Column, ColumnFiltersState } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import {
   ArrowDown,
   ArrowUp,
   ChevronsUpDown,
+  CloudOff,
+  FunnelX,
   Inbox,
-  LoaderCircle,
+  RefreshCw,
+  SearchX,
   ShieldOff,
+  WifiOff,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -23,6 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table";
+import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { DataTablePagination } from "@/shared/components/data-table/data-table-pagination";
 import { cn } from "@/shared/lib/utils";
 import { isScopedResource } from "@/shared/api/session";
@@ -102,11 +109,46 @@ type DataTableProps<TData extends BaseRecord> = {
    * divided by hairlines — filters, rows, pager.
    */
   toolbar?: ReactNode;
+  /**
+   * What one row is called on this screen — "phiếu", "đơn vị", "kỳ báo cáo" —
+   * so the empty and error states can say "Chưa có phiếu nào" rather than a
+   * generic sentence. Optional: without it the states fall back to "dữ liệu".
+   */
+  itemLabel?: string;
+  /**
+   * Replaces the "nothing here yet" state (no filters, not scoped). The doc
+   * (`trang-thai-chung.md` §1) words it per screen — when rows will appear, or
+   * what to do to make them — and only the screen knows that.
+   */
+  emptyState?: EmptyStateContent;
+  /**
+   * An extra sentence for the "no match" state, e.g. "Đang xem năm 2026 — nếu
+   * phiếu thuộc năm khác, hãy đổi năm ở góc trên." on a screen that is scoped
+   * to a year. The year is not a filter, so "Xoá lọc" never resets it.
+   */
+  filteredHint?: ReactNode;
+  /**
+   * The filter id the search box writes, so the "no match" title can quote
+   * what was typed. Same default as `DataTableQuickFilter`.
+   * @default "q"
+   */
+  searchField?: string;
+};
+
+export type EmptyStateContent = {
+  icon?: LucideIcon;
+  title?: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
 };
 
 export function DataTable<TData extends BaseRecord>({
   table,
   toolbar,
+  itemLabel,
+  emptyState,
+  filteredHint,
+  searchField = "q",
 }: DataTableProps<TData>) {
   const {
     reactTable: { getHeaderGroups, getRowModel, getTotalSize },
@@ -284,7 +326,7 @@ export function DataTable<TData extends BaseRecord>({
                         <div
                           role="separator"
                           aria-orientation="vertical"
-                          aria-label={`Resize column ${header.column.id}`}
+                          aria-label="Kéo để đổi độ rộng cột"
                           onMouseDown={header.getResizeHandler()}
                           onTouchStart={header.getResizeHandler()}
                           // The header may itself be clickable (sorting), and
@@ -335,32 +377,17 @@ export function DataTable<TData extends BaseRecord>({
                             getPinnedClasses({ column })
                           )}
                         >
-                          <div className="h-8" />
+                          {/* A grey bar per cell, the shape of a row that is
+                              on its way (Figma "Dòng khung xám"): no spinner
+                              and no words — the toolbar above stays usable. */}
+                          <div className="flex h-8 items-center">
+                            <Skeleton className="h-3.5 w-3/5 rounded" />
+                          </div>
                         </TableCell>
                       ))}
                     </TableRow>
                   )
                 )}
-                <TableRow>
-                  <TableCell
-                    colSpan={leafColumns.length}
-                    className={cn("absolute", "inset-0", "pointer-events-none")}
-                  >
-                    <LoaderCircle
-                      className={cn(
-                        "absolute",
-                        "top-1/2",
-                        "left-1/2",
-                        "animate-spin",
-                        "text-primary",
-                        "h-8",
-                        "w-8",
-                        "-translate-x-1/2",
-                        "-translate-y-1/2"
-                      )}
-                    />
-                  </TableCell>
-                </TableRow>
               </>
             ) : getRowModel().rows?.length ? (
               getRowModel().rows.map((row) => {
@@ -408,6 +435,15 @@ export function DataTable<TData extends BaseRecord>({
               <DataTableNoData
                 isOverflowing={isOverflowing}
                 columnsLength={leafColumns.length}
+                columnFilters={table.reactTable.getState().columnFilters}
+                onClearFilters={() => table.reactTable.setColumnFilters([])}
+                isError={tableQuery.isError}
+                isRetrying={tableQuery.isFetching}
+                onRetry={() => void tableQuery.refetch()}
+                itemLabel={itemLabel}
+                emptyState={emptyState}
+                filteredHint={filteredHint}
+                searchField={searchField}
               />
             )}
           </TableBody>
@@ -465,18 +501,134 @@ function SortIndicator({ sorted }: { sorted: false | "asc" | "desc" }) {
   );
 }
 
+type FilterEntry = { id: string; value: unknown };
+
+/** A filter the person set themselves and can take off again. */
+function isActiveFilter(entry: FilterEntry) {
+  const { value } = entry;
+  if (value == null || value === "") return false;
+  if (Array.isArray(value)) return value.some((v) => v != null && v !== "");
+  return true;
+}
+
+/**
+ * Which of the five "no rows" states applies, in the order
+ * `trang-thai-chung.md` puts them:
+ *
+ *   error     the read failed — say so and offer "Thử lại" (§5), or "mất mạng"
+ *             when the browser itself reports being offline
+ *   filtered  any filter the person set — "Xoá lọc" (§2). Checked before
+ *             `scoped` on purpose: with a filter on, the filter is the likelier
+ *             reason and the one the person can do something about
+ *   scoped    the account sees only part of this resource (§3)
+ *   empty     genuinely nothing yet (§1)
+ */
 function DataTableNoData({
   isOverflowing,
   columnsLength,
+  columnFilters,
+  onClearFilters,
+  isError,
+  isRetrying,
+  onRetry,
+  itemLabel,
+  emptyState,
+  filteredHint,
+  searchField,
 }: {
   isOverflowing: { horizontal: boolean; vertical: boolean };
   columnsLength: number;
+  columnFilters: ColumnFiltersState;
+  onClearFilters: () => void;
+  isError: boolean;
+  isRetrying: boolean;
+  onRetry: () => void;
+  itemLabel?: string;
+  emptyState?: EmptyStateContent;
+  filteredHint?: ReactNode;
+  searchField: string;
 }) {
   // A narrowed account sees exactly what a system with no data looks like, and
   // has no way to tell the two apart. Saying which it is costs one sentence and
   // saves the support ticket that would otherwise be raised.
   const { resource } = useResourceParams();
   const scoped = isScopedResource(resource?.name);
+
+  const entries = (columnFilters as unknown as FilterEntry[]).filter(
+    isActiveFilter
+  );
+  const filtered = entries.length > 0;
+  const search = entries.find((entry) => entry.id === searchField)?.value;
+  const searchText =
+    typeof search === "string" && search.trim() ? search.trim() : undefined;
+
+  const label = itemLabel?.trim() || undefined;
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+
+  let content: Required<Pick<EmptyStateContent, "icon" | "title">> &
+    EmptyStateContent;
+
+  if (isError) {
+    const retry = (
+      <Button variant="outline" onClick={onRetry} disabled={isRetrying}>
+        <RefreshCw className={cn(isRetrying && "animate-spin")} />
+        Thử lại
+      </Button>
+    );
+    content = offline
+      ? {
+          icon: WifiOff,
+          title: "Máy tính đang mất kết nối mạng",
+          description:
+            "Kiểm tra dây mạng hoặc wifi. Khi có mạng lại, bấm Thử lại.",
+          action: retry,
+        }
+      : {
+          icon: CloudOff,
+          title: label
+            ? `Chưa tải được danh sách ${label}`
+            : "Chưa tải được danh sách",
+          description:
+            "Có thể do mạng chập chờn hoặc hệ thống đang bận. Bạn bấm Thử lại; nếu vẫn không được sau vài lần, hãy báo bộ phận hỗ trợ.",
+          action: retry,
+        };
+  } else if (filtered) {
+    content = {
+      icon: SearchX,
+      title: searchText
+        ? `Không tìm thấy ${label ?? "dữ liệu"} nào có "${searchText}"`
+        : `Không có ${label ?? "dữ liệu"} nào khớp bộ lọc`,
+      description: (
+        <>
+          Thử bỏ bớt điều kiện lọc hoặc tìm bằng từ khác.
+          {filteredHint && <> {filteredHint}</>}
+        </>
+      ),
+      action: (
+        <Button variant="outline" onClick={onClearFilters}>
+          <FunnelX />
+          Xoá lọc
+        </Button>
+      ),
+    };
+  } else if (scoped) {
+    content = {
+      icon: ShieldOff,
+      title: `Không có ${label ?? "dữ liệu"} nào trong phần bạn được xem`,
+      description: `Tài khoản của bạn chỉ được xem một phần dữ liệu, và phần đó hiện chưa có ${label ?? "dữ liệu"} nào. Nếu công việc cần xem thêm, hãy liên hệ người quản trị của Sở Tài chính.`,
+    };
+  } else {
+    content = {
+      icon: emptyState?.icon ?? Inbox,
+      title: emptyState?.title ?? `Chưa có ${label ?? "dữ liệu"} nào`,
+      description:
+        emptyState?.description ??
+        (emptyState?.title ? undefined : "Khi có dữ liệu, các dòng sẽ hiện ở đây."),
+      action: emptyState?.action,
+    };
+  }
+
+  const Icon = content.icon;
 
   return (
     <TableRow className="hover:bg-transparent">
@@ -494,6 +646,8 @@ function DataTableNoData({
             "items-center",
             "justify-center",
             "gap-2",
+            "px-6",
+            "whitespace-normal",
             "bg-card"
           )}
           style={{
@@ -516,16 +670,27 @@ function DataTableNoData({
               "bg-accent text-muted-foreground [&_svg]:size-6"
             )}
           >
-            {scoped ? <ShieldOff /> : <Inbox />}
+            <Icon aria-hidden />
           </span>
-          <div className={cn("text-base", "font-semibold", "text-foreground")}>
-            {scoped ? "Nothing in your data scope" : "No records yet"}
+          <div
+            role={isError ? "alert" : undefined}
+            className={cn("text-base", "font-semibold", "text-foreground")}
+          >
+            {content.title}
           </div>
-          <div className={cn("max-w-sm", "text-sm", "text-muted-foreground")}>
-            {scoped
-              ? "You can open this resource, but no rows fall within the scope your roles grant."
-              : "This table is empty for the time being."}
-          </div>
+          {content.description && (
+            <div
+              className={cn(
+                "max-w-sm",
+                "text-sm",
+                "text-muted-foreground",
+                "whitespace-normal"
+              )}
+            >
+              {content.description}
+            </div>
+          )}
+          {content.action && <div className="pt-2">{content.action}</div>}
         </div>
       </TableCell>
     </TableRow>

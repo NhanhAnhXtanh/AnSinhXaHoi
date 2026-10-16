@@ -33,7 +33,7 @@ export function Breadcrumb() {
       key: "breadcrumb-item-home",
       href: rootRouteResource.matchedRoute ?? "/",
       Component: (
-        <Link to={rootRouteResource.matchedRoute ?? "/"}>
+        <Link to={rootRouteResource.matchedRoute ?? "/"} aria-label="Trang chủ">
           {rootRouteResource?.resource?.meta?.icon ?? (
             <House className="h-4 w-4" />
           )}
