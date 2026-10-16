@@ -18,4 +18,29 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // SpreadJS là thư viện đóng gói sẵn: lõi ~6 MB, Designer + add-on ~15 MB. Hai chunk
+    // dưới đây vượt ngưỡng cảnh báo mặc định (500 kB) là bình thường — chúng chỉ tải
+    // khi màn có bảng tính mở (React.lazy trong shared/components/spreadsheet/lazy.tsx).
+    chunkSizeWarningLimit: 16000,
+    rollupOptions: {
+      output: {
+        // Tách SpreadJS khỏi chunk của màn hình: màn nhập/xem chỉ kéo "spreadjs",
+        // màn thiết kế mẫu kéo thêm "spreadjs-designer". Chỉ gói @mescius vào đây —
+        // chúng chỉ được import từ module nạp động nên không làm nặng trang đầu.
+        manualChunks(id) {
+          const normalized = id.replace(/\\/g, "/");
+          if (!normalized.includes("/node_modules/@mescius/")) return undefined;
+          if (
+            /\/@mescius\/spread-sheets-(designer|print|shapes|datacharts-addon|slicers|pivot-addon|tablesheet|ganttsheet|reportsheet-addon|formula-panel)/.test(
+              normalized
+            )
+          ) {
+            return "spreadjs-designer";
+          }
+          return "spreadjs";
+        },
+      },
+    },
+  },
 });
