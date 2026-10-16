@@ -49,3 +49,11 @@ databaseChangeLog:
       file: db/changelog/changes/111-seed-asxh-template-permissions.sql
   - include:
       file: db/changelog/changes/112-seed-asxh-templates.sql
+  - include:
+      file: db/changelog/changes/120-create-asxh-period-setup.yaml
+  - include:
+      file: db/changelog/changes/121-create-asxh-input-reports.yaml
+  - include:
+      file: db/changelog/changes/122-seed-asxh-report-permissions.sql
+  - include:
+      file: db/changelog/changes/123-seed-asxh-report-demo.sql

@@ -1,0 +1,243 @@
+# Phiếu nhập (đơn vị x kỳ x đợt) và tờ biểu bên trong phiếu.
+#
+# Phụ thuộc 120 (asxh_publications) và bảng của BE1/BE2 (asxh_report_units,
+# asxh_report_periods, asxh_templates, asxh_template_versions).
+databaseChangeLog:
+  - changeSet:
+      id: 121-create-asxh-input-reports
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_input_reports
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_input_reports
+              - column:
+                  name: unit_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: period_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: publication_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: revision_no
+                  type: int
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: previous_revision_id
+                  type: bigint
+              # DRAFT | SUBMITTED | APPROVED | RETURNED | LOCKED | CANCELLED | SUPERSEDED
+              - column:
+                  name: status
+                  type: varchar(20)
+                  defaultValue: DRAFT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: submitted_at
+                  type: timestamp with time zone
+              - column:
+                  name: submitted_by
+                  type: varchar(255)
+              - column:
+                  name: approved_at
+                  type: timestamp with time zone
+              - column:
+                  name: approved_by
+                  type: varchar(255)
+              - column:
+                  name: returned_at
+                  type: timestamp with time zone
+              - column:
+                  name: returned_by
+                  type: varchar(255)
+              - column:
+                  name: return_reason
+                  type: varchar(1000)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # Không có unique (unit_id, period_id): đợt bổ sung sinh phiếu riêng khi phiếu cũ đã nộp,
+        # và mỗi lần trả lại sinh một phiên bản mới.
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_reports
+            baseColumnNames: unit_id
+            constraintName: fk_asxh_input_reports_unit
+            referencedTableName: asxh_report_units
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_reports
+            baseColumnNames: period_id
+            constraintName: fk_asxh_input_reports_period
+            referencedTableName: asxh_report_periods
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_reports
+            baseColumnNames: publication_id
+            constraintName: fk_asxh_input_reports_publication
+            referencedTableName: asxh_publications
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # SET NULL: thu hồi kỳ xoá cả chuỗi phiên bản trong một câu lệnh.
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_reports
+            baseColumnNames: previous_revision_id
+            constraintName: fk_asxh_input_reports_previous
+            referencedTableName: asxh_input_reports
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: asxh_input_reports
+            indexName: idx_asxh_input_reports_period
+            columns:
+              - column:
+                  name: period_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: asxh_input_reports
+            indexName: idx_asxh_input_reports_unit
+            columns:
+              - column:
+                  name: unit_id
+        - createIndex:
+            tableName: asxh_input_reports
+            indexName: idx_asxh_input_reports_status
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            tableName: asxh_input_reports
+            indexName: idx_asxh_input_reports_publication
+            columns:
+              - column:
+                  name: publication_id
+        - createIndex:
+            tableName: asxh_input_reports
+            indexName: idx_asxh_input_reports_previous
+            columns:
+              - column:
+                  name: previous_revision_id
+
+        - createTable:
+            tableName: asxh_input_report_sheets
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_input_report_sheets
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_version_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # Workbook JSON frontend gửi lên; máy chủ chưa đọc nội dung.
+              - column:
+                  name: data_json
+                  type: text
+              # NOT_STARTED | IN_PROGRESS | COMPLETED | NO_DATA
+              - column:
+                  name: completion
+                  type: varchar(20)
+                  defaultValue: NOT_STARTED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completed_at
+                  type: timestamp with time zone
+              - column:
+                  name: completed_by
+                  type: varchar(255)
+              - column:
+                  name: data_updated_at
+                  type: timestamp with time zone
+              - column:
+                  name: data_updated_by
+                  type: varchar(255)
+              # Số hiệu bản lưu (@Version) chống ghi đè giữa hai phiên làm việc.
+              - column:
+                  name: version
+                  type: bigint
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        # Mỗi biểu một lần trong một phiếu; cột đầu report_id nên cũng là chỉ mục "tờ biểu của phiếu".
+        - addUniqueConstraint:
+            tableName: asxh_input_report_sheets
+            columnNames: report_id, template_id
+            constraintName: uq_asxh_input_report_sheets_report_template
+        # CASCADE: tờ biểu không có nghĩa khi phiếu không còn.
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_report_sheets
+            baseColumnNames: report_id
+            constraintName: fk_asxh_input_report_sheets_report
+            referencedTableName: asxh_input_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_report_sheets
+            baseColumnNames: template_id
+            constraintName: fk_asxh_input_report_sheets_template
+            referencedTableName: asxh_templates
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # Phiên bản đã ghim vào phiếu thì không xoá được.
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_report_sheets
+            baseColumnNames: template_version_id
+            constraintName: fk_asxh_input_report_sheets_version
+            referencedTableName: asxh_template_versions
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: asxh_input_report_sheets
+            indexName: idx_asxh_input_report_sheets_version
+            columns:
+              - column:
+                  name: template_version_id
+        - createIndex:
+            tableName: asxh_input_report_sheets
+            indexName: idx_asxh_input_report_sheets_template
+            columns:
+              - column:
+                  name: template_id
