@@ -4,6 +4,7 @@ import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateKind;
 import com.dth.frw.domain.asxh.template.TemplateStatus;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
+import com.dth.frw.module.asxh.template.repo.TemplateVersionRow;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -51,6 +52,26 @@ public record TemplateVersionResponse(
     /** Dạng gọn cho danh sách — không kèm workbook / script. */
     public static TemplateVersionResponse summary(TemplateVersion version) {
         return from(version, false);
+    }
+
+    /** Dạng gọn từ dòng đọc không kèm workbook / script (danh sách). */
+    public static TemplateVersionResponse summary(TemplateVersionRow row) {
+        return new TemplateVersionResponse(
+                row.id(),
+                TemplateSummary.from(row.template()),
+                row.versionNo(),
+                row.previousVersionId(),
+                row.status(),
+                row.effectiveFrom(),
+                row.effectiveTo(),
+                row.publishedAt(),
+                row.publishedBy(),
+                row.revokedAt(),
+                row.revokedBy(),
+                null,
+                null,
+                row.createdAt(),
+                row.updatedAt());
     }
 
     /** Dạng đầy đủ cho {@code getOne} và các thao tác. */

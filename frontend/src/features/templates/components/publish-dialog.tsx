@@ -1,5 +1,4 @@
 import { useEffect, useId, useState } from "react";
-import { toast } from "sonner";
 
 import { formatDate } from "@/shared/components/asxh";
 import { Button } from "@/shared/ui/button";
@@ -15,31 +14,33 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { cn } from "@/shared/lib/utils";
 
-import type { TemplateVersion } from "../fixtures";
-import { firstOfNextMonth, parseVnDate, versionLabel } from "../model";
-import { minEffectiveDate, publishVersion } from "../store";
+import type { TemplateVersion } from "../types";
+import { firstOfNextMonth, nextDay, parseVnDate, versionLabel } from "../model";
 
 /**
  * Hộp "Ban hành phiên bản N?" (UC-13): một ô Áp dụng từ ngày, điền sẵn ngày đã
- * lưu (chưa có thì ngày 1 tháng sau). Ngày phải sau ngày áp dụng của bản trước.
+ * lưu (chưa có thì ngày 1 tháng sau). Ngày phải sau ngày áp dụng của bản
+ * nguồn — kiểm sơ ở đây cho nhanh, máy chủ kiểm lại và trả câu báo.
  */
 export function PublishDialog({
   version,
-  previousLabel,
+  previous,
   onOpenChange,
-  onPublished,
+  onSubmit,
 }: {
   /** Phiên bản cần ban hành; null = hộp đóng. */
   version: TemplateVersion | null;
-  /** "phiên bản 3 (01/07/2026)" — để viết gợi ý dưới ô ngày. */
-  previousLabel?: string;
+  /** Bản nguồn còn ngày áp dụng — để viết gợi ý và kiểm ngày sớm nhất. */
+  previous?: TemplateVersion;
   onOpenChange: (open: boolean) => void;
-  onPublished?: (version: TemplateVersion) => void;
+  /** Gửi ban hành; trả câu lỗi để hiện dưới ô ngày, hoặc null khi xong. */
+  onSubmit: (version: TemplateVersion, isoDate: string) => Promise<string | null>;
 }) {
   const inputId = useId();
   const hintId = useId();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   // Giữ phiên bản vừa mở để chữ trong hộp không mất khi hộp đang mờ dần lúc đóng.
   const [shown, setShown] = useState<TemplateVersion | null>(version);
 
@@ -48,12 +49,13 @@ export function PublishDialog({
     setShown(version);
     setText(formatDate(version.effectiveFrom ?? firstOfNextMonth()));
     setError(null);
+    setBusy(false);
   }, [version]);
 
-  const min = version ? minEffectiveDate(version.id) : null;
+  const min = previous?.effectiveFrom ? nextDay(previous.effectiveFrom) : null;
 
-  function submit() {
-    if (!version) return;
+  async function submit() {
+    if (!version || busy) return;
     if (!text.trim()) {
       setError("Hãy chọn ngày áp dụng trước khi ban hành.");
       return;
@@ -63,22 +65,20 @@ export function PublishDialog({
       setError("Ngày chưa đúng. Hãy nhập theo dạng ngày/tháng/năm, ví dụ 01/11/2026.");
       return;
     }
-    const result = publishVersion(version.id, iso);
-    if (!result.ok) {
-      setError(result.error);
+    if (min && iso < min) {
+      setError(`Ngày áp dụng phải từ ${formatDate(min)} trở đi.`);
       return;
     }
-    toast.success(
-      `Đã ban hành ${versionLabel(version).toLowerCase()}, áp dụng từ ${formatDate(iso)}.`
-    );
-    onOpenChange(false);
-    onPublished?.(result.value);
+    setBusy(true);
+    const failure = await onSubmit(version, iso);
+    setBusy(false);
+    if (failure) setError(failure);
   }
 
   const label = shown ? versionLabel(shown) : "";
 
   return (
-    <Dialog open={version !== null} onOpenChange={onOpenChange}>
+    <Dialog open={version !== null} onOpenChange={(open) => !busy && onOpenChange(open)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Ban hành {label.toLowerCase()}?</DialogTitle>
@@ -93,7 +93,7 @@ export function PublishDialog({
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            submit();
+            void submit();
           }}
         >
           <Label htmlFor={inputId}>
@@ -105,6 +105,7 @@ export function PublishDialog({
             inputMode="numeric"
             placeholder="ngày/tháng/năm"
             autoComplete="off"
+            disabled={busy}
             aria-invalid={error ? true : undefined}
             aria-describedby={hintId}
             onChange={(e) => {
@@ -120,8 +121,8 @@ export function PublishDialog({
             )}
           >
             {error ??
-              (min && previousLabel
-                ? `Phải sau ngày áp dụng của ${previousLabel}.`
+              (previous?.effectiveFrom
+                ? `Phải sau ngày áp dụng của ${versionLabel(previous).toLowerCase()} (${formatDate(previous.effectiveFrom)}).`
                 : "Phiên bản đầu tiên của biểu chọn ngày tự do.")}
           </p>
 
@@ -129,11 +130,14 @@ export function PublishDialog({
             <Button
               type="button"
               variant="outline"
+              disabled={busy}
               onClick={() => onOpenChange(false)}
             >
               Quay lại
             </Button>
-            <Button type="submit">Ban hành {label.toLowerCase()}</Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? "Đang ban hành…" : `Ban hành ${label.toLowerCase()}`}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

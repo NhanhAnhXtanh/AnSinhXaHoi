@@ -1,14 +1,18 @@
-import type { SheetData, SheetRow, StatusTone } from "@/shared/components/asxh";
+import type { StatusTone } from "@/shared/components/asxh";
 
-import {
-  POLICY_ITEMS,
-  SAMPLE_PLACE,
-  SAMPLE_UNIT,
-  type FormKind,
-  type TemplateForm,
-  type TemplateVersion,
-  type VersionStatus,
-} from "./fixtures";
+import type {
+  ApiTemplate,
+  ApiTemplateKind,
+  ApiTemplateSet,
+  ApiTemplateStatus,
+  ApiTemplateVersion,
+  ChangeLogEntry,
+  FormKind,
+  TemplateForm,
+  TemplateSet,
+  TemplateVersion,
+  VersionStatus,
+} from "./types";
 
 /* ------------------------------------------------------------------ */
 /* Nhãn                                                                */
@@ -37,7 +41,7 @@ export const KIND_LABEL: Record<FormKind, string> = {
   "tong-hop": "Biểu tổng hợp",
 };
 
-/** "Biểu 1a", "Biểu tổng hợp năm". */
+/** "Biểu 1a", "Biểu TH". */
 export function formLabel(form: Pick<TemplateForm, "name">): string {
   return `Biểu ${form.name}`;
 }
@@ -52,7 +56,87 @@ export function isEditable(status: VersionStatus): boolean {
 }
 
 /* ------------------------------------------------------------------ */
-/* Quy tắc phiên bản                                                   */
+/* Chuyển từ dữ liệu API                                               */
+/* ------------------------------------------------------------------ */
+
+const STATUS_FROM_API: Record<ApiTemplateStatus, VersionStatus> = {
+  DRAFT: "draft",
+  TESTING: "testing",
+  PUBLISHED: "published",
+  LOCKED: "locked",
+  REVOKED: "revoked",
+  ARCHIVED: "archived",
+};
+
+export const KIND_FROM_API: Record<ApiTemplateKind, FormKind> = {
+  CHI_TIET: "chi-tiet",
+  TONG_HOP: "tong-hop",
+};
+
+export const KIND_TO_API: Record<FormKind, ApiTemplateKind> = {
+  "chi-tiet": "CHI_TIET",
+  "tong-hop": "TONG_HOP",
+};
+
+export function toSet(api: ApiTemplateSet): TemplateSet {
+  return {
+    id: String(api.id),
+    name: api.name,
+    description: api.description ?? undefined,
+    createdAt: api.createdAt,
+    updatedAt: api.updatedAt ?? api.createdAt,
+    templateCount: api.templateCount,
+    inUse: api.inUse,
+  };
+}
+
+export function toForm(api: ApiTemplate): TemplateForm {
+  return {
+    id: String(api.id),
+    setId: String(api.set.id),
+    name: api.shortName,
+    title: api.name,
+    kind: KIND_FROM_API[api.kind],
+    sortOrder: api.sortOrder,
+    createdAt: api.createdAt,
+    latestVersionId: api.latestVersion ? String(api.latestVersion.id) : null,
+  };
+}
+
+/** Biểu dựng từ phần "template" lồng trong một phiên bản (màn thiết kế chỉ nạp phiên bản). */
+export function formOfVersion(api: ApiTemplateVersion): TemplateForm {
+  return {
+    id: String(api.template.id),
+    setId: String(api.template.set.id),
+    name: api.template.shortName,
+    title: api.template.name,
+    kind: KIND_FROM_API[api.template.kind],
+    sortOrder: 0,
+    createdAt: api.createdAt,
+    latestVersionId: null,
+  };
+}
+
+export function toVersion(api: ApiTemplateVersion): TemplateVersion {
+  return {
+    id: String(api.id),
+    formId: String(api.template.id),
+    number: api.versionNo,
+    status: STATUS_FROM_API[api.status],
+    previousId: api.previousVersionId === null ? null : String(api.previousVersionId),
+    effectiveFrom: api.effectiveFrom,
+    effectiveTo: api.effectiveTo,
+    publishedAt: api.publishedAt,
+    approver: api.publishedBy,
+    revokedAt: api.revokedAt,
+    revokedBy: api.revokedBy,
+    createdAt: api.createdAt,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Quy tắc phiên bản — chỉ để làm mờ nút kèm lý do; máy chủ kiểm lại   */
+/* và trả câu báo (409) nếu lệch.                                       */
 /* ------------------------------------------------------------------ */
 
 /** Phiên bản của một biểu, mới nhất trước. */
@@ -80,17 +164,16 @@ export function currentVersion(
   );
 }
 
-/** Bản đứng trước trong chuỗi (bỏ qua bản đã thu hồi) — để kiểm ngày áp dụng khi ban hành. */
+/** Bản nguồn còn hiệu lực của một phiên bản — để kiểm ngày áp dụng khi ban hành. */
 export function previousLiveVersion(
   list: TemplateVersion[],
   version: TemplateVersion
 ): TemplateVersion | undefined {
-  return list.find(
-    (x) =>
-      x.number < version.number &&
-      x.status !== "revoked" &&
-      x.effectiveFrom !== null
-  );
+  const source = version.previousId
+    ? list.find((x) => x.id === version.previousId)
+    : undefined;
+  if (source && source.effectiveFrom) return source;
+  return undefined;
 }
 
 /** Bản kế tiếp còn hiệu lực (nháp cũng tính) — có rồi thì không tạo thêm (không rẽ nhánh). */
@@ -98,9 +181,9 @@ export function successorOf(
   list: TemplateVersion[],
   version: TemplateVersion
 ): TemplateVersion | undefined {
-  return [...list]
-    .reverse()
-    .find((x) => x.number > version.number && x.status !== "revoked");
+  return list.find(
+    (x) => x.previousId === version.id && x.status !== "revoked"
+  );
 }
 
 export type Availability = { ok: true } | { ok: false; reason: string };
@@ -125,6 +208,8 @@ export function canClone(
     return no("Chỉ tạo từ phiên bản đang ban hành.");
   const next = successorOf(list, version);
   if (next) return no(`Đã có ${versionLabel(next).toLowerCase()} — không tạo thêm.`);
+  const draft = list.find((x) => isEditable(x.status));
+  if (draft) return no(`Đang có ${versionLabel(draft).toLowerCase()} chưa ban hành.`);
   return yes;
 }
 
@@ -135,21 +220,166 @@ export function canLock(
   if (version.status === "locked") return yes;
   if (version.status !== "published")
     return no("Chỉ khoá được bản đã ban hành mới nhất.");
-  const newest = list.find((x) => x.status === "published");
-  if (newest && newest.id !== version.id)
-    return no("Chỉ khoá được bản đã ban hành mới nhất.");
+  const newer = list.find(
+    (x) =>
+      x.id !== version.id &&
+      x.status === "published" &&
+      x.effectiveFrom !== null &&
+      version.effectiveFrom !== null &&
+      x.effectiveFrom > version.effectiveFrom
+  );
+  if (newer) return no("Chỉ khoá được bản đã ban hành mới nhất.");
   return yes;
 }
 
+/**
+ * Thu hồi (UC-17): chỉ bản đã ban hành / đang thử nghiệm, lần lượt từ bản mới
+ * nhất xuống, không phải bản đã ban hành cuối cùng, chuỗi không còn nháp khác.
+ */
+export function canRevoke(
+  list: TemplateVersion[],
+  version: TemplateVersion
+): Availability {
+  if (version.status === "locked")
+    return no("Đang khoá — mở khoá trước khi thu hồi.");
+  if (version.status !== "published" && version.status !== "testing")
+    return no(
+      version.status === "draft"
+        ? "Bản nháp thì xoá, không cần thu hồi."
+        : "Phiên bản này không còn dùng được."
+    );
+  if (list.some((x) => x.id !== version.id && isEditable(x.status)))
+    return no("Đang có bản nháp khác — xử lý bản đó trước.");
+  if (successorOf(list, version))
+    return no("Thu hồi lần lượt từ bản mới nhất xuống.");
+  if (
+    version.status === "published" &&
+    !list.some((x) => x.id !== version.id && x.status === "published")
+  )
+    return no("Là bản đang áp dụng cuối cùng — hãy tạo phiên bản kế tiếp để thay.");
+  return yes;
+}
+
+/**
+ * Xoá (UC-16): chỉ bản mới nhất của chuỗi. Bản đã được dùng để lập phiếu thì
+ * máy chủ từ chối kèm câu báo — màn không biết trước điều đó.
+ */
 export function canDelete(
   list: TemplateVersion[],
   version: TemplateVersion
 ): Availability {
-  if (list[0] && list[0].id !== version.id)
+  if (list.some((x) => x.previousId === version.id))
     return no("Đã có phiên bản mới hơn — xoá từ bản mới nhất xuống.");
-  if (version.usedCount > 0)
-    return no(`Đã dùng cho ${version.usedCount} phiếu — chỉ khoá được.`);
   return yes;
+}
+
+/** Xoá biểu: chỉ khi chưa từng có phiên bản rời trạng thái nháp. */
+export function canDeleteForm(chain: TemplateVersion[]): Availability {
+  if (chain.some((x) => !isEditable(x.status)))
+    return no("Biểu đã ban hành — chỉ khoá phiên bản được.");
+  return yes;
+}
+
+/* ------------------------------------------------------------------ */
+/* Lịch sử thay đổi của bộ mẫu — dựng từ mốc thời gian có thật trên dữ  */
+/* liệu (tạo bộ, tạo biểu, tạo / ban hành / thu hồi phiên bản).        */
+/* ------------------------------------------------------------------ */
+
+export function buildChangeLog(
+  set: TemplateSet,
+  forms: TemplateForm[],
+  versions: TemplateVersion[]
+): ChangeLogEntry[] {
+  const byId = new Map(forms.map((f) => [f.id, f]));
+  const entries: ChangeLogEntry[] = [
+    {
+      id: `set-${set.id}`,
+      at: set.createdAt,
+      actor: null,
+      content: `Tạo bộ mẫu “${set.name}”`,
+    },
+  ];
+  for (const form of forms) {
+    entries.push({
+      id: `form-${form.id}`,
+      at: form.createdAt,
+      actor: null,
+      content: `Tạo ${formLabel(form).toLowerCase()}`,
+    });
+  }
+  for (const v of versions) {
+    const form = byId.get(v.formId);
+    if (!form) continue;
+    const of = `${versionLabel(v).toLowerCase()} của ${formLabel(form).toLowerCase()}`;
+    if (v.number > 1) {
+      entries.push({ id: `v-${v.id}-c`, at: v.createdAt, actor: null, content: `Tạo ${of}` });
+    }
+    if (v.publishedAt) {
+      entries.push({ id: `v-${v.id}-p`, at: v.publishedAt, actor: v.approver, content: `Ban hành ${of}` });
+    }
+    if (v.revokedAt) {
+      entries.push({ id: `v-${v.id}-r`, at: v.revokedAt, actor: v.revokedBy, content: `Thu hồi ${of}` });
+    }
+  }
+  return entries.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+}
+
+/* ------------------------------------------------------------------ */
+/* Lỗi từ máy chủ                                                      */
+/* ------------------------------------------------------------------ */
+
+const HAS_VIETNAMESE = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
+
+/**
+ * Câu báo cho cán bộ từ lỗi API. Máy chủ trả câu tiếng Việt ở `message` (409)
+ * hoặc ở `errors` theo từng trường (422). Câu không dấu (lỗi kỹ thuật tiếng
+ * Anh) thì thay bằng câu chung `fallback`.
+ */
+export function errorText(error: unknown, fallback: string): string {
+  const e = error as {
+    message?: unknown;
+    statusCode?: number;
+    errors?: Record<string, unknown>;
+  } | null;
+  if (e?.statusCode === 403) return "Bạn không có quyền làm việc này.";
+  if (e?.statusCode === 413)
+    return "Bảng tính quá lớn (quá 20MB). Hãy xoá bớt vùng trống, dòng hoặc cột thừa rồi lưu lại.";
+  if (e?.errors) {
+    for (const value of Object.values(e.errors)) {
+      const text = Array.isArray(value) ? value[0] : value;
+      if (typeof text === "string" && HAS_VIETNAMESE.test(text)) return text;
+    }
+  }
+  if (typeof e?.message === "string" && HAS_VIETNAMESE.test(e.message))
+    return e.message;
+  return fallback;
+}
+
+/* ------------------------------------------------------------------ */
+/* Workbook                                                            */
+/* ------------------------------------------------------------------ */
+
+/** Giới hạn máy chủ nhận (UC-11 4b) — kiểm trước để báo ngay, khỏi gửi. */
+export const MAX_WORKBOOK_BYTES = 20 * 1024 * 1024;
+
+/** Chuỗi JSON đã lưu → đối tượng workbook; rỗng / "{}" / hỏng → null (bảng trống). */
+export function parseWorkbook(json: string | null | undefined): Record<string, unknown> | null {
+  if (!json) return null;
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const sheets = (parsed as { sheets?: unknown }).sheets;
+    if (!sheets || typeof sheets !== "object" || Object.keys(sheets).length === 0)
+      return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** Số byte UTF-8 của chuỗi (đúng thứ máy chủ đếm). */
+export function byteLength(text: string): number {
+  return new Blob([text]).size;
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,11 +391,6 @@ const pad = (n: number) => String(n).padStart(2, "0");
 /** Date → "2026-11-01" theo giờ máy. */
 export function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** Date → "2026-11-01T09:30:00" theo giờ máy. */
-export function toIsoDateTime(d: Date): string {
-  return `${toIsoDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }
 
 /** "01/11/2026" → "2026-11-01"; sai định dạng hoặc ngày không có thật → null. */
@@ -185,7 +410,7 @@ export function parseVnDate(text: string): string | null {
   return toIsoDate(d);
 }
 
-/** "2026-07-01" → "02/07/2026" (ngày hôm sau), để báo ngày sớm nhất được chọn. */
+/** "2026-07-01" → "2026-07-02" (ngày hôm sau), để báo ngày sớm nhất được chọn. */
 export function nextDay(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return toIsoDate(new Date(y, m - 1, d + 1));
@@ -194,70 +419,4 @@ export function nextDay(iso: string): string {
 /** Ngày 1 của tháng sau — mặc định "Áp dụng từ ngày". */
 export function firstOfNextMonth(today = new Date()): string {
   return toIsoDate(new Date(today.getFullYear(), today.getMonth() + 1, 1));
-}
-
-/* ------------------------------------------------------------------ */
-/* Bảng thiết kế minh hoạ                                               */
-/* ------------------------------------------------------------------ */
-
-const COLUMNS: SheetData["columns"] = [
-  { label: "A", width: 56, align: "center" },
-  { label: "B", width: 380, align: "left" },
-  { label: "C", width: 112, align: "right" },
-  { label: "D", width: 112, align: "right" },
-  { label: "E", width: 112, align: "right" },
-  { label: "F", width: 112, align: "right" },
-  { label: "G", width: 120, align: "left" },
-  { label: "H", width: 96 },
-  { label: "I", width: 96 },
-];
-
-const blank = (n: number): null[] => Array.from({ length: n }, () => null);
-
-/** Dựng bảng thiết kế của một biểu: tiêu đề, hàng cột, các dòng chính sách, dòng Cộng, chỗ ký. */
-export function buildSheet(form: TemplateForm, year = 2026): SheetData {
-  const items = POLICY_ITEMS[form.id] ?? [];
-  const title = (form.title ?? formLabel(form)).toUpperCase();
-
-  const body: SheetRow[] = items.map(([name, people, monthly, months], i) => {
-    const amount = Math.round((people * monthly * months) / 1_000_000);
-    return {
-      kind: "normal",
-      editable: true,
-      cells: [i + 1, name, people, amount, monthly || null, months || null, "—", null, null],
-    };
-  });
-
-  const totalPeople = items.reduce((s, [, p]) => s + p, 0);
-  const totalAmount = items.reduce(
-    (s, [, p, m, t]) => s + Math.round((p * m * t) / 1_000_000),
-    0
-  );
-
-  return {
-    columns: COLUMNS,
-    rows: [
-      { kind: "title", cells: [null, `ĐƠN VỊ: ${SAMPLE_UNIT}`, ...blank(7)] },
-      {
-        kind: "title",
-        cells: [null, `TỔNG HỢP KẾT QUẢ THỰC HIỆN ${title} NĂM ${year}`, ...blank(7)],
-      },
-      { kind: "normal", cells: [...blank(6), "Đơn vị tính: triệu đồng", null, null] },
-      {
-        kind: "header",
-        cells: ["STT", "Chính sách, chế độ", "Số đối tượng", "Kinh phí", "Mức hỗ trợ", "Số tháng", "Ghi chú", null, null],
-      },
-      { kind: "group", cells: ["A", "B", 1, 2, 3, 4, 5, null, null] },
-      ...body,
-      {
-        kind: "total",
-        cells: [null, "Cộng", totalPeople, totalAmount, null, null, null, null, null],
-      },
-      { kind: "normal", cells: blank(9) },
-      {
-        kind: "normal",
-        cells: [null, `${SAMPLE_PLACE}, ngày ... tháng ... năm ${year}`, ...blank(4), "NGƯỜI LẬP BIỂU", null, null],
-      },
-    ],
-  };
 }

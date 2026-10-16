@@ -5,6 +5,7 @@ import com.dth.frw.module.asxh.template.api.dto.PublishRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionPatchRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionResponse;
+import com.dth.frw.module.asxh.template.repo.TemplateVersionRow;
 import com.dth.frw.module.asxh.template.security.TemplatePermissions;
 import com.dth.frw.module.asxh.template.service.TemplateDates;
 import com.dth.frw.module.asxh.template.service.TemplateVersionService;
@@ -52,17 +53,19 @@ public class TemplateVersionController {
     public ResponseEntity<List<TemplateVersionResponse>> list(@RequestParam MultiValueMap<String, String> query) {
         ListParams params = new ListParams(query);
 
+        // Đọc dạng gọn (không kéo workbook / script từ cơ sở dữ liệu) — màn chỉ
+        // lấy workbook qua getOne khi mở thiết kế hoặc mở phiếu.
         List<Long> ids = params.ids();
         if (!ids.isEmpty()) {
-            List<TemplateVersionResponse> rows = service.getMany(ids).stream()
+            List<TemplateVersionResponse> rows = service.getManySummaries(ids).stream()
                     .map(TemplateVersionResponse::summary)
                     .toList();
             return ListResponse.of(rows, rows.size());
         }
 
-        Page<TemplateVersion> page = service.list(params);
+        Page<TemplateVersionRow> page = service.listSummaries(params);
         return ListResponse.of(
-                page.map(TemplateVersionResponse::summary).getContent(),
+                page.getContent().stream().map(TemplateVersionResponse::summary).toList(),
                 page.getTotalElements());
     }
 
@@ -116,6 +119,20 @@ public class TemplateVersionController {
             @PathVariable Long id, @RequestBody(required = false) PublishRequest request) {
         LocalDate effectiveFrom = request == null ? null : request.effectiveFrom();
         return TemplateVersionResponse.full(service.publish(id, effectiveFrom));
+    }
+
+    /** Nháp → Đang thử nghiệm (nhãn cho người thiết kế; vẫn sửa và ban hành được). */
+    @PostMapping("/{id}/start_testing")
+    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
+    public TemplateVersionResponse startTesting(@PathVariable Long id) {
+        return TemplateVersionResponse.full(service.startTesting(id));
+    }
+
+    /** Đang thử nghiệm → Nháp. */
+    @PostMapping("/{id}/stop_testing")
+    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
+    public TemplateVersionResponse stopTesting(@PathVariable Long id) {
+        return TemplateVersionResponse.full(service.stopTesting(id));
     }
 
     /** UC-15: khoá. */

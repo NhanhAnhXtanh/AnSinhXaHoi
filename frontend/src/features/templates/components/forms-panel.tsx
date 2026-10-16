@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CopyPlus, Eye, FilePlus, Pencil, Search, SearchX, Send } from "lucide-react";
+import { CopyPlus, Eye, FilePlus, Pencil, Search, SearchX, Send, Trash } from "lucide-react";
 
 import {
   EmptyState,
@@ -28,12 +28,13 @@ import type {
   TemplateForm,
   TemplateSet,
   TemplateVersion,
-} from "../fixtures";
+} from "../types";
 import {
   KIND_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
   canClone,
+  canDeleteForm,
   canPublish,
   formLabel,
   isEditable,
@@ -67,6 +68,7 @@ export function FormsPanel({
   onOpenDesigner,
   onPublish,
   onClone,
+  onDeleteForm,
   className,
 }: {
   set: TemplateSet;
@@ -78,6 +80,7 @@ export function FormsPanel({
   onOpenDesigner: (version: TemplateVersion) => void;
   onPublish: (version: TemplateVersion) => void;
   onClone: (version: TemplateVersion) => void;
+  onDeleteForm: (form: TemplateForm) => void;
   className?: string;
 }) {
   const [tab, setTab] = useState<"forms" | "history">("forms");
@@ -95,12 +98,10 @@ export function FormsPanel({
     );
   }, [rows, query, kind]);
 
-  const sortedLogs = useMemo(
-    () => [...logs].sort((a, b) => b.at.localeCompare(a.at)),
-    [logs]
-  );
+  // Đã sắp mới nhất trước khi dựng (buildChangeLog).
+  const sortedLogs = logs;
 
-  function rowItems({ chain, current }: FormRow): ActionItem[] {
+  function rowItems({ form, chain, current }: FormRow): ActionItem[] {
     const latest = chain[0];
     const items: ActionItem[] = [];
     if (latest) {
@@ -136,6 +137,17 @@ export function FormsPanel({
       disabled: !cloneable.ok,
       reason: cloneable.ok ? undefined : cloneable.reason,
       onSelect: () => base && onClone(base),
+    });
+    const removable = canDeleteForm(chain);
+    items.push({
+      key: "delete-form",
+      label: "Xoá biểu",
+      icon: Trash,
+      destructive: true,
+      separatorBefore: true,
+      disabled: !removable.ok,
+      reason: removable.ok ? undefined : removable.reason,
+      onSelect: () => onDeleteForm(form),
     });
     return items;
   }
@@ -285,7 +297,9 @@ export function FormsPanel({
                             </td>
                             <td className={cn(td, "tabular-nums whitespace-nowrap")}>
                               {live?.effectiveFrom
-                                ? `${formatDate(live.effectiveFrom)} – nay`
+                                ? `${formatDate(live.effectiveFrom)} – ${
+                                    live.effectiveTo ? formatDate(live.effectiveTo) : "nay"
+                                  }`
                                 : "—"}
                             </td>
                             <td className={td}>
@@ -333,7 +347,7 @@ export function FormsPanel({
                     <td className="h-11 border-b px-3 align-middle tabular-nums whitespace-nowrap text-muted-foreground">
                       {formatDateTime(log.at)}
                     </td>
-                    <td className="h-11 border-b px-3 align-middle">{log.actor}</td>
+                    <td className="h-11 border-b px-3 align-middle">{log.actor ?? "—"}</td>
                     <td className="h-11 border-b px-3 align-middle">{log.content}</td>
                   </tr>
                 ))}

@@ -1,8 +1,7 @@
 import { useId } from "react";
-import { Play, X } from "lucide-react";
+import { LoaderCircle, Play, X } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import {
   Select,
@@ -11,60 +10,62 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
-import { Switch } from "@/shared/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
-export type RuleScope = "form" | "set";
-
-export type RuleDraft = {
-  name: string;
-  scope: RuleScope;
-  enabled: boolean;
-  code: string;
-};
+/**
+ * Các bước của script chạy thử được từ màn thiết kế (bước gắn vào thao tác sửa
+ * ô thì tự chạy khi gõ, không chạy riêng). Giá trị là tên bước trong script.
+ */
+export const RUNNABLE_HOOKS: { value: string; label: string }[] = [
+  { value: "onLoad", label: "Khi mở biểu" },
+  { value: "afterInject", label: "Sau khi điền số tổng hợp" },
+  { value: "validate", label: "Kiểm tra trước khi nộp" },
+  { value: "beforeExtract", label: "Trước khi lấy số liệu" },
+  { value: "getInputData", label: "Lấy số liệu khi duyệt" },
+  { value: "getSummaryData", label: "Lấy số liệu tổng hợp" },
+];
 
 /**
- * Khung "Soạn công thức và quy tắc nhập" bên phải bảng thiết kế (khung
- * 311:88923): tên quy tắc, phạm vi, bật/tắt, vùng soạn nền tối, nhật ký chạy thử.
+ * Khung "Công thức và quy tắc nhập" bên phải bảng thiết kế (khung 311:88923):
+ * chọn bước chạy thử, vùng soạn nền tối (chữ đơn cách), nhật ký chạy thử.
+ * Bản Jmix dùng Monaco; ở đây là ô soạn văn bản thường — không thêm gói mới.
+ * Nội dung lưu cùng nút Lưu của màn (một lần với bảng tính, UC-11 / UC-12).
  */
 export function RulesPanel({
-  formName,
-  rule,
+  script,
   onChange,
   readOnly,
+  hook,
+  onHookChange,
   log,
+  running,
   onRun,
   onClose,
   className,
 }: {
-  /** "1a" — để viết lựa chọn "Chỉ biểu 1a". */
-  formName: string;
-  rule: RuleDraft;
-  onChange: (rule: RuleDraft) => void;
+  script: string;
+  onChange: (script: string) => void;
   readOnly: boolean;
-  log: { time: string; text: string }[];
+  hook: string;
+  onHookChange: (hook: string) => void;
+  log: { time: string; text: string; error?: boolean }[];
+  running: boolean;
   onRun: () => void;
   onClose: () => void;
   className?: string;
 }) {
-  const nameId = useId();
-  const scopeId = useId();
-  const enabledId = useId();
+  const hookId = useId();
   const codeId = useId();
 
   return (
     <aside
-      aria-label="Soạn công thức và quy tắc nhập"
+      aria-label="Công thức và quy tắc nhập"
       className={cn("bg-card flex min-h-0 flex-col border-l", className)}
     >
       <div className="flex items-center gap-2 border-b px-4 py-2.5">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
-          Soạn công thức và quy tắc nhập
+          Công thức và quy tắc nhập
         </h2>
-        <Button type="button" variant="outline" size="sm" onClick={onRun}>
-          <Play aria-hidden />
-          Chạy thử
-        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -76,60 +77,71 @@ export function RulesPanel({
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-3 border-b px-4 py-3">
-        <div className="flex min-w-0 flex-col gap-2">
-          <Label htmlFor={nameId}>Tên quy tắc</Label>
-          <Input
-            id={nameId}
-            value={rule.name}
-            readOnly={readOnly}
-            autoComplete="off"
-            onChange={(e) => onChange({ ...rule, name: e.target.value })}
-          />
-        </div>
-        <div className="flex min-w-0 flex-col gap-2">
-          <Label htmlFor={scopeId}>Áp dụng cho</Label>
-          <Select
-            value={rule.scope}
-            disabled={readOnly}
-            onValueChange={(v) => onChange({ ...rule, scope: v as RuleScope })}
-          >
-            <SelectTrigger id={scopeId} className="w-full">
+      <div className="flex items-end gap-2 border-b px-4 py-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <Label htmlFor={hookId}>Chạy thử bước</Label>
+          <Select value={hook} onValueChange={onHookChange}>
+            <SelectTrigger id={hookId} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="form">Chỉ biểu {formName}</SelectItem>
-              <SelectItem value="set">Mọi biểu trong bộ</SelectItem>
+              {RUNNABLE_HOOKS.map((h) => (
+                <SelectItem key={h.value} value={h.value}>
+                  {h.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        <div className="col-span-2 flex items-center gap-2">
-          <Switch
-            id={enabledId}
-            checked={rule.enabled}
-            disabled={readOnly}
-            onCheckedChange={(checked) => onChange({ ...rule, enabled: checked })}
-          />
-          <Label htmlFor={enabledId} className="font-normal">
-            Bật quy tắc này
-          </Label>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={running || !script.trim()}
+          onClick={onRun}
+        >
+          {running ? (
+            <LoaderCircle aria-hidden className="animate-spin" />
+          ) : (
+            <Play aria-hidden />
+          )}
+          Chạy thử
+        </Button>
       </div>
 
       {/* Vùng soạn nền tối: dùng tông của thanh bên để đọc tốt ở cả chế độ sáng và tối. */}
       <div className="bg-sidebar text-sidebar-foreground flex min-h-0 flex-1 flex-col">
         <label htmlFor={codeId} className="sr-only">
-          Nội dung quy tắc
+          Nội dung công thức và quy tắc nhập
         </label>
         <textarea
           id={codeId}
-          value={rule.code}
+          value={script}
           readOnly={readOnly}
           spellCheck={false}
-          onChange={(e) => onChange({ ...rule, code: e.target.value })}
+          autoCapitalize="off"
+          autoCorrect="off"
+          placeholder={
+            readOnly
+              ? "Phiên bản này chưa có quy tắc nhập."
+              : "return defineScript({\n  onLoad(ctx) {\n    // …\n  },\n})"
+          }
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            // Tab chèn hai dấu cách thay vì nhảy khỏi ô soạn.
+            if (e.key !== "Tab" || readOnly || e.shiftKey) return;
+            e.preventDefault();
+            const el = e.currentTarget;
+            const { selectionStart, selectionEnd, value } = el;
+            const next = `${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`;
+            onChange(next);
+            requestAnimationFrame(() => {
+              el.selectionStart = el.selectionEnd = selectionStart + 2;
+            });
+          }}
           className={cn(
             "min-h-0 flex-1 resize-none bg-transparent px-4 py-3",
             "font-mono text-xs leading-5 whitespace-pre outline-none",
+            "placeholder:text-sidebar-foreground/50",
             "focus-visible:ring-sidebar-ring/60 focus-visible:ring-2 focus-visible:ring-inset"
           )}
         />
@@ -152,7 +164,9 @@ export function RulesPanel({
                   <span className="text-sidebar-foreground/70 shrink-0 tabular-nums">
                     {line.time}
                   </span>
-                  <span className="min-w-0">{line.text}</span>
+                  <span className={cn("min-w-0", line.error && "text-destructive-text")}>
+                    {line.text}
+                  </span>
                 </li>
               ))}
             </ul>

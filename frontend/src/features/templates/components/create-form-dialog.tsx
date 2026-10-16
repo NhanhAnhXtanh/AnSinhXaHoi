@@ -21,35 +21,41 @@ import {
   SelectValue,
 } from "@/shared/ui/select";
 
-import type { FormKind, TemplateForm, TemplateSet, TemplateVersion } from "../fixtures";
+import type { TemplateActions } from "../api";
+import type { FormKind, TemplateForm, TemplateSet } from "../types";
 import { KIND_LABEL, firstOfNextMonth, parseVnDate } from "../model";
-import { createForm } from "../store";
 
 type Field = "name" | "kind" | "date";
 
 /**
- * Hộp Tạo biểu mẫu (UC-10, khung 311:85173): tên ngắn, loại biểu, áp dụng từ
- * ngày. Tạo ra phiên bản 1 (nháp) của biểu. Hai cách kết thúc: Lưu nháp (ở lại
- * màn, biểu mới được chọn) hoặc Tạo và mở thiết kế.
+ * Hộp Tạo biểu mẫu (UC-10, khung 311:85173): tên ngắn, tên đầy đủ (không bắt
+ * buộc — trống thì lấy "Biểu <tên ngắn>"), loại biểu, áp dụng từ ngày. Tạo ra
+ * phiên bản 1 (nháp) của biểu. Hai cách kết thúc: Lưu nháp (ở lại màn, biểu
+ * mới được chọn) hoặc Tạo và mở thiết kế.
  */
 export function CreateFormDialog({
+  actions,
   set,
   onOpenChange,
   onCreated,
 }: {
+  actions: TemplateActions;
   /** Bộ mẫu nhận biểu mới; null = hộp đóng. */
   set: TemplateSet | null;
   onOpenChange: (open: boolean) => void;
   onCreated: (
-    created: { form: TemplateForm; version: TemplateVersion },
+    created: { form: TemplateForm; firstVersionId: string | null },
     openDesigner: boolean
   ) => void;
 }) {
   const nameId = useId();
+  const titleId = useId();
   const kindId = useId();
   const dateId = useId();
   const [shownSet, setShownSet] = useState<TemplateSet | null>(set);
   const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
+  const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState<FormKind>("chi-tiet");
   const [date, setDate] = useState("");
   const [invalid, setInvalid] = useState<Set<Field>>(new Set());
@@ -59,14 +65,16 @@ export function CreateFormDialog({
     if (!set) return;
     setShownSet(set);
     setName("");
+    setTitle("");
+    setBusy(false);
     setKind("chi-tiet");
     setDate(formatDate(firstOfNextMonth()));
     setInvalid(new Set());
     setError(null);
   }, [set]);
 
-  function submit(openDesigner: boolean) {
-    if (!set) return;
+  async function submit(openDesigner: boolean) {
+    if (!set || busy) return;
     const bad = new Set<Field>();
     if (!name.trim()) bad.add("name");
     const iso = parseVnDate(date);
@@ -83,7 +91,15 @@ export function CreateFormDialog({
       document.getElementById(dateId)?.focus();
       return;
     }
-    const result = createForm({ setId: set.id, name, kind, effectiveFrom: iso });
+    setBusy(true);
+    const result = await actions.createForm({
+      setId: set.id,
+      shortName: name,
+      name: title.trim() || `Biểu ${name.trim()}`,
+      kind,
+      effectiveFrom: iso,
+    });
+    setBusy(false);
     if (!result.ok) {
       setInvalid(new Set(["name"]));
       setError(result.error);
@@ -117,7 +133,7 @@ export function CreateFormDialog({
           className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            submit(true);
+            void submit(true);
           }}
         >
           <div className="flex flex-col gap-2">
@@ -139,6 +155,17 @@ export function CreateFormDialog({
             <p className="text-muted-foreground text-xs">
               Tên ngắn, hiện trên thẻ của biểu.
             </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={titleId}>Tên đầy đủ (không bắt buộc)</Label>
+            <Input
+              id={titleId}
+              value={title}
+              autoComplete="off"
+              placeholder="Ví dụ: Kinh phí thực hiện chính sách bảo trợ xã hội"
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
 
           <div className="flex flex-col gap-2">
@@ -194,10 +221,17 @@ export function CreateFormDialog({
             >
               Quay lại
             </Button>
-            <Button type="button" variant="outline" onClick={() => submit(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void submit(false)}
+            >
               Lưu nháp
             </Button>
-            <Button type="submit">Tạo và mở thiết kế</Button>
+            <Button type="submit" disabled={busy}>
+              Tạo và mở thiết kế
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

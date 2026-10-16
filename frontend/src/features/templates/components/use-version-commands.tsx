@@ -1,14 +1,17 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import {
+  Ban,
   CodeXml,
   CopyPlus,
   Eye,
+  FlaskConical,
   Lock,
   LockOpen,
   Pencil,
   Send,
   Trash,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,61 +21,60 @@ import {
   type ActionItem,
 } from "@/shared/components/asxh";
 
-import type { TemplateVersion } from "../fixtures";
+import type { TemplateActions } from "../api";
+import type { TemplateVersion } from "../types";
 import {
   canClone,
   canDelete,
   canLock,
   canPublish,
+  canRevoke,
   isEditable,
   previousLiveVersion,
   versionLabel,
-  versionsOf,
 } from "../model";
-import {
-  cloneVersion,
-  deleteVersion,
-  toggleLock,
-  useTemplateState,
-} from "../store";
 import { PublishDialog } from "./publish-dialog";
 
 /**
  * Các việc trên một phiên bản (menu ⋯ của thẻ phiên bản, nút chân panel, đầu
  * trang Thiết kế mẫu) cùng các hộp xác nhận của chúng — dùng chung cho hai màn
- * để chữ, điều kiện và lý do mờ chỉ viết một lần.
+ * để chữ, điều kiện và lý do mờ chỉ viết một lần. Điều kiện ở đây chỉ để làm
+ * mờ nút kèm lý do; máy chủ kiểm lại, câu báo của máy chủ hiện thành toast.
  */
 export function useVersionCommands({
+  actions,
+  chainOf,
   onOpenDesigner,
   onCloned,
   onDeleted,
   onPublished,
+  onChanged,
 }: {
+  actions: TemplateActions;
+  /** Chuỗi phiên bản của biểu chứa phiên bản này, mới nhất trước. */
+  chainOf: (version: TemplateVersion) => TemplateVersion[];
   onOpenDesigner?: (version: TemplateVersion, rules?: boolean) => void;
   onCloned?: (version: TemplateVersion) => void;
   onDeleted?: (version: TemplateVersion) => void;
   onPublished?: (version: TemplateVersion) => void;
+  /** Sau mọi thao tác đổi trạng thái thành công (khoá, mở khoá, thu hồi, thử nghiệm). */
+  onChanged?: (version: TemplateVersion) => void;
 }) {
-  const state = useTemplateState();
   const [publishing, setPublishing] = useState<TemplateVersion | null>(null);
   const [locking, setLocking] = useState<TemplateVersion | null>(null);
+  const [revoking, setRevoking] = useState<TemplateVersion | null>(null);
   const [deleting, setDeleting] = useState<TemplateVersion | null>(null);
   // Tên phiên bản trên hộp xác nhận giữ nguyên trong lúc hộp mờ dần khi đóng.
   const [lastLock, setLastLock] = useState<TemplateVersion | null>(null);
+  const [lastRevoke, setLastRevoke] = useState<TemplateVersion | null>(null);
   const [lastDelete, setLastDelete] = useState<TemplateVersion | null>(null);
-  const askLock = (v: TemplateVersion) => {
-    setLastLock(v);
-    setLocking(v);
-  };
-  const askDelete = (v: TemplateVersion) => {
-    setLastDelete(v);
-    setDeleting(v);
-  };
+  const [busy, setBusy] = useState(false);
 
-  const chainOf = (v: TemplateVersion) => versionsOf(state.versions, v.formId);
-
-  function clone(version: TemplateVersion) {
-    const result = cloneVersion(version.id);
+  async function clone(version: TemplateVersion) {
+    if (busy) return;
+    setBusy(true);
+    const result = await actions.nextVersion(version.formId);
+    setBusy(false);
     if (!result.ok) {
       toast.error(result.error);
       return;
@@ -83,15 +85,31 @@ export function useVersionCommands({
     onCloned?.(result.value);
   }
 
+  async function change(
+    version: TemplateVersion,
+    action: "lock" | "unlock" | "revoke" | "start_testing" | "stop_testing",
+    done: string
+  ) {
+    if (busy) return;
+    setBusy(true);
+    const result = await actions.versionAction(version.id, action);
+    setBusy(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(done);
+    onChanged?.(result.value);
+  }
+
   function lockOrUnlock(version: TemplateVersion) {
     if (version.status === "published") {
-      askLock(version);
+      setLastLock(version);
+      setLocking(version);
       return;
     }
     // Mở khoá không hỏi lại (UC-15).
-    const result = toggleLock(version.id);
-    if (!result.ok) toast.error(result.error);
-    else toast.success(`Đã mở khoá ${versionLabel(version).toLowerCase()}.`);
+    void change(version, "unlock", `Đã mở khoá ${versionLabel(version).toLowerCase()}.`);
   }
 
   /** Mục menu ⋯ của một phiên bản (khung 311:82742). */
@@ -101,10 +119,12 @@ export function useVersionCommands({
     const publish = canPublish(version);
     const cloneable = canClone(chain, version);
     const lockable = canLock(chain, version);
+    const revocable = canRevoke(chain, version);
     const removable = canDelete(chain, version);
     const locked = version.status === "locked";
+    const testing = version.status === "testing";
 
-    return [
+    const items: ActionItem[] = [
       {
         key: "design",
         label: editable ? "Thiết kế biểu" : "Xem thiết kế",
@@ -119,6 +139,24 @@ export function useVersionCommands({
         reason: editable ? undefined : "Chỉ sửa được ở phiên bản nháp.",
         onSelect: () => onOpenDesigner?.(version, true),
       },
+    ];
+    if (editable) {
+      items.push({
+        key: "testing",
+        label: testing ? "Trả về nháp" : "Chuyển sang thử nghiệm",
+        icon: testing ? Undo2 : FlaskConical,
+        disabled: busy,
+        onSelect: () =>
+          void change(
+            version,
+            testing ? "stop_testing" : "start_testing",
+            testing
+              ? `Đã trả ${versionLabel(version).toLowerCase()} về nháp.`
+              : `Đã chuyển ${versionLabel(version).toLowerCase()} sang thử nghiệm.`
+          ),
+      });
+    }
+    items.push(
       {
         key: "publish",
         label: "Ban hành",
@@ -131,29 +169,45 @@ export function useVersionCommands({
         key: "clone",
         label: "Tạo phiên bản kế tiếp",
         icon: CopyPlus,
-        disabled: !cloneable.ok,
+        disabled: !cloneable.ok || busy,
         reason: cloneable.ok ? undefined : cloneable.reason,
-        onSelect: () => clone(version),
+        onSelect: () => void clone(version),
       },
       {
         key: "lock",
         label: locked ? "Mở khoá phiên bản" : "Khoá phiên bản",
         icon: locked ? LockOpen : Lock,
-        disabled: !lockable.ok,
+        disabled: !lockable.ok || busy,
         reason: lockable.ok ? undefined : lockable.reason,
         onSelect: () => lockOrUnlock(version),
+      },
+      {
+        key: "revoke",
+        label: "Thu hồi phiên bản",
+        icon: Ban,
+        destructive: true,
+        separatorBefore: true,
+        disabled: !revocable.ok || busy,
+        reason: revocable.ok ? undefined : revocable.reason,
+        onSelect: () => {
+          setLastRevoke(version);
+          setRevoking(version);
+        },
       },
       {
         key: "delete",
         label: "Xoá phiên bản",
         icon: Trash,
         destructive: true,
-        separatorBefore: true,
-        disabled: !removable.ok,
+        disabled: !removable.ok || busy,
         reason: removable.ok ? undefined : removable.reason,
-        onSelect: () => askDelete(version),
-      },
-    ];
+        onSelect: () => {
+          setLastDelete(version);
+          setDeleting(version);
+        },
+      }
+    );
+    return items;
   }
 
   const previous = publishing
@@ -164,13 +218,20 @@ export function useVersionCommands({
     <>
       <PublishDialog
         version={publishing}
-        previousLabel={
-          previous?.effectiveFrom
-            ? `${versionLabel(previous).toLowerCase()} (${formatDate(previous.effectiveFrom)})`
-            : undefined
-        }
+        previous={previous}
         onOpenChange={(open) => !open && setPublishing(null)}
-        onPublished={onPublished}
+        onSubmit={async (version, iso) => {
+          const result = await actions.versionAction(version.id, "publish", {
+            effectiveFrom: iso,
+          });
+          if (!result.ok) return result.error;
+          toast.success(
+            `Đã ban hành ${versionLabel(version).toLowerCase()}, áp dụng từ ${formatDate(iso)}.`
+          );
+          setPublishing(null);
+          onPublished?.(result.value);
+          return null;
+        }}
       />
 
       <ConfirmDialog
@@ -181,10 +242,24 @@ export function useVersionCommands({
         confirmLabel="Khoá phiên bản"
         onConfirm={() => {
           if (!locking) return;
-          const result = toggleLock(locking.id);
-          if (!result.ok) toast.error(result.error);
-          else toast.success(`Đã khoá ${versionLabel(locking).toLowerCase()}.`);
+          const target = locking;
           setLocking(null);
+          void change(target, "lock", `Đã khoá ${versionLabel(target).toLowerCase()}.`);
+        }}
+      />
+
+      <ConfirmDialog
+        open={revoking !== null}
+        onOpenChange={(open) => !open && setRevoking(null)}
+        title={`Thu hồi ${lastRevoke ? versionLabel(lastRevoke).toLowerCase() : "phiên bản"}?`}
+        description="Thu hồi là VĨNH VIỄN: phiên bản này không dùng lại được và không ban hành lại được. Hệ thống tự dùng lại phiên bản đã ban hành liền trước. Phiếu đã lập theo phiên bản này vẫn giữ nguyên số liệu. Chỉ thu hồi khi phiên bản bị ban hành nhầm."
+        confirmLabel="Thu hồi phiên bản"
+        destructive
+        onConfirm={() => {
+          if (!revoking) return;
+          const target = revoking;
+          setRevoking(null);
+          void change(target, "revoke", `Đã thu hồi ${versionLabel(target).toLowerCase()}.`);
         }}
       />
 
@@ -198,13 +273,18 @@ export function useVersionCommands({
         onConfirm={() => {
           if (!deleting) return;
           const target = deleting;
-          const result = deleteVersion(target.id);
-          if (!result.ok) toast.error(result.error);
-          else {
+          setDeleting(null);
+          void (async () => {
+            setBusy(true);
+            const result = await actions.deleteVersion(target.id);
+            setBusy(false);
+            if (!result.ok) {
+              toast.error(result.error);
+              return;
+            }
             toast.success(`Đã xoá ${versionLabel(target).toLowerCase()}.`);
             onDeleted?.(target);
-          }
-          setDeleting(null);
+          })();
         }}
       />
     </>
@@ -213,7 +293,8 @@ export function useVersionCommands({
   return {
     itemsFor,
     dialogs,
+    busy,
     requestPublish: (v: TemplateVersion) => setPublishing(v),
-    clone,
+    clone: (v: TemplateVersion) => void clone(v),
   };
 }

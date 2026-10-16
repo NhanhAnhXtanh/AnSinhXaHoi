@@ -13,19 +13,21 @@ import {
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
-import type { TemplateSet } from "../fixtures";
-import { saveSet } from "../store";
+import type { TemplateActions } from "../api";
+import type { TemplateSet } from "../types";
 
 /**
  * Hộp Tạo / Sửa bộ mẫu (UC-09, khung 311:84908): tên bắt buộc + mô tả.
  * Không có ô trạng thái (BR-09.3); mã bộ mẫu do hệ thống tự sinh.
  */
 export function SetDialog({
+  actions,
   open,
   editing,
   onOpenChange,
   onSaved,
 }: {
+  actions: TemplateActions;
   open: boolean;
   /** Bộ mẫu đang sửa; không có = tạo mới. */
   editing?: TemplateSet | null;
@@ -38,20 +40,27 @@ export function SetDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setName(editing?.name ?? "");
     setDescription(editing?.description ?? "");
     setError(null);
+    setBusy(false);
   }, [open, editing]);
 
-  function submit() {
+  async function submit() {
+    if (busy) return;
     if (!name.trim()) {
       setError("Hãy nhập tên bộ mẫu.");
       return;
     }
-    const result = saveSet({ id: editing?.id, name, description });
+    setBusy(true);
+    const result = editing
+      ? await actions.updateSet(editing.id, { name, description })
+      : await actions.createSet({ name, description });
+    setBusy(false);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -82,7 +91,7 @@ export function SetDialog({
           className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            submit();
+            void submit();
           }}
         >
           <div className="flex flex-col gap-2">
@@ -128,7 +137,9 @@ export function SetDialog({
             >
               Quay lại
             </Button>
-            <Button type="submit">{editing ? "Lưu" : "Tạo bộ mẫu"}</Button>
+            <Button type="submit" disabled={busy}>
+              {editing ? "Lưu" : "Tạo bộ mẫu"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

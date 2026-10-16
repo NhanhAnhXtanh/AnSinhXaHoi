@@ -13,7 +13,7 @@ import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
 
-import type { TemplateForm, TemplateVersion } from "../fixtures";
+import type { TemplateForm, TemplateVersion } from "../types";
 import {
   KIND_LABEL,
   STATUS_LABEL,

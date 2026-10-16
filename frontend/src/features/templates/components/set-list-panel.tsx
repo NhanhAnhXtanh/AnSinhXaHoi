@@ -5,7 +5,7 @@ import { EmptyState, formatDate } from "@/shared/components/asxh";
 import { Input } from "@/shared/ui/input";
 import { cn } from "@/shared/lib/utils";
 
-import type { TemplateSet } from "../fixtures";
+import type { TemplateSet } from "../types";
 
 /**
  * Cột trái của Bộ biểu mẫu: tiêu đề + số bộ, ô tìm, danh sách thẻ bộ mẫu

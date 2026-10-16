@@ -1,30 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FocusEvent, FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bold,
   CodeXml,
   CopyPlus,
   Eye,
+  FileDown,
+  FileUp,
   FileX,
-  Italic,
+  FlaskConical,
   Maximize,
   Minimize,
-  PaintBucket,
   Pencil,
-  Percent,
-  Redo2,
   Save,
   Send,
-  Sigma,
-  SquareFunction,
-  Table,
-  TextAlignCenter,
-  TextAlignEnd,
-  TextAlignStart,
-  Underline,
+  TriangleAlert,
   Undo2,
 } from "lucide-react";
+import { useWarnAboutChange } from "@refinedev/core";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -32,59 +25,84 @@ import {
   AsxhPage,
   EmptyState,
   HeaderActions,
+  LoadingState,
   SheetTabs,
-  SpreadsheetView,
   StatusBadge,
   formatDate,
-  formatNumber,
   type ActionItem,
   type PrimaryAction,
-  type SheetCell,
-  type SheetData,
 } from "@/shared/components/asxh";
+import {
+  SpreadDesigner,
+  SpreadWorkbook,
+  runClientScript,
+  type SpreadWorkbookApi,
+  type WorkbookJson,
+} from "@/shared/components/spreadsheet";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
 
-import { SAMPLE_RULE, type TemplateForm, type TemplateSet, type TemplateVersion } from "./fixtures";
+import {
+  useDesignerContext,
+  useTemplateActions,
+  useTemplateVersion,
+} from "./api";
+import type { ApiTemplateVersion } from "./types";
 import {
   KIND_LABEL,
+  MAX_WORKBOOK_BYTES,
   STATUS_LABEL,
   STATUS_TONE,
-  buildSheet,
+  byteLength,
   canClone,
   formLabel,
+  formOfVersion,
   isEditable,
+  parseWorkbook,
+  toVersion,
   versionLabel,
-  versionsOf,
 } from "./model";
-import { saveDesign, useTemplateState } from "./store";
-import { RulesPanel, type RuleDraft } from "./components/rules-panel";
+import { RulesPanel } from "./components/rules-panel";
 import { useVersionCommands } from "./components/use-version-commands";
+
+const TITLE = "Thiết kế mẫu";
 
 /**
  * Thiết kế mẫu (UC-11, UC-12; khung 311:87785, xem trước 311:88607, quy tắc
  * 311:88923). Đường dẫn /templates/designer/:id với id là phiên bản mẫu.
  *
- * Phiên bản nháp: bảng sửa được, có thanh định dạng, Lưu / Xem trước / Ban hành.
- * Phiên bản đã ban hành / khoá / thu hồi: chỉ xem (BR-11.2).
+ * Phiên bản nháp / đang thử nghiệm: SpreadJS Designer (ribbon) sửa được, Lưu
+ * (workbook + quy tắc trong một lần), Xem trước, nhập file Excel, Ban hành.
+ * Phiên bản đã ban hành / khoá / thu hồi: chỉ xem (BR-11.2, BR-12.4).
  */
 export function TemplateDesigner() {
   const { id } = useParams<{ id: string }>();
-  const state = useTemplateState();
+  const { version, isLoading, isError, statusCode } = useTemplateVersion(id);
 
-  const version = state.versions.find((v) => v.id === id);
-  const form = version && state.forms.find((f) => f.id === version.formId);
-  const set = form && state.sets.find((s) => s.id === form.setId);
-
-  if (!version || !form || !set) {
+  if (isLoading) {
     return (
-      <AsxhPage title="Thiết kế mẫu" backTo="/templates" fill>
+      <AsxhPage title={TITLE} backTo="/templates" fill>
+        <div className="bg-card flex min-h-0 flex-1 rounded-lg border shadow-e1">
+          <LoadingState label="Đang mở thiết kế…" hint="Biểu lớn có thể mất vài giây." />
+        </div>
+      </AsxhPage>
+    );
+  }
+
+  if (isError || !version) {
+    const missing = statusCode === 404 || (!isError && !version);
+    return (
+      <AsxhPage title={TITLE} backTo="/templates" fill>
         <div className="bg-card flex min-h-0 flex-1 rounded-lg border shadow-e1">
           <EmptyState
-            icon={FileX}
-            title="Không tìm thấy phiên bản mẫu"
-            description="Phiên bản này có thể đã bị xoá. Hãy quay lại Bộ biểu mẫu để chọn phiên bản khác."
+            icon={missing ? FileX : TriangleAlert}
+            title={missing ? "Không tìm thấy phiên bản mẫu" : "Không mở được thiết kế"}
+            description={
+              missing
+                ? "Phiên bản này có thể đã bị xoá. Hãy quay lại Bộ biểu mẫu để chọn phiên bản khác."
+                : "Kiểm tra kết nối mạng rồi mở lại."
+            }
             action={
               <Button asChild variant="outline">
                 <Link to="/templates">Về Bộ biểu mẫu</Link>
@@ -97,50 +115,12 @@ export function TemplateDesigner() {
   }
 
   // Đổi biểu (tab dưới) là đổi phiên bản: dựng lại vùng làm việc từ đầu.
-  return <DesignerWorkspace key={version.id} version={version} form={form} set={set} />;
+  return <DesignerWorkspace key={version.id} data={version} />;
 }
 
 /* ------------------------------------------------------------------ */
 
 type Mode = "design" | "preview";
-
-/** Dòng nhập trong bảng thiết kế sửa được mọi cột trừ STT. */
-function designSheet(form: TemplateForm): SheetData {
-  const sheet = buildSheet(form);
-  return {
-    ...sheet,
-    rows: sheet.rows.map((row) =>
-      row.editable ? { ...row, editableCols: [1, 2, 3, 4, 5, 6] } : row
-    ),
-  };
-}
-
-const num = (v: SheetCell | undefined) => (typeof v === "number" ? v : null);
-
-/** Quy tắc "Tự tính kinh phí": D = C × E × F / 1.000.000 trên mỗi dòng nhập, dòng Cộng = tổng C và D. */
-function applyRule(sheet: SheetData, onlyRow?: number): { sheet: SheetData; rows: number } {
-  let touched = 0;
-  const rows = sheet.rows.map((row, r) => {
-    if (!row.editable || (onlyRow !== undefined && r !== onlyRow)) return row;
-    const c = num(row.cells[2]);
-    const e = num(row.cells[4]);
-    const f = num(row.cells[5]);
-    if (c === null || e === null || f === null) return row;
-    touched += 1;
-    const cells = [...row.cells];
-    cells[3] = Math.round((c * e * f) / 1_000_000);
-    return { ...row, cells };
-  });
-  const totalIndex = rows.findIndex((r) => r.kind === "total");
-  if (totalIndex >= 0) {
-    const data = rows.filter((r) => r.editable);
-    const cells = [...rows[totalIndex].cells];
-    cells[2] = data.reduce((s, r) => s + (num(r.cells[2]) ?? 0), 0);
-    cells[3] = data.reduce((s, r) => s + (num(r.cells[3]) ?? 0), 0);
-    rows[totalIndex] = { ...rows[totalIndex], cells };
-  }
-  return { sheet: { ...sheet, rows }, rows: touched };
-}
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const clock = () => {
@@ -148,140 +128,53 @@ const clock = () => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-function DesignerWorkspace({
-  version,
-  form,
-  set,
-}: {
-  version: TemplateVersion;
-  form: TemplateForm;
-  set: TemplateSet;
-}) {
+function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
   const navigate = useNavigate();
-  const state = useTemplateState();
   const [params] = useSearchParams();
+  const actions = useTemplateActions();
 
+  const version = useMemo(() => toVersion(data), [data]);
+  const form = useMemo(() => formOfVersion(data), [data]);
+  const setName = data.template.set.name;
   const editable = isEditable(version.status);
-  const chain = useMemo(() => versionsOf(state.versions, form.id), [state.versions, form.id]);
+
+  const context = useDesignerContext(form.setId, form.id);
+  const chain = context.chain.length > 0 ? context.chain : [version];
+
+  /* ---------------- bảng tính ---------------- */
+
+  // Nội dung nạp vào Designer — chỉ đặt khi mở và khi quay lại từ xem trước,
+  // để lưu xong không nạp lại (mất lịch sử hoàn tác, vị trí ô đang chọn).
+  const [seed, setSeed] = useState<WorkbookJson | null>(() => parseWorkbook(data.workbookJson));
+  // Bản đã lưu gần nhất — cho chế độ chỉ xem sau khi ban hành.
+  const [saved, setSaved] = useState<WorkbookJson | null>(seed);
+  const [previewJson, setPreviewJson] = useState<WorkbookJson | null>(null);
+  const spreadRef = useRef<SpreadWorkbookApi | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [mode, setMode] = useState<Mode>("design");
-  const [rulesOpen, setRulesOpen] = useState(params.get("rules") === "1" && editable);
   const [fullscreen, setFullscreen] = useState(false);
+  const [workbookDirty, setWorkbookDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Bảng + lịch sử để Hoàn tác / Làm lại.
-  const [history, setHistory] = useState<SheetData[]>(() => [designSheet(form)]);
-  const [step, setStep] = useState(0);
-  const sheet = history[step];
+  /* ---------------- quy tắc nhập ---------------- */
 
-  const [rule, setRule] = useState<RuleDraft>({
-    name: SAMPLE_RULE.name,
-    scope: "form",
-    enabled: true,
-    code: SAMPLE_RULE.code,
-  });
-  const [log, setLog] = useState<{ time: string; text: string }[]>([]);
-  const [dirty, setDirty] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(params.get("rules") === "1");
+  const [script, setScript] = useState(data.scriptText ?? "");
+  const [scriptDirty, setScriptDirty] = useState(false);
+  const [hook, setHook] = useState("onLoad");
+  const [log, setLog] = useState<{ time: string; text: string; error?: boolean }[]>([]);
+  const [running, setRunning] = useState(false);
 
-  // Ô đang chọn cho thanh công thức.
-  const [cell, setCell] = useState<{ ref: string; text: string }>(() => {
-    const b6 = sheet.rows[5]?.cells[1];
-    return { ref: "B6", text: b6 === null || b6 === undefined ? "" : String(b6) };
-  });
+  const dirty = editable && (workbookDirty || scriptDirty);
+  const backTo = `/templates?set=${form.setId}&form=${form.id}&version=${version.id}`;
 
-  const [format, setFormat] = useState({
-    bold: false,
-    italic: false,
-    underline: false,
-    align: "start" as "start" | "center" | "end",
-  });
-
-  const backTo = `/templates?set=${set.id}&form=${form.id}&version=${version.id}`;
-  const readOnly = mode === "preview" || !editable;
-
-  /* ---------------- sửa bảng ---------------- */
-
-  function pushSheet(next: SheetData) {
-    setHistory((h) => [...h.slice(0, step + 1), next]);
-    setStep((s) => s + 1);
-    setDirty(true);
-  }
-
-  function onCellChange(r: number, c: number, value: SheetCell) {
-    if (r >= sheet.rows.length) return;
-    const rows = sheet.rows.map((row, i) => {
-      if (i !== r) return row;
-      const cells = [...row.cells];
-      while (cells.length <= c) cells.push(null);
-      cells[c] = value;
-      return { ...row, cells };
-    });
-    let next: SheetData = { ...sheet, rows };
-    if (rule.enabled && [2, 4, 5].includes(c)) next = applyRule(next, r).sheet;
-    pushSheet(next);
-  }
-
-  const canUndo = step > 0;
-  const canRedo = step < history.length - 1;
-
-  /* ---------------- thanh công thức ---------------- */
-
-  function cellInfo(target: EventTarget | null) {
-    if (!(target instanceof HTMLInputElement)) return null;
-    const label = target.getAttribute("aria-label") ?? "";
-    const m = /^Ô ([A-Z]+)(\d+)$/.exec(label);
-    if (!m) return null;
-    const ref = `${m[1]}${m[2]}`;
-    const row = sheet.rows[Number(m[2]) - 1];
-    // Ô kinh phí của dòng nhập là ô có công thức.
-    if (m[1] === "D" && row?.editable && rule.enabled) {
-      return { ref, text: `=C${m[2]}*E${m[2]}*F${m[2]}/1.000.000` };
-    }
-    return { ref, text: target.value };
-  }
-
-  const onFocusCapture = (e: FocusEvent<HTMLDivElement>) => {
-    const info = cellInfo(e.target);
-    if (info) setCell(info);
-  };
-  const onInputCapture = (e: FormEvent<HTMLDivElement>) => {
-    const info = cellInfo(e.target);
-    if (info) {
-      setCell(info);
-      setDirty(true);
-    }
-  };
-
-  /* ---------------- lưu / phím tắt / rời trang ---------------- */
-
-  const save = useCallback(() => {
-    if (!editable) return;
-    if (!dirty) {
-      toast.info("Chưa có thay đổi nào để lưu.");
-      return;
-    }
-    const result = saveDesign(version.id, "design");
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    setDirty(false);
-    toast.success(
-      `Đã lưu thiết kế và quy tắc của ${formLabel(form).toLowerCase()}, ${versionLabel(version).toLowerCase()}.`
-    );
-  }, [dirty, editable, form, version]);
-
+  // Rời màn khi còn thay đổi chưa lưu: hộp hỏi của ứng dụng (UC-11 4c).
+  const { setWarnWhen } = useWarnAboutChange();
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        save();
-      } else if (e.key === "Escape" && fullscreen) {
-        setFullscreen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [save, fullscreen]);
+    setWarnWhen(dirty);
+    return () => setWarnWhen(false);
+  }, [dirty, setWarnWhen]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -292,49 +185,167 @@ function DesignerWorkspace({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  /* ---------------- quy tắc ---------------- */
+  /* ---------------- lưu ---------------- */
 
-  function recalcTotals() {
-    pushSheet(applyRule(sheet).sheet);
-    toast.info("Đã tính lại kinh phí từng dòng và dòng Cộng.");
-  }
-
-  function runRule() {
-    if (!rule.enabled) {
-      setLog((l) => [
-        ...l,
-        { time: clock(), text: `Quy tắc “${rule.name}” đang tắt — bật lên rồi chạy thử.` },
-      ]);
+  const save = useCallback(async () => {
+    if (!editable || saving) return;
+    if (!dirty) {
+      toast.info("Chưa có thay đổi nào để lưu.");
       return;
     }
-    const result = applyRule(sheet);
-    const total = result.sheet.rows.find((r) => r.kind === "total");
-    if (editable) pushSheet(result.sheet);
+    const api = spreadRef.current;
+    const values: { workbookJson?: string; scriptText?: string } = {};
+    let json: WorkbookJson | null = null;
+    if (workbookDirty || mode === "preview") {
+      json = mode === "preview" ? previewJson : (api?.toJSON() ?? null);
+      if (!json) {
+        toast.error("Bảng tính chưa mở xong, vui lòng thử lại.");
+        return;
+      }
+      const text = JSON.stringify(json);
+      if (byteLength(text) > MAX_WORKBOOK_BYTES) {
+        toast.error(
+          "Bảng tính quá lớn (quá 20MB). Hãy xoá bớt vùng trống, dòng hoặc cột thừa rồi lưu lại."
+        );
+        return;
+      }
+      values.workbookJson = text;
+    }
+    if (scriptDirty) values.scriptText = script;
+
+    setSaving(true);
+    const result = await actions.saveVersion(version.id, values);
+    setSaving(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    if (json) setSaved(json);
+    setWorkbookDirty(false);
+    setScriptDirty(false);
+    toast.success(
+      `Đã lưu thiết kế và quy tắc của ${formLabel(form).toLowerCase()}, ${versionLabel(version).toLowerCase()}.`
+    );
+  }, [
+    actions,
+    dirty,
+    editable,
+    form,
+    mode,
+    previewJson,
+    saving,
+    script,
+    scriptDirty,
+    version,
+    workbookDirty,
+  ]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void save();
+      } else if (e.key === "Escape" && fullscreen) {
+        setFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [save, fullscreen]);
+
+  /* ---------------- xem trước ---------------- */
+
+  function openPreview() {
+    const json = spreadRef.current?.toJSON() ?? seed;
+    setPreviewJson(json);
+    setMode("preview");
+  }
+
+  function closePreview() {
+    // Designer được dựng lại từ đúng nội dung đang xem — không mất phần chưa lưu.
+    setSeed(previewJson);
+    setMode("design");
+  }
+
+  /* ---------------- nhập / xuất file ---------------- */
+
+  async function importFile(file: File) {
+    const api = spreadRef.current;
+    if (!api) {
+      toast.error("Bảng tính chưa mở xong, vui lòng thử lại.");
+      return;
+    }
+    try {
+      await api.importFile(file);
+      setWorkbookDirty(true);
+      const sheets = api.getSheetNames().length;
+      if (sheets > 1) {
+        toast.warning(
+          `Đã nhập file “${file.name}”. File có ${sheets} trang — mỗi biểu chỉ dùng một trang, hãy xoá trang thừa trước khi ban hành.`
+        );
+      } else {
+        toast.success(`Đã nhập file “${file.name}”. Bấm Lưu để giữ lại.`);
+      }
+    } catch {
+      toast.error(`Không đọc được file “${file.name}”. Hãy chọn file Excel (.xlsx).`);
+    }
+  }
+
+  async function exportFile() {
+    const api = spreadRef.current;
+    if (!api) return;
+    try {
+      await api.exportXlsx(`${formLabel(form)} - ${versionLabel(version)}.xlsx`);
+    } catch {
+      toast.error("Không tải được file Excel. Hãy thử lại.");
+    }
+  }
+
+  /* ---------------- chạy thử quy tắc ---------------- */
+
+  async function runRule() {
+    const api = spreadRef.current;
+    if (!api) {
+      toast.error("Bảng tính chưa mở xong, vui lòng thử lại.");
+      return;
+    }
+    setRunning(true);
     const time = clock();
+    const result = await runClientScript(api, script, hook, {
+      mode: "designer",
+      unitName: "Đơn vị chạy thử",
+      year: new Date().getFullYear(),
+    });
+    setRunning(false);
     setLog((l) => [
       ...l,
-      { time, text: `Chạy quy tắc “${rule.name}” trên ${formLabel(form).toLowerCase()}.` },
-      { time, text: `Đã tính lại ${result.rows} dòng, không có lỗi.` },
-      ...(total
-        ? [{ time, text: `Dòng cộng: ${formatNumber(num(total.cells[3]))} triệu đồng.` }]
-        : []),
+      ...result.messages.map((text) => ({ time, text, error: !result.ok })),
+      {
+        time,
+        text: result.ok ? "Chạy xong, không có lỗi." : "Chạy xong, có lỗi — xem các dòng trên.",
+        error: !result.ok,
+      },
     ]);
   }
 
   /* ---------------- việc trên phiên bản ---------------- */
 
   const commands = useVersionCommands({
+    actions,
+    chainOf: () => chain,
     onCloned: (v) => navigate(`/templates/designer/${v.id}`),
+    onDeleted: () => navigate(backTo),
     onPublished: () => setMode("design"),
   });
 
   const cloneable = canClone(chain, version);
+  const testing = version.status === "testing";
 
-  const publishAction: PrimaryAction | undefined = editable
+  const primary: PrimaryAction | undefined = editable
     ? {
         label: "Ban hành",
         icon: Send,
-        disabled: dirty,
+        disabled: dirty || saving,
         reason: dirty ? "Lưu thay đổi trước đã." : undefined,
         onClick: () => commands.requestPublish(version),
       }
@@ -342,19 +353,23 @@ function DesignerWorkspace({
       ? {
           label: "Tạo phiên bản kế tiếp",
           icon: CopyPlus,
+          loading: commands.busy,
           onClick: () => commands.clone(version),
         }
       : undefined;
 
-  const secondary: PrimaryAction[] =
-    mode === "preview"
-      ? [{ label: "Quay lại thiết kế", icon: Pencil, onClick: () => setMode("design") }]
-      : editable
-        ? [
-            { label: "Lưu", icon: Save, onClick: save },
-            { label: "Xem trước", icon: Eye, onClick: () => setMode("preview") },
-          ]
-        : [];
+  const secondary: PrimaryAction[] = !editable
+    ? []
+    : mode === "preview"
+      ? [{ label: "Quay lại thiết kế", icon: Pencil, onClick: closePreview }]
+      : [
+          { label: "Lưu", icon: Save, loading: saving, onClick: () => void save() },
+          { label: "Xem trước", icon: Eye, onClick: openPreview },
+        ];
+
+  const versionItems = commands.itemsFor(version);
+  const testingItem = versionItems.find((i) => i.key === "testing");
+  const lockItem = versionItems.find((i) => i.key === "lock");
 
   const menu: ActionItem[] = [
     ...(mode === "design"
@@ -367,10 +382,40 @@ function DesignerWorkspace({
           },
         ]
       : []),
+    ...(editable && mode === "design"
+      ? [
+          {
+            key: "import",
+            label: "Nhập file Excel",
+            icon: FileUp,
+            onSelect: () => fileRef.current?.click(),
+          },
+        ]
+      : []),
+    {
+      key: "export",
+      label: "Tải về file Excel",
+      icon: FileDown,
+      disabled: mode === "preview",
+      onSelect: () => void exportFile(),
+    },
+    ...(testingItem
+      ? [
+          {
+            ...testingItem,
+            icon: testing ? Undo2 : FlaskConical,
+            disabled: testingItem.disabled || dirty,
+            reason: dirty ? "Lưu thay đổi trước đã." : testingItem.reason,
+            separatorBefore: true,
+          },
+        ]
+      : []),
+    ...(lockItem && !editable ? [{ ...lockItem, separatorBefore: true }] : []),
     {
       key: "fullscreen",
       label: fullscreen ? "Thoát toàn màn hình" : "Toàn màn hình",
       icon: fullscreen ? Minimize : Maximize,
+      separatorBefore: true,
       onSelect: () => setFullscreen((f) => !f),
     },
   ];
@@ -384,9 +429,9 @@ function DesignerWorkspace({
 
   const description =
     mode === "preview"
-      ? "Chế độ chỉ xem, không sửa được ở đây. Muốn sửa, bấm Quay lại thiết kế."
+      ? "Chế độ chỉ xem, giống màn nhập liệu của đơn vị. Muốn sửa, bấm Quay lại thiết kế."
       : [
-          set.name,
+          setName,
           KIND_LABEL[form.kind],
           editable
             ? version.effectiveFrom
@@ -402,9 +447,9 @@ function DesignerWorkspace({
 
   /* ---------------- tab biểu ---------------- */
 
-  const tabs = state.forms
-    .filter((f) => f.setId === set.id)
-    .map((f) => ({ key: f.id, label: f.name }));
+  const tabs = context.forms.length > 0
+    ? context.forms.map((f) => ({ key: f.id, label: f.name }))
+    : [{ key: form.id, label: form.name }];
 
   function switchForm(formId: string) {
     if (formId === form.id) return;
@@ -412,12 +457,12 @@ function DesignerWorkspace({
       toast.warning("Hãy lưu thay đổi trước khi chuyển sang biểu khác.");
       return;
     }
-    const target = versionsOf(state.versions, formId)[0];
+    const target = context.forms.find((f) => f.id === formId)?.latestVersionId;
     if (!target) {
       toast.info("Biểu này chưa có phiên bản nào.");
       return;
     }
-    navigate(`/templates/designer/${target.id}`);
+    navigate(`/templates/designer/${target}`);
   }
 
   const fullscreenButton = (
@@ -427,6 +472,52 @@ function DesignerWorkspace({
       onClick={() => setFullscreen((f) => !f)}
     />
   );
+
+  /* ---------------- vùng bảng tính ---------------- */
+
+  let sheetArea: ReactNode;
+  if (!editable) {
+    sheetArea = (
+      <SpreadWorkbook
+        workbook={saved}
+        readOnly
+        className="min-h-0 flex-1"
+        onReady={(api) => {
+          spreadRef.current = api;
+        }}
+      />
+    );
+  } else if (mode === "preview") {
+    sheetArea = (
+      <SpreadWorkbook
+        workbook={previewJson}
+        scriptText={script}
+        scriptContext={{
+          mode: "input",
+          unitName: "Đơn vị xem trước",
+          year: new Date().getFullYear(),
+        }}
+        stampInputLocks
+        className="min-h-0 flex-1"
+        onReady={(api) => {
+          spreadRef.current = api;
+        }}
+      />
+    );
+  } else {
+    sheetArea = (
+      <SpreadDesigner
+        workbook={seed}
+        className="min-h-0 flex-1"
+        onReady={(api) => {
+          spreadRef.current = api;
+        }}
+        onDirtyChange={(d) => {
+          if (d) setWorkbookDirty(true);
+        }}
+      />
+    );
+  }
 
   return (
     <AsxhPage
@@ -439,10 +530,20 @@ function DesignerWorkspace({
       description={description}
       backTo={backTo}
       fill
-      actions={
-        <HeaderActions primary={publishAction} secondary={secondary} items={menu} />
-      }
+      actions={<HeaderActions primary={primary} secondary={secondary} items={menu} />}
     >
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".xlsx,.ssjson,.json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void importFile(file);
+        }}
+      />
+
       <div
         className={cn(
           "bg-card flex min-h-0 flex-1 overflow-hidden border shadow-e1",
@@ -450,58 +551,7 @@ function DesignerWorkspace({
         )}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {mode === "design" && (
-            <div
-              role="toolbar"
-              aria-label="Định dạng bảng"
-              className="flex items-center gap-1 overflow-x-auto border-b px-2 py-1.5"
-            >
-              <IconTool icon={Undo2} label="Hoàn tác" disabled={readOnly || !canUndo} onClick={() => { setStep((s) => s - 1); setDirty(true); }} />
-              <IconTool icon={Redo2} label="Làm lại" disabled={readOnly || !canRedo} onClick={() => { setStep((s) => s + 1); setDirty(true); }} />
-              <ToolDivider />
-              <IconTool icon={Bold} label="Chữ đậm" disabled={readOnly} pressed={format.bold} onClick={() => { setFormat((f) => ({ ...f, bold: !f.bold })); setDirty(true); }} />
-              <IconTool icon={Italic} label="Chữ nghiêng" disabled={readOnly} pressed={format.italic} onClick={() => { setFormat((f) => ({ ...f, italic: !f.italic })); setDirty(true); }} />
-              <IconTool icon={Underline} label="Gạch chân" disabled={readOnly} pressed={format.underline} onClick={() => { setFormat((f) => ({ ...f, underline: !f.underline })); setDirty(true); }} />
-              <ToolDivider />
-              <IconTool icon={TextAlignStart} label="Canh trái" disabled={readOnly} pressed={format.align === "start"} onClick={() => { setFormat((f) => ({ ...f, align: "start" })); setDirty(true); }} />
-              <IconTool icon={TextAlignCenter} label="Canh giữa" disabled={readOnly} pressed={format.align === "center"} onClick={() => { setFormat((f) => ({ ...f, align: "center" })); setDirty(true); }} />
-              <IconTool icon={TextAlignEnd} label="Canh phải" disabled={readOnly} pressed={format.align === "end"} onClick={() => { setFormat((f) => ({ ...f, align: "end" })); setDirty(true); }} />
-              <ToolDivider />
-              <IconTool icon={Table} label="Kẻ khung ô" disabled={readOnly} onClick={() => setDirty(true)} />
-              <IconTool icon={PaintBucket} label="Tô màu nền ô" disabled={readOnly} onClick={() => setDirty(true)} />
-              <ToolDivider />
-              <IconTool icon={Sigma} label="Tính lại dòng Cộng" disabled={readOnly} onClick={recalcTotals} />
-              <IconTool icon={Percent} label="Định dạng phần trăm" disabled={readOnly} onClick={() => setDirty(true)} />
-              <div className="ms-auto flex items-center">{fullscreenButton}</div>
-            </div>
-          )}
-
-          {/* Thanh công thức: tên ô + nội dung ô đang chọn. */}
-          <div className="flex h-9 shrink-0 items-center gap-2 border-b px-2 text-sm">
-            <span
-              aria-label="Ô đang chọn"
-              className="text-muted-foreground w-10 shrink-0 text-center text-xs font-medium tabular-nums"
-            >
-              {cell.ref}
-            </span>
-            <SquareFunction aria-hidden className="text-muted-foreground size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate" title={cell.text}>
-              {cell.text}
-            </span>
-          </div>
-
-          <div
-            className="flex min-h-0 flex-1 flex-col"
-            onFocusCapture={onFocusCapture}
-            onInputCapture={onInputCapture}
-          >
-            <SpreadsheetView
-              sheet={sheet}
-              readOnly={readOnly}
-              minRows={40}
-              onCellChange={readOnly ? undefined : onCellChange}
-            />
-          </div>
+          <div className="flex min-h-0 flex-1 flex-col">{sheetArea}</div>
 
           <div className="shrink-0 border-t px-2 py-1.5">
             <SheetTabs
@@ -509,22 +559,24 @@ function DesignerWorkspace({
               value={form.id}
               onChange={switchForm}
               maxVisible={6}
-              trailing={mode === "preview" ? fullscreenButton : undefined}
+              trailing={fullscreenButton}
             />
           </div>
         </div>
 
         {mode === "design" && rulesOpen && (
           <RulesPanel
-            formName={form.name}
-            rule={rule}
+            script={script}
             readOnly={!editable}
-            log={log}
             onChange={(next) => {
-              setRule(next);
-              setDirty(true);
+              setScript(next);
+              setScriptDirty(true);
             }}
-            onRun={runRule}
+            hook={hook}
+            onHookChange={setHook}
+            log={log}
+            running={running}
+            onRun={() => void runRule()}
             onClose={() => setRulesOpen(false)}
             className="w-[min(520px,45%)] shrink-0"
           />
@@ -538,23 +590,15 @@ function DesignerWorkspace({
 
 /* ------------------------------------------------------------------ */
 
-function ToolDivider() {
-  return <span aria-hidden className="bg-border mx-1 h-5 w-px shrink-0" />;
-}
-
-/** Nút chỉ có icon trên thanh công cụ: có tên đọc được và gợi ý khi rê chuột. */
+/** Nút chỉ có icon: có tên đọc được và gợi ý khi rê chuột. */
 function IconTool({
   icon: Icon,
   label,
   onClick,
-  disabled,
-  pressed,
 }: {
   icon: LucideIcon;
   label: string;
   onClick?: () => void;
-  disabled?: boolean;
-  pressed?: boolean;
 }) {
   return (
     <Tooltip>
@@ -564,10 +608,7 @@ function IconTool({
           variant="ghost"
           size="icon-sm"
           aria-label={label}
-          aria-pressed={pressed}
-          disabled={disabled}
           onClick={onClick}
-          className={cn(pressed && "bg-accent text-accent-foreground")}
         >
           <Icon aria-hidden />
         </Button>

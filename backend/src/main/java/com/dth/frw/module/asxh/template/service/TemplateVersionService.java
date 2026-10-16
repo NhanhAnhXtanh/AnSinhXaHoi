@@ -6,7 +6,9 @@ import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionPatchRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionRequest;
 import com.dth.frw.module.asxh.template.repo.TemplateVersionRepository;
+import com.dth.frw.module.asxh.template.repo.TemplateVersionRow;
 import com.dth.frw.module.asxh.template.repo.TemplateVersionSpecifications;
+import com.dth.frw.module.asxh.template.repo.TemplateVersionSummaryQuery;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.security.CurrentUser;
 import com.dth.frw.shared.web.ListParams;
@@ -20,11 +22,13 @@ import java.util.Set;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Phiên bản mẫu: sửa nội dung, ban hành, khoá / mở khoá, thu hồi, xoá, tạo
@@ -43,7 +47,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>TODO: chưa port — chạy script phía máy chủ (validate / getInputData /
  * getSummaryData bằng GraalJS), tự đăng ký chỉ tiêu khi lưu script (UC-05),
- * chuẩn hoá workbook (cắt dòng trống, gỡ sheet "Evaluation Version"), ngoại lệ
+ * chuẩn hoá workbook cắt dòng trống thừa (BR-11.3; sheet "Evaluation Version"
+ * thì đã cắt khi lưu), ngoại lệ
  * thay riêng script getSummaryData sau ban hành (UC-12 4b, chờ BA). Đếm phiếu
  * trong hộp cảnh báo thu hồi cũng chưa có — cần slice phiếu nhập cung cấp.
  */
@@ -56,14 +61,23 @@ public class TemplateVersionService {
 
     private static final Sort DEFAULT_SORT = Sort.by(Sort.Order.desc("versionNo"), Sort.Order.desc("id"));
 
+    /**
+     * Tên sheet mà bản dùng thử SpreadJS tự chèn khi chưa có giấy phép. Frontend
+     * đã cắt khi lưu; máy chủ cắt thêm lần nữa cho chắc (UC-11 4b).
+     */
+    static final String EVALUATION_SHEET = "Evaluation Version";
+
     private final TemplateVersionRepository repository;
+    private final TemplateVersionSummaryQuery summaryQuery;
     private final TemplateService templateService;
     private final ObjectMapper mapper;
 
     public TemplateVersionService(TemplateVersionRepository repository,
+                                  TemplateVersionSummaryQuery summaryQuery,
                                   TemplateService templateService,
                                   ObjectMapper mapper) {
         this.repository = repository;
+        this.summaryQuery = summaryQuery;
         this.templateService = templateService;
         this.mapper = mapper;
     }
@@ -81,6 +95,23 @@ public class TemplateVersionService {
 
     public List<TemplateVersion> getMany(List<Long> ids) {
         return repository.findAllById(ids);
+    }
+
+    /**
+     * Danh sách cho {@code GET /template_versions}: cùng bộ lọc, sắp xếp, phân
+     * trang như {@link #list}, nhưng không đọc cột workbook / script.
+     */
+    public Page<TemplateVersionRow> listSummaries(ListParams params) {
+        return summaryQuery.page(TemplateVersionSpecifications.from(params), params.pageable(SORTABLE, DEFAULT_SORT));
+    }
+
+    /** {@code getMany} dạng gọn — không đọc workbook / script. */
+    public List<TemplateVersionRow> getManySummaries(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Specification<TemplateVersion> byIds = (root, query, cb) -> root.get("id").in(ids);
+        return summaryQuery.all(byIds, DEFAULT_SORT);
     }
 
     // ------------------------------------------------- chọn phiên bản (UC-19)
@@ -216,8 +247,17 @@ public class TemplateVersionService {
                                 .formatted(other.getVersionNo(), TemplateDates.format(date)));
             }
         }
-        // TODO: bản cũ còn đòi "đúng một biểu"; ở đây một phiên bản luôn là một
-        // biểu. Chưa kiểm tra workbook đã thiết kế (khác "{}") — chờ có Designer.
+        // UC-13 3d: phiên bản phải có đúng một trang bảng tính (BR-11.1).
+        int sheets = sheetCount(version.getWorkbookJson());
+        if (sheets == 0) {
+            throw new ConflictException(
+                    "Biểu chưa được thiết kế — hãy mở thiết kế, dựng bảng và lưu trước khi ban hành.");
+        }
+        if (sheets > 1) {
+            throw new ConflictException(
+                    "Mỗi phiên bản chỉ được có một trang bảng tính (hiện có %d trang) — hãy xoá bớt trang thừa trong thiết kế rồi lưu lại."
+                            .formatted(sheets));
+        }
 
         version.setEffectiveFrom(date);
         version.setStatus(TemplateStatus.PUBLISHED);
@@ -226,6 +266,40 @@ public class TemplateVersionService {
         repository.save(version);
         refreshEffectiveTo(version.getTemplate().getId());
         return version;
+    }
+
+    /**
+     * Đưa bản nháp sang "Đang thử nghiệm" — nhãn cho người thiết kế biết bản này
+     * đang được chạy thử, chưa ban hành. Nội dung vẫn sửa được, vẫn ban hành /
+     * thu hồi như nháp (xem {@link TemplateStatus#TESTING}); phép chọn phiên bản
+     * theo ngày vẫn bỏ qua. Bản Jmix không có thao tác nào tạo trạng thái này —
+     * thêm ở bản mới theo yêu cầu màn Thiết kế mẫu, chờ BA xác nhận.
+     */
+    @Transactional
+    public TemplateVersion startTesting(Long id) {
+        TemplateVersion version = lockedVersion(id);
+        if (version.getStatus() == TemplateStatus.TESTING) {
+            return version;
+        }
+        if (version.getStatus() != TemplateStatus.DRAFT) {
+            throw new ConflictException("Chỉ chuyển sang thử nghiệm được phiên bản đang nháp.");
+        }
+        version.setStatus(TemplateStatus.TESTING);
+        return repository.save(version);
+    }
+
+    /** Ngược lại {@link #startTesting}: bản đang thử nghiệm trở về nháp. */
+    @Transactional
+    public TemplateVersion stopTesting(Long id) {
+        TemplateVersion version = lockedVersion(id);
+        if (version.getStatus() == TemplateStatus.DRAFT) {
+            return version;
+        }
+        if (version.getStatus() != TemplateStatus.TESTING) {
+            throw new ConflictException("Chỉ trả về nháp được phiên bản đang thử nghiệm.");
+        }
+        version.setStatus(TemplateStatus.DRAFT);
+        return repository.save(version);
     }
 
     /**
@@ -443,8 +517,12 @@ public class TemplateVersionService {
         }
     }
 
-    /** UC-11 4a: workbook phải là một đối tượng JSON. */
-    private String requireWorkbook(String json) {
+    /**
+     * UC-11 4a: workbook phải là một đối tượng JSON có ít nhất một trang bảng
+     * tính. Trang chữ mờ "Evaluation Version" của bản dùng thử SpreadJS bị cắt
+     * trước khi lưu (UC-11 4b) — để lọt vào thì mọi phiếu lập từ mẫu đều mang nó.
+     */
+    String requireWorkbook(String json) {
         JsonNode node;
         try {
             node = mapper.readTree(json);
@@ -454,7 +532,32 @@ public class TemplateVersionService {
         if (node == null || !node.isObject()) {
             throw new ConflictException("Bảng tính gửi lên không hợp lệ — hãy mở lại thiết kế và lưu lại.");
         }
+        JsonNode sheets = node.path("sheets");
+        if (sheets.isObject() && sheets.has(EVALUATION_SHEET)) {
+            ((ObjectNode) sheets).remove(EVALUATION_SHEET);
+            ((ObjectNode) node).put("sheetCount", sheets.size());
+            json = mapper.writeValueAsString(node);
+        }
+        if (!sheets.isObject() || sheets.size() == 0) {
+            throw new ConflictException("Bảng tính chưa có trang nào — hãy dựng bảng trong thiết kế rồi lưu lại.");
+        }
         return json;
+    }
+
+    /** Số trang bảng tính trong workbook đã lưu; JSON hỏng hoặc chưa thiết kế ({@code "{}"}) → 0. */
+    int sheetCount(String json) {
+        if (json == null || json.isBlank()) {
+            return 0;
+        }
+        try {
+            JsonNode sheets = mapper.readTree(json).path("sheets");
+            if (!sheets.isObject()) {
+                return 0;
+            }
+            return sheets.has(EVALUATION_SHEET) ? sheets.size() - 1 : sheets.size();
+        } catch (JacksonException e) {
+            return 0;
+        }
     }
 
     private static String currentUsername() {
