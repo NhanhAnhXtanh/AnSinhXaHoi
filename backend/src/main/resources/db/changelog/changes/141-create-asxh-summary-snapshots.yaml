@@ -1,0 +1,66 @@
+# Ảnh chụp workbook tổng hợp (UC-57, chỉ REST): một bản cho mỗi (kỳ × phiên bản mẫu), ghi đè.
+# Khoá ngoại RESTRICT tới phiên bản mẫu: ảnh chụp chặn xoá phiên bản đó (UC-16).
+databaseChangeLog:
+  - changeSet:
+      id: 141-create-asxh-summary-snapshots
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_summary_snapshots
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_summary_snapshots
+              - column:
+                  name: period_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_version_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: workbook_json
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rendered_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rendered_by
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        - addUniqueConstraint:
+            tableName: asxh_summary_snapshots
+            columnNames: period_id, template_version_id
+            constraintName: uq_asxh_summary_snapshots_period_version
+        - addForeignKeyConstraint:
+            baseTableName: asxh_summary_snapshots
+            baseColumnNames: period_id
+            constraintName: fk_asxh_summary_snapshots_period
+            referencedTableName: asxh_report_periods
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_summary_snapshots
+            baseColumnNames: template_version_id
+            constraintName: fk_asxh_summary_snapshots_version
+            referencedTableName: asxh_template_versions
+            referencedColumnNames: id
+            onDelete: RESTRICT

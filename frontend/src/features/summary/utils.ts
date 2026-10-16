@@ -55,6 +55,23 @@ export function parseViDate(text: string): string | null {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
+/** Chữ không dấu, nối gạch: "Quý I/2026" → "Quy-I-2026". */
+function slug(raw: string): string {
+  return raw
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Tên tệp xuất Excel bảng tổng hợp (UC-53): "TongHop_1a_Quy-I-2026.xlsx". */
+export function summaryExportName(sheetLabel: string, scopeLabel: string): string {
+  const parts = ["TongHop", slug(sheetLabel), slug(scopeLabel)].filter((part) => part !== "");
+  return `${parts.join("_")}.xlsx`;
+}
+
 /** Hôm nay dạng "dd/mm/yyyy". */
 export function todayVi(): string {
   const d = new Date();

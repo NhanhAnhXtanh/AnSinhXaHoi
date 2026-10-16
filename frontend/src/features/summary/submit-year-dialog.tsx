@@ -17,7 +17,8 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { cn } from "@/shared/lib/utils";
 
-import type { AttachedFile } from "./fixtures";
+/** Một tệp đính kèm phiếu nộp (tên + dung lượng KB). */
+export type AttachedFile = { name: string; sizeKb: number };
 import { parseViDate, todayVi } from "./utils";
 
 const MAX_FILES = 10;

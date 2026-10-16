@@ -201,6 +201,111 @@ public class ServerScriptRunner {
         return new GetInputDataResult(List.copyOf(rows), executed);
     }
 
+    // ------------------------------------------------------------ getSummaryData
+
+    /** Chế độ đặt vào {@code ctx.mode} khi Sở trích số đã sửa trên bảng tổng hợp. */
+    public static final String MODE_SUMMARY_EDIT = "summary-edit";
+
+    /**
+     * Một dòng hook {@code getSummaryData} trả về — số Sở chốt trên bảng tổng hợp (port
+     * {@code SummaryDataRowDto}). {@code organizationCode} rỗng = dòng gộp các đơn vị; {@code slot}
+     * rỗng = cả kỳ. {@code allocatedAmount} = "Kinh phí đã bố trí trong dự toán NSĐP".
+     */
+    public record SummaryDataRow(
+            String organizationCode,
+            String indicatorCode,
+            String indicatorName,
+            String slot,
+            BigDecimal quantity,
+            BigDecimal amount,
+            BigDecimal allocatedAmount,
+            String note,
+            Integer orderNo) {
+    }
+
+    /**
+     * @param executedHookCount {@code 0} = mẫu không có hook {@code getSummaryData} — người gọi coi là lỗi
+     *                          cấu hình, KHÔNG được ghi số liệu Sở rỗng
+     */
+    public record GetSummaryDataResult(List<SummaryDataRow> rows, int executedHookCount) {
+    }
+
+    /**
+     * Chạy hook {@code getSummaryData} trên bảng Sở vừa sửa ({@code ctx.mode = 'summary-edit'}) — port
+     * {@code runGetSummaryData} của bản Jmix. Thêm cho phần số liệu Sở (UC-55).
+     *
+     * @param orgCodeByName tên đơn vị → mã, đặt ở {@code ctx.shared.orgCodeByName}: biểu mỗi đơn vị một
+     *                      dòng chỉ ghi TÊN đơn vị, script dịch ngược ra mã không cần gọi API
+     * @throws ServerScriptException biên dịch / chạy lỗi, quá giờ, hoặc script tự báo lỗi ERROR
+     */
+    public GetSummaryDataResult runGetSummaryData(String workbookJson, List<ScriptSource> scripts, ReportInfo report,
+                                                  Map<String, String> orgCodeByName) {
+        WorkbookJsonCellReader reader = WorkbookJsonCellReader.parse(workbookJson);
+        List<SummaryDataRow> rows = new ArrayList<>();
+        List<String> errorIssues = new ArrayList<>();
+        int executed = 0;
+        Map<String, Object> shared = new HashMap<>();
+        shared.put("orgCodeByName", ProxyObject.fromMap(new HashMap<>(orgCodeByName == null ? Map.of() : orgCodeByName)));
+
+        try (Context context = newSandboxedContext()) {
+            ScheduledFuture<?> killer = scheduleKill(context);
+            try {
+                Value defineScript = context.eval("js", "(function (hooks) { return hooks; })");
+                Value ctx = buildContext(context, reader, report, errorIssues, MODE_SUMMARY_EDIT, shared);
+                for (ScriptSource script : scripts) {
+                    Value hooks = compile(context, script, defineScript);
+                    Value hook = hooks.hasMember("getSummaryData") ? hooks.getMember("getSummaryData") : null;
+                    if (hook == null || !hook.canExecute()) {
+                        continue;
+                    }
+                    Value result;
+                    try {
+                        result = hook.execute(ctx);
+                    } catch (PolyglotException e) {
+                        throw translate("Script \"" + script.name() + "\" lỗi khi chạy getSummaryData", e);
+                    }
+                    executed++;
+                    if (result == null || result.isNull()) {
+                        continue;
+                    }
+                    if (!result.hasArrayElements()) {
+                        throw new ServerScriptException(ServerScriptException.Kind.SCRIPT,
+                                "Script \"" + script.name() + "\": getSummaryData phải trả về một mảng dòng"
+                                        + " (trên máy chủ không dùng hàm async).");
+                    }
+                    for (long i = 0; i < result.getArraySize(); i++) {
+                        Value row = result.getArrayElement(i);
+                        if (row == null || row.isNull() || !row.hasMembers()) {
+                            continue;
+                        }
+                        rows.add(new SummaryDataRow(
+                                stringMember(row, "organizationCode"),
+                                stringMember(row, "indicatorCode"),
+                                stringMember(row, "indicatorName"),
+                                stringMember(row, "slot"),
+                                decimalMember(row, "quantity"),
+                                decimalMember(row, "amount"),
+                                decimalMember(row, "allocatedAmount"),
+                                stringMember(row, "note"),
+                                intMember(row, "orderNo")));
+                    }
+                }
+            } finally {
+                killer.cancel(false);
+            }
+        } catch (PolyglotException e) {
+            throw translate("Lỗi chạy script mẫu trên máy chủ", e);
+        } catch (IllegalStateException e) {
+            throw new ServerScriptException(ServerScriptException.Kind.TIMEOUT,
+                    "Script bị huỷ do vượt thời gian cho phép.", e);
+        }
+
+        if (!errorIssues.isEmpty()) {
+            throw new ServerScriptException(ServerScriptException.Kind.DATA, String.join("; ", errorIssues));
+        }
+        return new GetSummaryDataResult(List.copyOf(rows), executed);
+    }
+
     // ------------------------------------------------------------ validate
 
     /**

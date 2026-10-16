@@ -203,7 +203,10 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
         const issues: TempTableValidationIssue[] = [...engine.compileErrorIssues()];
         issues.push(...(await engine.runLifecycle("onLoad")).issues);
         if (cancelled) return;
-        if (mode === "summary" || mode === "summary-edit") {
+        // Bản nháp Sở đang sửa (fromDraft) đã mang số của Sở: không chạy afterInject
+        // để khỏi đổ số tổng hợp đè lên — giống bản Jmix.
+        const fromDraft = scriptContext?.fromDraft === true;
+        if ((mode === "summary" || mode === "summary-edit") && !fromDraft) {
           issues.push(...(await engine.runLifecycle("afterInject")).issues);
           if (cancelled) return;
         }

@@ -8,11 +8,17 @@ import { Separator } from "@/shared/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
 
-import type { Unit } from "./fixtures";
+import type { UnitOption } from "./api";
+
+const BLOCK_LABEL: Record<string, string> = {
+  tinh: "Khối tỉnh",
+  huyen: "Khối huyện",
+  xa: "Khối xã",
+};
 
 /**
- * Ô "Phạm vi": Toàn tỉnh · Khối xã · Khối huyện, hoặc một đơn vị cụ thể (gõ để
- * tìm). Chỉ liệt kê đơn vị đã có phiếu được duyệt trong kỳ.
+ * Ô "Phạm vi": Toàn tỉnh · Khối (chỉ khi có từ hai khối), hoặc một đơn vị cụ thể
+ * (gõ để tìm). Chỉ liệt kê đơn vị có phiếu trong kỳ (BR-51.1).
  */
 export function ScopePicker({
   value,
@@ -23,30 +29,30 @@ export function ScopePicker({
 }: {
   value: string;
   onChange: (scope: string) => void;
-  /** Đơn vị có phiếu được duyệt trong kỳ. */
-  units: Unit[];
+  /** Đơn vị có phiếu trong kỳ. */
+  units: UnitOption[];
   disabled?: boolean;
   disabledReason?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const huyen = units.filter((u) => u.block === "huyen").length;
-  const xa = units.filter((u) => u.block === "xa").length;
+  const blocks = (["tinh", "huyen", "xa"] as const)
+    .map((block) => ({
+      key: `khoi-${block}`,
+      label: BLOCK_LABEL[block],
+      count: units.filter((u) => u.block === block).length,
+    }))
+    .filter((group) => group.count > 0);
 
   const groups = [
     { key: "tinh", label: "Toàn tỉnh", count: units.length },
-    ...(xa > 0 && huyen > 0
-      ? [
-          { key: "khoi-xa", label: "Khối xã", count: xa },
-          { key: "khoi-huyen", label: "Khối huyện", count: huyen },
-        ]
-      : []),
+    ...(blocks.length > 1 ? blocks : []),
   ];
 
   const label =
     groups.find((g) => g.key === value)?.label ??
-    units.find((u) => u.id === value)?.name ??
+    units.find((u) => String(u.id) === value)?.name ??
     "Toàn tỉnh";
 
   const filtered = useMemo(() => {
@@ -132,8 +138,8 @@ export function ScopePicker({
           {filtered.map((u) => (
             <ScopeOption
               key={u.id}
-              selected={value === u.id}
-              onSelect={() => pick(u.id)}
+              selected={value === String(u.id)}
+              onSelect={() => pick(String(u.id))}
               label={u.name}
             />
           ))}
