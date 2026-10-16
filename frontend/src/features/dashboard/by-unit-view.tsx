@@ -8,7 +8,6 @@ import {
   SquarePen,
   Undo2,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import {
   EmptyState,
@@ -29,120 +28,120 @@ import {
 } from "@/shared/ui/select";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  SHEETS_PER_REPORT,
-  SHEET_NAMES,
-  UNITS,
-  UNIT_PERIODS,
-  UNIT_TYPE_LABEL,
-  type Unit,
-  type UnitType,
-} from "./fixtures";
 import { ArrowLink, Panel, PanelEmpty, StatCard, StatRow } from "./parts";
 import {
   CELL_STATUS,
   UNIT_PROGRESS,
   UNIT_PROGRESS_ORDER,
-  isSubmitted,
+  UNIT_TYPE_LABEL,
   percent,
+  reportBadge,
   unitProgress,
-  type UnitProgress,
 } from "./status";
+import type {
+  HomeDashboard,
+  ReportUnitType,
+  UnitBoard,
+  UnitPeriod,
+  UnitRow,
+  UnitState,
+} from "./types";
 
 const ALL = "all";
-const ALL_PERIOD_IDS = UNIT_PERIODS.map((p) => p.id);
-const NO_UNITS: Unit[] = [];
 
-/**
- * Phiếu đáng nhìn nhất của một đơn vị: phiếu đầu tiên chưa nộp xong
- * (đang nhập, chưa nộp hoặc bị trả lại); nộp hết rồi thì coi như đủ biểu.
- */
-function currentDone(unit: Unit, periodIds: string[]): number {
-  const open = unit.reports.find(
-    (r) => periodIds.includes(r.periodId) && !isSubmitted(r.status)
-  );
-  return open ? open.done : SHEETS_PER_REPORT;
-}
+/** Bảng hiện tối đa bốn cột kỳ gần nhất khi xem "Tất cả kỳ đang nhận" (UC-76). */
+const PERIOD_COLUMN_LIMIT = 4;
 
-/** Tên các biểu chưa xong của một phiếu, xoay theo đơn vị cho khác nhau. */
-function unfinishedSheets(done: number, seed: number): string[] {
-  const missing = SHEETS_PER_REPORT - done;
-  if (missing <= 0) return [];
-  const start = seed % SHEET_NAMES.length;
-  const rotated = [...SHEET_NAMES.slice(start), ...SHEET_NAMES.slice(0, start)];
-  return rotated
-    .slice(0, missing)
-    .sort((a, b) => SHEET_NAMES.indexOf(a) - SHEET_NAMES.indexOf(b));
-}
+const EMPTY_BOARD: UnitBoard = {
+  periods: [],
+  summary: {
+    unitCount: 0,
+    reportCount: 0,
+    complete: 0,
+    notSubmitted: 0,
+    partial: 0,
+    returned: 0,
+    returnedReports: 0,
+  },
+  typeShares: [],
+  items: [],
+};
+
+/** Phiếu của đơn vị trong các kỳ đang lọc (`null` = mọi kỳ). */
+const reportsIn = (unit: UnitRow, periodId: number | null) =>
+  periodId === null ? unit.reports : unit.reports.filter((r) => r.periodId === periodId);
 
 /**
  * Trang chủ, chế độ "Theo đơn vị": tiến độ nộp của từng đơn vị qua các kỳ
  * đang nhận số liệu, bảng bên trái, chi tiết đơn vị đang chọn bên phải.
+ *
+ * Thẻ chỉ số và phân bố theo loại là số máy chủ đã tính trên mọi kỳ; tìm kiếm,
+ * lọc kỳ, lọc loại và chip tình trạng lọc tại chỗ trên danh sách đã nạp.
  */
-export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }) {
-  const units = hasData ? UNITS : NO_UNITS;
+export function ByUnitView({
+  data,
+  onRefresh,
+  refreshing,
+}: {
+  data: HomeDashboard;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
+  const { year, capabilities } = data;
+  const board = data.units ?? EMPTY_BOARD;
+  const units = board.items;
 
   const [search, setSearch] = useState("");
-  const [periodId, setPeriodId] = useState<string>(ALL);
+  const [periodValue, setPeriodValue] = useState<string>(ALL);
   const [unitType, setUnitType] = useState<string>(ALL);
-  const [progress, setProgress] = useState<UnitProgress | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(units[0]?.id ?? null);
+  const [progress, setProgress] = useState<UnitState | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const periodIds = useMemo(
-    () => (periodId === ALL ? ALL_PERIOD_IDS : [periodId]),
-    [periodId]
-  );
-  const periods = UNIT_PERIODS.filter((p) => periodIds.includes(p.id));
-
-  // Thẻ chỉ số và phân bố theo loại tính trên mọi kỳ, không theo bộ lọc.
-  const overall = useMemo(() => {
-    const counts: Record<UnitProgress, number> = {
-      notSubmitted: 0,
-      returned: 0,
-      partial: 0,
-      complete: 0,
-    };
-    const byType: Record<UnitType, { complete: number; total: number }> = {
-      xa: { complete: 0, total: 0 },
-      truong: { complete: 0, total: 0 },
-      so: { complete: 0, total: 0 },
-    };
-    for (const u of units) {
-      const p = unitProgress(u, ALL_PERIOD_IDS);
-      counts[p] += 1;
-      byType[u.type].total += 1;
-      if (p === "complete") byType[u.type].complete += 1;
-    }
-    return { counts, byType };
-  }, [units]);
+  // Kỳ đang lọc: giá trị cũ không còn trong danh sách (đổi năm) thì về "tất cả".
+  const periodId =
+    periodValue === ALL || !board.periods.some((p) => String(p.id) === periodValue)
+      ? null
+      : Number(periodValue);
+  const columns: UnitPeriod[] =
+    periodId === null
+      ? board.periods.slice(-PERIOD_COLUMN_LIMIT)
+      : board.periods.filter((p) => p.id === periodId);
 
   // Lọc theo tìm kiếm, kỳ, loại; chip trạng thái đếm trên kết quả đó.
   const scoped = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("vi");
-    return units
-      .filter((u) => unitType === ALL || u.type === unitType)
-      .filter((u) => !q || u.name.toLocaleLowerCase("vi").includes(q))
-      .map((u) => ({ unit: u, progress: unitProgress(u, periodIds) }));
-  }, [units, search, unitType, periodIds]);
+    const rows: { unit: UnitRow; progress: UnitState }[] = [];
+    for (const unit of units) {
+      if (unitType !== ALL && unit.type !== unitType) continue;
+      if (q && !unit.name.toLocaleLowerCase("vi").includes(q)) continue;
+      const p = unitProgress(unit, periodId);
+      if (p) rows.push({ unit, progress: p });
+    }
+    return rows;
+  }, [units, search, unitType, periodId]);
 
   const chipCounts = UNIT_PROGRESS_ORDER.reduce(
     (acc, k) => {
       acc[k] = scoped.filter((r) => r.progress === k).length;
       return acc;
     },
-    {} as Record<UnitProgress, number>
+    {} as Record<UnitState, number>
   );
   const rows = progress ? scoped.filter((r) => r.progress === progress) : scoped;
-  // Chưa bấm đơn vị nào (hoặc vừa đổi sang năm có dữ liệu) thì xem đơn vị đầu bảng.
+  // Chưa bấm đơn vị nào thì xem đơn vị đầu bảng.
   const selected =
-    units.find((u) => u.id === selectedId) ?? (selectedId ? null : (units[0] ?? null));
+    (selectedId !== null ? units.find((u) => u.id === selectedId) : undefined) ??
+    rows[0]?.unit ??
+    null;
 
-  const notComplete = overall.counts.notSubmitted + overall.counts.partial;
-  const totalReports = units.length * UNIT_PERIODS.length;
+  const { summary } = board;
+  const notComplete = summary.notSubmitted + summary.partial;
+  const typeOptions: ReportUnitType[] = board.typeShares.map((s) => s.type);
+  const hasUnits = units.length > 0;
 
   const resetFilters = () => {
     setSearch("");
-    setPeriodId(ALL);
+    setPeriodValue(ALL);
     setUnitType(ALL);
     setProgress(null);
   };
@@ -153,26 +152,27 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
         <StatCard
           icon={BuildingComplex}
           tone="primary"
-          value={units.length}
-          label={`Đơn vị phải nộp (${formatNumber(totalReports)} phiếu, ${UNIT_PERIODS.length} kỳ)`}
+          value={summary.unitCount}
+          label={`Đơn vị phải nộp (${formatNumber(summary.reportCount)} phiếu, ${board.periods.length} kỳ)`}
         />
         <StatCard
           icon={CircleCheck}
           tone="success"
-          value={overall.counts.complete}
-          label={`Đã nộp đủ (${percent(overall.counts.complete, units.length)}% số đơn vị)`}
+          value={summary.complete}
+          label={`Đã nộp đủ (${percent(summary.complete, summary.unitCount)}% số đơn vị)`}
         />
         <StatCard
           icon={SquarePen}
           tone="warning"
           value={notComplete}
-          label={`Chưa nộp đủ (${overall.counts.notSubmitted} chưa nộp, ${overall.counts.partial} nộp thiếu)`}
+          label={`Chưa nộp đủ (${summary.notSubmitted} chưa nộp, ${summary.partial} nộp thiếu)`}
         />
         <StatCard
           icon={Undo2}
           tone="destructive"
-          value={overall.counts.returned}
+          value={summary.returned}
           label="Có phiếu bị trả lại"
+          to={capabilities.approve ? "/report-review" : "/input-reports"}
         />
       </StatRow>
 
@@ -202,14 +202,17 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
                 className="ps-9"
               />
             </div>
-            <Select value={periodId} onValueChange={setPeriodId}>
+            <Select
+              value={periodId === null ? ALL : String(periodId)}
+              onValueChange={setPeriodValue}
+            >
               <SelectTrigger className="w-40" aria-label="Lọc theo kỳ">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Tất cả kỳ đang nhận</SelectItem>
-                {UNIT_PERIODS.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
+                {board.periods.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
                   </SelectItem>
                 ))}
@@ -221,7 +224,7 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Tất cả loại đơn vị</SelectItem>
-                {(Object.keys(UNIT_TYPE_LABEL) as UnitType[]).map((t) => (
+                {typeOptions.map((t) => (
                   <SelectItem key={t} value={t}>
                     {UNIT_TYPE_LABEL[t]}
                   </SelectItem>
@@ -233,9 +236,10 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
               size="icon"
               aria-label="Làm mới"
               title="Làm mới"
-              onClick={() => toast.success("Đã cập nhật số liệu mới nhất.")}
+              disabled={refreshing}
+              onClick={onRefresh}
             >
-              <RefreshCw />
+              <RefreshCw className={cn(refreshing && "animate-spin")} />
             </Button>
           </div>
 
@@ -260,7 +264,7 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
 
           <div className="scrollbar-fade min-h-0 flex-1 overflow-auto rounded-md border">
             {rows.length === 0 ? (
-              hasData ? (
+              hasUnits ? (
                 <EmptyState
                   icon={SearchX}
                   title="Không có đơn vị nào khớp"
@@ -274,7 +278,11 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
               ) : (
                 <EmptyState
                   icon={BuildingComplex}
-                  title={`Năm ${year} chưa có kỳ nào đang nhận số liệu`}
+                  title={
+                    data.hasPeriods
+                      ? `Năm ${year} chưa có kỳ nào đang nhận số liệu`
+                      : "Chưa có kỳ báo cáo nào"
+                  }
                   description="Khi Sở mở đợt nhận số liệu, tiến độ của từng đơn vị sẽ hiện ở đây."
                 />
               )
@@ -285,7 +293,7 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
                     <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium">
                       Đơn vị
                     </th>
-                    {periods.map((p) => (
+                    {columns.map((p) => (
                       <th
                         key={p.id}
                         className="text-muted-foreground w-32 px-3 py-2.5 text-left text-xs font-medium"
@@ -304,6 +312,9 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
                 <tbody>
                   {rows.map(({ unit, progress: p }) => {
                     const isSelected = unit.id === selected?.id;
+                    const inScope = reportsIn(unit, periodId);
+                    const done = inScope.reduce((n, r) => n + r.sheetsDone, 0);
+                    const total = inScope.reduce((n, r) => n + r.sheetsTotal, 0);
                     return (
                       <tr
                         key={unit.id}
@@ -325,26 +336,23 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
                         <td className="px-3 py-2">
                           <TwoLineCell
                             primary={unit.name}
-                            secondary={`${UNIT_TYPE_LABEL[unit.type]} · ${periods.length} phiếu`}
+                            secondary={`${UNIT_TYPE_LABEL[unit.type]} · ${inScope.length} phiếu`}
                           />
                         </td>
-                        {periods.map((period) => {
-                          const r = unit.reports.find((x) => x.periodId === period.id);
+                        {columns.map((period) => {
+                          const cell = unit.periodStates[String(period.id)];
                           return (
                             <td key={period.id} className="px-3 py-2">
-                              {r && (
-                                <StatusBadge tone={CELL_STATUS[r.status].tone}>
-                                  {CELL_STATUS[r.status].label}
+                              {cell && (
+                                <StatusBadge tone={CELL_STATUS[cell].tone}>
+                                  {CELL_STATUS[cell].label}
                                 </StatusBadge>
                               )}
                             </td>
                           );
                         })}
                         <td className="px-3 py-2">
-                          <ProgressCell
-                            done={currentDone(unit, periodIds)}
-                            total={SHEETS_PER_REPORT}
-                          />
+                          <ProgressCell done={done} total={total} />
                         </td>
                         <td className="px-3 py-2">
                           <StatusBadge tone={UNIT_PROGRESS[p].tone}>
@@ -369,7 +377,12 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
         <div className="flex min-h-0 min-w-0 flex-col gap-4">
           <Panel className="xl:flex-1">
             {selected ? (
-              <UnitDetail unit={selected} periodIds={periodIds} />
+              <UnitDetail
+                unit={selected}
+                periods={board.periods}
+                periodId={periodId}
+                canApprove={capabilities.approve}
+              />
             ) : (
               <>
                 <h2 className="text-base leading-6 font-semibold">Chi tiết đơn vị</h2>
@@ -380,31 +393,26 @@ export function ByUnitView({ year, hasData }: { year: number; hasData: boolean }
 
           <Panel className="shrink-0 gap-3.5">
             <h2 className="text-base leading-6 font-semibold">Phân bố theo loại đơn vị</h2>
-            {units.length === 0 ? (
+            {board.typeShares.length === 0 ? (
               <PanelEmpty>Năm {year} chưa có đơn vị nào phải nộp.</PanelEmpty>
             ) : (
-              (Object.keys(UNIT_TYPE_LABEL) as UnitType[]).map((t) => {
-                const { complete, total } = overall.byType[t];
-                return (
-                  <div key={t} className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{UNIT_TYPE_LABEL[t]}</span>
-                      <span className="text-muted-foreground flex-1 text-xs">
-                        {total} đơn vị
-                      </span>
-                      <span className="text-[13px] leading-5 font-medium tabular-nums">
-                        {complete}/{total} · {percent(complete, total)}%
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-accent">
-                      <div
-                        className="h-full bg-success"
-                        style={{ width: `${percent(complete, total)}%` }}
-                      />
-                    </div>
+              board.typeShares.map(({ type, complete, total }) => (
+                <div key={type} className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">{UNIT_TYPE_LABEL[type]}</span>
+                    <span className="text-muted-foreground flex-1 text-xs">{total} đơn vị</span>
+                    <span className="text-[13px] leading-5 font-medium tabular-nums">
+                      {complete}/{total} · {percent(complete, total)}%
+                    </span>
                   </div>
-                );
-              })
+                  <div className="h-2 overflow-hidden rounded-full bg-accent">
+                    <div
+                      className="h-full bg-success"
+                      style={{ width: `${percent(complete, total)}%` }}
+                    />
+                  </div>
+                </div>
+              ))
             )}
           </Panel>
         </div>
@@ -448,31 +456,40 @@ function FilterChip({
 }
 
 /** Panel phải: tình trạng từng phiếu của đơn vị đang chọn. */
-function UnitDetail({ unit, periodIds }: { unit: Unit; periodIds: string[] }) {
-  const reports = unit.reports.filter((r) => periodIds.includes(r.periodId));
-  const p = unitProgress(unit, periodIds);
-  const seed = Number(unit.id.replace(/\D/g, "")) || 0;
+function UnitDetail({
+  unit,
+  periods,
+  periodId,
+  canApprove,
+}: {
+  unit: UnitRow;
+  periods: UnitPeriod[];
+  periodId: number | null;
+  canApprove: boolean;
+}) {
+  const reports = reportsIn(unit, periodId);
+  const p = unitProgress(unit, periodId) ?? unit.state;
+  const periodCount = new Set(reports.map((r) => r.periodId)).size;
 
   const stats = [
     {
       label: "Đã duyệt",
-      value: reports.filter((r) => r.status === "approved").length,
+      value: reports.filter((r) => r.status === "APPROVED").length,
       text: "text-success-text",
     },
     {
       label: "Chờ duyệt",
-      value: reports.filter((r) => r.status === "pending").length,
+      value: reports.filter((r) => r.status === "SUBMITTED").length,
       text: "text-warning-text",
     },
     {
       label: "Bị trả lại",
-      value: reports.filter((r) => r.status === "returned").length,
+      value: reports.filter((r) => r.status === "RETURNED").length,
       text: "text-destructive-text",
     },
     {
       label: "Đang nhập liệu",
-      value: reports.filter((r) => r.status === "entering" || r.status === "notStarted")
-        .length,
+      value: reports.filter((r) => r.status === "DRAFT" || r.status === "LOCKED").length,
       text: "text-info-text",
     },
   ];
@@ -485,7 +502,7 @@ function UnitDetail({ unit, periodIds }: { unit: Unit; periodIds: string[] }) {
           <StatusBadge tone={UNIT_PROGRESS[p].tone}>{UNIT_PROGRESS[p].label}</StatusBadge>
         </div>
         <span className="text-muted-foreground text-xs">
-          {UNIT_TYPE_LABEL[unit.type]} · {reports.length} phiếu trong {reports.length} kỳ
+          {UNIT_TYPE_LABEL[unit.type]} · {reports.length} phiếu trong {periodCount} kỳ
         </span>
       </div>
 
@@ -500,29 +517,37 @@ function UnitDetail({ unit, periodIds }: { unit: Unit; periodIds: string[] }) {
         ))}
       </div>
 
-      {reports.map((r, i) => {
-        const period = UNIT_PERIODS.find((x) => x.id === r.periodId);
-        if (!period) return null;
-        const missing = isSubmitted(r.status) ? [] : unfinishedSheets(r.done, seed + i);
+      {reports.map((r) => {
+        const period = periods.find((x) => x.id === r.periodId);
+        const badge = reportBadge(r.status, r.sheetsDone);
+        const editable = r.status === "DRAFT" || r.status === "RETURNED";
+        const link =
+          r.status === "SUBMITTED" && canApprove ? `/report-review/${r.id}` : `/input-reports/${r.id}`;
         return (
-          <div key={r.periodId} className="flex flex-col gap-2">
+          <div key={r.id} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">
-                {period.name} · {period.batch}
+                {period?.name ?? "Kỳ báo cáo"} · Đợt {r.publicationNo}
               </span>
-              <StatusBadge tone={CELL_STATUS[r.status].tone}>
-                {CELL_STATUS[r.status].label}
-              </StatusBadge>
+              <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
             </div>
             <span className="text-muted-foreground text-xs">
-              Hạn nộp {formatDate(period.deadline)}
+              {period?.deadline ? `Hạn nộp ${formatDate(period.deadline)}` : "Chưa đặt hạn nộp"}
             </span>
-            <ProgressCell done={r.done} total={SHEETS_PER_REPORT} />
-            {missing.length > 0 && (
-              <p className="rounded-md bg-surface-subtle px-3 py-2.5 text-[13px] leading-5">
-                Biểu chưa xong: biểu {missing.join(", ")}
+            <ProgressCell done={r.sheetsDone} total={r.sheetsTotal} />
+            {r.status === "RETURNED" && r.returnReason?.trim() && (
+              <p className="rounded-md bg-destructive-subtle px-3 py-2.5 text-[13px] leading-5 text-destructive-text">
+                Lý do trả lại: {r.returnReason.trim()}
               </p>
             )}
+            {editable && r.pendingSheets.length > 0 && (
+              <p className="rounded-md bg-surface-subtle px-3 py-2.5 text-[13px] leading-5">
+                Biểu chưa xong: biểu {r.pendingSheets.join(", ")}
+              </p>
+            )}
+            <div>
+              <ArrowLink to={link}>Mở phiếu</ArrowLink>
+            </div>
           </div>
         );
       })}

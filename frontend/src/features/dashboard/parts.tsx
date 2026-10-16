@@ -16,20 +16,25 @@ const STAT_TONE: Record<StatTone, string> = {
   destructive: "bg-destructive-subtle text-destructive-text",
 };
 
-/** Thẻ chỉ số: ô biểu tượng 40px + số lớn + một dòng giải thích. */
+/**
+ * Thẻ chỉ số: ô biểu tượng 40px + số lớn + một dòng giải thích.
+ * Có `to` thì cả thẻ là liên kết sang màn tương ứng (UC-75 bước 2).
+ */
 export function StatCard({
   icon: Icon,
   tone,
   value,
   label,
+  to,
 }: {
   icon: LucideIcon;
   tone: StatTone;
   value: number;
   label: ReactNode;
+  to?: string;
 }) {
-  return (
-    <div className="flex min-w-0 items-center gap-4 rounded-xl border bg-card p-5 shadow-e1">
+  const body = (
+    <>
       <div
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-md",
@@ -46,8 +51,25 @@ export function StatCard({
           {label}
         </span>
       </div>
-    </div>
+    </>
   );
+  const frame = "flex min-w-0 items-center gap-4 rounded-xl border bg-card p-5 shadow-e1";
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className={cn(
+          frame,
+          "transition-colors hover:bg-surface-subtle",
+          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        )}
+      >
+        {body}
+      </Link>
+    );
+  }
+  return <div className={frame}>{body}</div>;
 }
 
 /** Hàng bốn thẻ chỉ số. */
