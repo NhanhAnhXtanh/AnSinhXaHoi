@@ -1,0 +1,239 @@
+# Mẫu biểu ASXH: bộ mẫu -> biểu -> phiên bản.
+#
+# Port từ QT_REPORT_TEMPLATE / QT_TEMPLATE_VERSION / QT_TEMPLATE_SHEET /
+# QT_TEMPLATE_SCRIPT của bản Jmix. Bản cũ đã chốt "một phiên bản đúng một biểu",
+# nên sheet + script gộp vào chính dòng phiên bản (workbook_json, script_text),
+# còn "chuỗi phiên bản" (series, khoá bằng sheetCode BM-xxxxxx) thành bảng
+# asxh_templates thật.
+#
+# Ba bảng một changeset vì không trạng thái nào của schema có bảng sau mà thiếu
+# bảng trước.
+databaseChangeLog:
+  - changeSet:
+      id: 110-create-asxh-templates
+      author: dth
+      changes:
+        # Số thứ tự cho mã nội bộ của biểu (BM-xxxxxx). Bắt đầu từ 1000 để mã
+        # của dữ liệu mẫu (BM-000001...) không bao giờ đụng mã sinh từ ứng dụng.
+        - createSequence:
+            sequenceName: asxh_template_code_seq
+            startValue: 1000
+            incrementBy: 1
+
+        - createTable:
+            tableName: asxh_template_sets
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_template_sets
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(1000)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # Tên bộ mẫu duy nhất không phân biệt hoa thường ("Tên bộ mẫu đã tồn tại").
+        # Service kiểm tra trước để trả câu báo; chỉ mục là lưới an toàn.
+        - sql:
+            sql: CREATE UNIQUE INDEX uq_asxh_template_sets_name ON asxh_template_sets (lower(name))
+
+        - createTable:
+            tableName: asxh_templates
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_templates
+              - column:
+                  name: template_set_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # Mã nội bộ ổn định (BM-xxxxxx), hệ thống sinh, không hiển thị.
+              - column:
+                  name: code
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_asxh_templates_code
+              # Nhãn tab biểu: 1a, 1b, ...
+              - column:
+                  name: short_name
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: kind
+                  type: varchar(32)
+                  defaultValue: CHI_TIET
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sort_order
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # RESTRICT: bộ mẫu còn biểu thì không xoá được.
+        - addForeignKeyConstraint:
+            baseTableName: asxh_templates
+            baseColumnNames: template_set_id
+            constraintName: fk_asxh_templates_set
+            referencedTableName: asxh_template_sets
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: asxh_templates
+            indexName: idx_asxh_templates_set
+            columns:
+              - column:
+                  name: template_set_id
+        # Tên ngắn duy nhất trong một bộ mẫu, không phân biệt hoa thường.
+        - sql:
+            sql: CREATE UNIQUE INDEX uq_asxh_templates_set_short_name ON asxh_templates (template_set_id, lower(short_name))
+
+        - createTable:
+            tableName: asxh_template_versions
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_template_versions
+              - column:
+                  name: template_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version_no
+                  type: int
+                  constraints:
+                    nullable: false
+              # Bản nguồn khi tạo bằng "phiên bản kế tiếp"; trống ở bản đầu chuỗi.
+              - column:
+                  name: previous_version_id
+                  type: bigint
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: DRAFT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: effective_from
+                  type: date
+              # Không do người nhập: service tính lại từ bản đã ban hành kế sau.
+              - column:
+                  name: effective_to
+                  type: date
+              - column:
+                  name: workbook_json
+                  type: text
+                  defaultValue: '{}'
+                  constraints:
+                    nullable: false
+              - column:
+                  name: script_text
+                  type: text
+                  defaultValue: ''
+                  constraints:
+                    nullable: false
+              - column:
+                  name: published_at
+                  type: timestamp with time zone
+              - column:
+                  name: published_by
+                  type: varchar(255)
+              - column:
+                  name: revoked_at
+                  type: timestamp with time zone
+              - column:
+                  name: revoked_by
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        - addForeignKeyConstraint:
+            baseTableName: asxh_template_versions
+            baseColumnNames: template_id
+            constraintName: fk_asxh_template_versions_template
+            referencedTableName: asxh_templates
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # RESTRICT: không xoá được bản đã có bản kế tiếp (service cũng chặn trước).
+        - addForeignKeyConstraint:
+            baseTableName: asxh_template_versions
+            baseColumnNames: previous_version_id
+            constraintName: fk_asxh_template_versions_previous
+            referencedTableName: asxh_template_versions
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addUniqueConstraint:
+            tableName: asxh_template_versions
+            columnNames: template_id, version_no
+            constraintName: uq_asxh_template_versions_template_no
+        # Phép chọn phiên bản theo ngày (UC-19): biểu + trạng thái + ngày áp dụng.
+        - createIndex:
+            tableName: asxh_template_versions
+            indexName: idx_asxh_template_versions_resolve
+            columns:
+              - column:
+                  name: template_id
+              - column:
+                  name: status
+              - column:
+                  name: effective_from
+        - createIndex:
+            tableName: asxh_template_versions
+            indexName: idx_asxh_template_versions_previous
+            columns:
+              - column:
+                  name: previous_version_id
+      rollback:
+        - dropTable:
+            tableName: asxh_template_versions
+        - dropTable:
+            tableName: asxh_templates
+        - dropTable:
+            tableName: asxh_template_sets
+        - dropSequence:
+            sequenceName: asxh_template_code_seq

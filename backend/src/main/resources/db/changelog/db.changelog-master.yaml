@@ -43,3 +43,9 @@ databaseChangeLog:
       file: db/changelog/changes/102-create-report-calendars.yaml
   - include:
       file: db/changelog/changes/103-seed-report-calendars.sql
+  - include:
+      file: db/changelog/changes/110-create-asxh-templates.yaml
+  - include:
+      file: db/changelog/changes/111-seed-asxh-template-permissions.sql
+  - include:
+      file: db/changelog/changes/112-seed-asxh-templates.sql
