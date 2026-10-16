@@ -1,5 +1,6 @@
 package com.dth.frw.module.asxh.inputreport.repo;
 
+import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.shared.data.SecuredRepository;
@@ -41,6 +42,38 @@ public interface InputReportRepository extends SecuredRepository<InputReport, Lo
             + "and r.status = :status order by u.name")
     List<String> findUnitNamesByPeriodAndStatus(@Param("periodId") Long periodId,
                                                 @Param("status") ReportStatus status);
+
+    /**
+     * Phiên bản kế tiếp của một phiếu (sinh khi Sở trả lại) — để dựng lịch sử phiên bản
+     * (UC-44). Chuỗi phiên bản không rẽ nhánh nên có tối đa một dòng.
+     */
+    @Query("select r from InputReport r where r.previousRevision.id = :id order by r.revisionNo asc, r.id asc")
+    List<InputReport> findNextRevisions(@Param("id") Long id);
+
+    /**
+     * Các kỳ có phiếu (trừ bản cũ) trong năm — ô "Kỳ" của hai màn danh sách. Không qua phạm vi
+     * dòng: tên kỳ của năm không phải dữ liệu riêng của ai.
+     */
+    @Query("select distinct p from InputReport r join r.period p where p.calendar.year = :year "
+            + "and r.status <> com.dth.frw.domain.asxh.report.ReportStatus.SUPERSEDED "
+            + "order by p.fromDate desc, p.id desc")
+    List<ReportPeriod> findPeriodsOfYear(@Param("year") Integer year);
+
+    /**
+     * Các đơn vị cha (huyện / thành phố) của đơn vị có phiếu trong năm, mỗi dòng
+     * {@code [id, tên]} — ô "Huyện / thành phố" của màn duyệt.
+     */
+    @Query("select distinct p.id, p.name from InputReport r join r.unit u join u.parent p "
+            + "where r.period.calendar.year = :year order by p.name asc")
+    List<Object[]> findParentUnitsOfYear(@Param("year") Integer year);
+
+    /**
+     * Tên đơn vị cha (huyện / thành phố) của đơn vị trên từng phiếu: mỗi dòng
+     * {@code [unitId, tên đơn vị cha]}. Đơn vị cha LAZY nên hỏi một lần cho cả trang thay vì
+     * chạm proxy sau khi giao dịch đã đóng.
+     */
+    @Query("select distinct u.id, p.name from InputReport r join r.unit u join u.parent p where r.id in :reportIds")
+    List<Object[]> findParentNames(@Param("reportIds") Collection<Long> reportIds);
 
     /** Chốt đợt: DRAFT / RETURNED → LOCKED trong một câu lệnh. */
     @Modifying(flushAutomatically = true)

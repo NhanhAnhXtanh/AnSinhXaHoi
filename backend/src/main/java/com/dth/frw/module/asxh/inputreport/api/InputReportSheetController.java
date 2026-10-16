@@ -61,7 +61,7 @@ public class InputReportSheetController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_READ + "')")
     public InputReportSheetResponse get(@PathVariable Long id) {
-        return InputReportSheetResponse.from(service.get(id), true);
+        return InputReportSheetResponse.full(service.getWithContent(id));
     }
 
     /** Lưu số liệu (UC-34). Trả tờ biểu với số hiệu bản lưu mới, không dội lại số liệu. */

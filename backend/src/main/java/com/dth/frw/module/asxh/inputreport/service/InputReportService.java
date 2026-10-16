@@ -76,13 +76,17 @@ public class InputReportService {
     private final InputReportRepository repository;
     private final InputReportSheetRepository sheetRepository;
     private final RowLevelSecurity rowLevel;
+    // Slice số liệu đã lưu (LEDGER): kiểm tra phía máy chủ khi nộp + lưu số liệu khi duyệt.
+    private final com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks;
 
     public InputReportService(InputReportRepository repository,
                               InputReportSheetRepository sheetRepository,
-                              RowLevelSecurity rowLevel) {
+                              RowLevelSecurity rowLevel,
+                              com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks) {
         this.repository = repository;
         this.sheetRepository = sheetRepository;
         this.rowLevel = rowLevel;
+        this.workflowHooks = workflowHooks;
     }
 
     // ------------------------------------------------------------------ đọc
@@ -142,8 +146,8 @@ public class InputReportService {
             throw new ConflictException("Còn %d/%d biểu chưa đánh dấu đã nhập xong, chưa nộp được phiếu."
                     .formatted(pending, sheets.size()));
         }
-        // TODO: xác nhận kho bạc (BR-38.1) — cần file đính kèm + ô tích "Đã có phiếu xác nhận".
-        // TODO: chạy lại hook validate của mẫu trên máy chủ cho từng biểu COMPLETED (BR-35.1).
+        // Xác nhận kho bạc (BR-38.1) rồi chạy lại hook validate của mẫu trên máy chủ (BR-35.1).
+        workflowHooks.beforeSubmit(report, sheets);
 
         report.setStatus(ReportStatus.SUBMITTED);
         report.setSubmittedAt(Instant.now());
@@ -165,9 +169,9 @@ public class InputReportService {
             throw new ConflictException("Phiếu phải đang chờ duyệt mới phê duyệt được.");
         }
         // TODO: khoá năm — năm đã nộp báo cáo lên UBND thì không duyệt (UC-41 3e).
-        // TODO: chống cộng đôi — cùng biểu, cùng đơn vị đã được duyệt ở kỳ khác giao thời gian.
-        // TODO: ghi sổ cái — chạy hook getInputData của từng tờ biểu (bỏ qua NO_DATA) rồi thay
-        //       toàn bộ sổ cái của (phiếu, biểu). Bản này chưa có sổ cái và chưa có máy chạy script.
+        // Chống cộng đôi + chạy getInputData từng tờ biểu (bỏ qua NO_DATA) + lưu số liệu, cùng
+        // giao dịch: lỗi bất kỳ → 409, phiếu vẫn chờ duyệt.
+        workflowHooks.onApprove(report, sheetRepository.findByReportId(report.getId()));
         report.setStatus(ReportStatus.APPROVED);
         report.setApprovedAt(Instant.now());
         report.setApprovedBy(currentUsername());
@@ -306,8 +310,8 @@ public class InputReportService {
     /**
      * Thu hồi kỳ (UC-29): xoá mọi phiếu và tờ biểu của kỳ, mọi trạng thái kể cả đã duyệt.
      *
-     * <p>Bản Jmix xoá MỀM; ở đây xoá cứng vì chưa có sổ cái / lịch sử nào cần giữ dấu vết phiếu
-     * đã thu hồi. TODO: khi có sổ cái, xoá sổ cái của kỳ cùng giao dịch này.
+     * <p>Bản Jmix xoá MỀM; ở đây xoá cứng. Số liệu đã lưu khi duyệt (sổ cái) đi theo phiếu
+     * nhờ khoá ngoại ON DELETE CASCADE, nên không cần xoá riêng.
      */
     @Transactional
     public int deleteAllForPeriod(Long periodId) {

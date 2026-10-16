@@ -15,10 +15,13 @@ export function ApproveErrorDialog({
   open,
   onOpenChange,
   onRetry,
+  message,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRetry: () => void;
+  /** Câu lỗi của máy chủ (tiếng Việt); bỏ trống thì dùng câu chung. */
+  message?: string | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -33,9 +36,15 @@ export function ApproveErrorDialog({
         >
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
           <DialogDescription className="text-destructive-text text-sm">
-            Chưa duyệt được phiếu này vì hệ thống chưa tính được số liệu của phiếu. Phiếu vẫn ở
-            trạng thái Chờ duyệt. Bạn thử lại sau ít phút; nếu vẫn không được, hãy báo bộ phận hỗ
-            trợ.
+            {message ? (
+              message
+            ) : (
+              <>
+                Chưa duyệt được phiếu này vì hệ thống chưa tính được số liệu của phiếu. Phiếu vẫn ở
+                trạng thái Chờ duyệt. Bạn thử lại sau ít phút; nếu vẫn không được, hãy báo bộ phận
+                hỗ trợ.
+              </>
+            )}
           </DialogDescription>
         </div>
 

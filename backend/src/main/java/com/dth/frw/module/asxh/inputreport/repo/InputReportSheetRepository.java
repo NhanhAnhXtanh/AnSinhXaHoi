@@ -35,6 +35,14 @@ public interface InputReportSheetRepository extends SecuredRepository<InputRepor
     List<Object[]> findIssuedPairs(@Param("periodId") Long periodId,
                                    @Param("excluded") Collection<ReportStatus> excluded);
 
+    /**
+     * Các bộ mẫu có biểu trong phiếu của năm, mỗi dòng {@code [setId, tên bộ]} — ô "Bộ biểu mẫu"
+     * của hai màn danh sách (cán bộ đơn vị không có quyền đọc danh mục bộ mẫu).
+     */
+    @Query("select distinct ts.id, ts.name from InputReportSheet s join s.template t join t.templateSet ts "
+            + "where s.report.period.calendar.year = :year order by ts.name asc")
+    List<Object[]> findTemplateSetsOfYear(@Param("year") Integer year);
+
     /** Thu hồi kỳ, bước 2: xoá mọi tờ biểu của các phiếu thuộc kỳ. */
     @Modifying(flushAutomatically = true)
     @Query("delete from InputReportSheet s where s.report.id in "

@@ -21,12 +21,15 @@ import {
 } from "@/shared/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
+import type { DisplayKey } from "./api";
 import { ALL, type ListFilters } from "./filters";
-import { STATUS_META, STATUS_OPTIONS, type DisplayStatus } from "./model";
+import { STATUS_META, STATUS_OPTIONS } from "./model";
+
+export type FilterOption = { id: string; name: string };
 
 /** Số điều kiện đang đặt trong "Bộ lọc khác". */
 function moreFilterCount(f: ListFilters): number {
-  return f.statuses.length + (f.templateSet !== ALL ? 1 : 0) + (f.templateVersion !== ALL ? 1 : 0);
+  return f.statuses.length + (f.templateSet !== ALL ? 1 : 0);
 }
 
 /** Chip điều kiện đang lọc — bo rounded-md (nguyên tắc: chip lọc bo 8). */
@@ -61,7 +64,6 @@ export function ListToolbar({
   onClear,
   periods,
   templateSets,
-  templateVersions,
   refreshing,
   onRefresh,
   hasQuickFilter,
@@ -69,9 +71,8 @@ export function ListToolbar({
   filters: ListFilters;
   onChange: (next: ListFilters) => void;
   onClear: () => void;
-  periods: string[];
-  templateSets: string[];
-  templateVersions: string[];
+  periods: FilterOption[];
+  templateSets: FilterOption[];
   refreshing: boolean;
   onRefresh: () => void;
   hasQuickFilter: boolean;
@@ -79,10 +80,13 @@ export function ListToolbar({
   const set = <K extends keyof ListFilters>(key: K, value: ListFilters[K]) =>
     onChange({ ...filters, [key]: value });
 
-  const toggleStatus = (s: DisplayStatus, on: boolean) =>
+  const toggleStatus = (s: DisplayKey, on: boolean) =>
     set("statuses", on ? [...filters.statuses, s] : filters.statuses.filter((x) => x !== s));
 
   const moreCount = moreFilterCount(filters);
+  // Lựa chọn đang đặt có thể chưa về (hoặc đã rời năm): vẫn hiện chữ thay vì ô trống.
+  const periodName = periods.find((p) => p.id === filters.period)?.name ?? "Kỳ đã chọn";
+  const templateSetName = templateSets.find((t) => t.id === filters.templateSet)?.name ?? "Bộ đã chọn";
   const hasChips = filters.period !== ALL || moreCount > 0;
   const canClear = hasChips || filters.search.trim() !== "" || hasQuickFilter;
 
@@ -94,8 +98,8 @@ export function ListToolbar({
           <Input
             value={filters.search}
             onChange={(e) => set("search", e.target.value)}
-            placeholder="Tìm theo kỳ báo cáo..."
-            aria-label="Tìm theo kỳ báo cáo"
+            placeholder="Tìm theo kỳ báo cáo hoặc đơn vị..."
+            aria-label="Tìm theo kỳ báo cáo hoặc đơn vị"
             className="ps-9"
           />
         </div>
@@ -108,8 +112,8 @@ export function ListToolbar({
           <SelectContent>
             <SelectItem value={ALL}>Tất cả các kỳ</SelectItem>
             {periods.map((p) => (
-              <SelectItem key={p} value={p}>
-                {p}
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -176,25 +180,8 @@ export function ListToolbar({
                 <SelectContent>
                   <SelectItem value={ALL}>Tất cả bộ biểu mẫu</SelectItem>
                   {templateSets.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Phiên bản biểu mẫu</Label>
-              <Select value={filters.templateVersion} onValueChange={(v) => set("templateVersion", v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Tất cả phiên bản</SelectItem>
-                  {templateVersions.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -216,8 +203,8 @@ export function ListToolbar({
       {(hasChips || canClear) && (
         <div className="flex flex-wrap items-center gap-2">
           {filters.period !== ALL && (
-            <FilterChip label={`Kỳ ${filters.period}`} onRemove={() => set("period", ALL)}>
-              Kỳ: {filters.period}
+            <FilterChip label={`Kỳ ${periodName}`} onRemove={() => set("period", ALL)}>
+              Kỳ: {periodName}
             </FilterChip>
           )}
           {filters.statuses.map((s) => (
@@ -226,13 +213,8 @@ export function ListToolbar({
             </FilterChip>
           ))}
           {filters.templateSet !== ALL && (
-            <FilterChip label={filters.templateSet} onRemove={() => set("templateSet", ALL)}>
-              Bộ biểu mẫu: {filters.templateSet}
-            </FilterChip>
-          )}
-          {filters.templateVersion !== ALL && (
-            <FilterChip label={filters.templateVersion} onRemove={() => set("templateVersion", ALL)}>
-              {filters.templateVersion}
+            <FilterChip label={templateSetName} onRemove={() => set("templateSet", ALL)}>
+              Bộ biểu mẫu: {templateSetName}
             </FilterChip>
           )}
           <Button type="button" variant="outline" size="sm" onClick={onClear}>

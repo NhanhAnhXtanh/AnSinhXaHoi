@@ -3,8 +3,10 @@ package com.dth.frw.module.asxh.inputreport.service;
 import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.domain.asxh.report.InputReportSheet;
 import com.dth.frw.domain.asxh.report.SheetCompletion;
+import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetSpecifications;
+import com.dth.frw.module.asxh.ledger.service.ReportSubmitValidationService;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
@@ -34,12 +36,18 @@ public class InputReportSheetService {
 
     private static final Sort DEFAULT_SORT = Sort.by(Sort.Order.asc("template.shortName"), Sort.Order.asc("id"));
 
+    /** Không dồn quá nhiều lỗi vào một thông báo — người dùng sửa vài dòng đầu rồi đánh dấu lại. */
+    private static final int MAX_REPORTED_ISSUES = 10;
+
     private final InputReportSheetRepository repository;
     private final RowLevelSecurity rowLevel;
+    private final ReportSubmitValidationService validation;
 
-    public InputReportSheetService(InputReportSheetRepository repository, RowLevelSecurity rowLevel) {
+    public InputReportSheetService(InputReportSheetRepository repository, RowLevelSecurity rowLevel,
+                                   ReportSubmitValidationService validation) {
         this.repository = repository;
         this.rowLevel = rowLevel;
+        this.validation = validation;
     }
 
     public Page<InputReportSheet> list(ListParams params) {
@@ -55,6 +63,26 @@ public class InputReportSheetService {
 
     public List<InputReportSheet> getMany(List<Long> ids) {
         return repository.findAll(rowLevel.byIds(InputReportSheet.class, Action.READ, ids));
+    }
+
+    /**
+     * Tờ biểu kèm nội dung phiên bản mẫu đã ghim, nạp TRONG giao dịch (phiên bản là LAZY và
+     * {@code open-in-view=false}).
+     *
+     * @param templateWorkbookJson workbook khung — chỉ khi tờ biểu chưa có số liệu
+     * @param scriptText           script của phiên bản mẫu (rỗng nếu mẫu không có script)
+     */
+    public record SheetContent(InputReportSheet sheet, String templateWorkbookJson, String scriptText) {
+    }
+
+    public SheetContent getWithContent(Long id) {
+        InputReportSheet sheet = get(id);
+        TemplateVersion version = sheet.getTemplateVersion();
+        boolean hasData = sheet.getDataJson() != null && !sheet.getDataJson().isBlank();
+        return new SheetContent(
+                sheet,
+                hasData ? null : version.getWorkbookJson(),
+                version.getScriptText());
     }
 
     /**
@@ -97,9 +125,15 @@ public class InputReportSheetService {
             throw new ConflictException("Biểu này chưa có số liệu. Hãy nhập số liệu rồi đánh dấu, "
                     + "hoặc chọn \"Không phát sinh số liệu\" nếu kỳ này đơn vị không có số liệu.");
         }
-        // TODO: chạy hook validate của phiên bản mẫu trên máy chủ (bản Jmix: GraalJS); còn lỗi
-        //       mức ERROR thì từ chối "Số liệu của biểu chưa hợp lệ (N lỗi)…". Hiện chỉ có hàng
-        //       rào ở trình duyệt.
+        // Cùng hàng rào như lúc nộp (BR-35.1): hook validate của phiên bản mẫu chạy trên bản đã
+        // lưu; còn lỗi mức ERROR thì không đánh dấu xong được.
+        List<String> errors = validation.validateSheet(sheet.getReport(), sheet);
+        if (!errors.isEmpty()) {
+            List<String> shown = errors.size() > MAX_REPORTED_ISSUES ? errors.subList(0, MAX_REPORTED_ISSUES) : errors;
+            throw new ConflictException("Số liệu của biểu chưa hợp lệ (" + errors.size() + " lỗi). "
+                    + "Hãy sửa rồi đánh dấu lại: " + String.join("; ", shown)
+                    + (errors.size() > shown.size() ? "; …" : "."));
+        }
         return mark(sheet, SheetCompletion.COMPLETED);
     }
 

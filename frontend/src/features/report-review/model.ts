@@ -1,14 +1,19 @@
-import type { SheetData, SheetRow, StatusTone } from "@/shared/components/asxh";
+import type { CrudFilter } from "@refinedev/core";
+
+import type { StatusTone } from "@/shared/components/asxh";
 import { formatDate, formatDateTime } from "@/shared/components/asxh";
 
-import {
-  MOCK_TODAY,
-  SHEET_DEFS,
-  type ReviewReport,
-  type ReviewStatus,
-} from "./fixtures";
+import type { InputReportRecord, InputReportSummary } from "./api";
 
-/** Nhãn và màu của bốn trạng thái phiếu phía Sở. */
+/**
+ * Quy tắc hiển thị của màn Duyệt phiếu (UC-39..44), phía Sở.
+ *
+ * Hàng đợi chỉ liệt kê 4 trạng thái (BR-39.1): Chờ duyệt, Đã trả lại, Đã phê
+ * duyệt, Chưa nộp (gồm cả phiếu chưa nộp của kỳ quá hạn). Không hiện Đã khoá,
+ * Đã huỷ, Bản cũ.
+ */
+export type ReviewStatus = "pending" | "returned" | "approved" | "notSubmitted";
+
 export const STATUS_META: Record<ReviewStatus, { label: string; tone: StatusTone }> = {
   pending: { label: "Chờ duyệt", tone: "warning" },
   returned: { label: "Đã trả lại", tone: "destructive" },
@@ -17,14 +22,60 @@ export const STATUS_META: Record<ReviewStatus, { label: string; tone: StatusTone
 };
 
 /** Thứ tự thẻ lọc nhanh và ô Trạng thái trong Bộ lọc khác. */
-export const STATUS_ORDER: ReviewStatus[] = [
-  "pending",
-  "returned",
-  "approved",
-  "notSubmitted",
-];
+export const STATUS_ORDER: ReviewStatus[] = ["pending", "returned", "approved", "notSubmitted"];
 
-export const TOTAL_SHEETS = SHEET_DEFS.length;
+/** Tham số `display` của máy chủ ứng với từng trạng thái phía Sở. */
+const DISPLAY_KEYS: Record<ReviewStatus, string[]> = {
+  pending: ["submitted"],
+  returned: ["returned"],
+  approved: ["approved"],
+  notSubmitted: ["draft", "overdue"],
+};
+
+/** Trạng thái phía Sở của một phiếu; `null` = không thuộc hàng đợi (đã khoá, huỷ, bản cũ). */
+export function reviewStatus(r: InputReportRecord): ReviewStatus | null {
+  switch (r.status) {
+    case "SUBMITTED":
+      return "pending";
+    case "RETURNED":
+      return "returned";
+    case "APPROVED":
+      return "approved";
+    case "DRAFT":
+      return "notSubmitted";
+    default:
+      return null;
+  }
+}
+
+/** Nhãn + màu badge — cả các trạng thái ngoài hàng đợi khi mở thẳng một phiếu. */
+export function badgeOf(r: InputReportRecord): { label: string; tone: StatusTone } {
+  const s = reviewStatus(r);
+  if (s === "approved" && r.period.status === "closed") return { label: "Đã chốt", tone: "locked" };
+  if (s) return STATUS_META[s];
+  switch (r.status) {
+    case "LOCKED":
+      return { label: "Đã chốt", tone: "locked" };
+    case "CANCELLED":
+      return { label: "Đã huỷ", tone: "neutral" };
+    default:
+      return { label: "Bản cũ", tone: "neutral" };
+  }
+}
+
+/** Lọc trạng thái gửi lên máy chủ: giao của thẻ nhanh và ô Trạng thái; mặc định đủ 4 trạng thái. */
+export function displayFilter(quick: ReviewStatus | null, statuses: ReviewStatus[]): CrudFilter {
+  let chosen: ReviewStatus[] = statuses.length === 0 ? STATUS_ORDER : statuses;
+  if (quick) chosen = chosen.includes(quick) ? [quick] : [];
+  const keys = chosen.flatMap((s) => DISPLAY_KEYS[s]);
+  return { field: "display", operator: "eq", value: keys.length === 0 ? "none" : keys.join(",") };
+}
+
+/** Số trên thẻ lọc nhanh. */
+export function countOf(summary: InputReportSummary | undefined, s: ReviewStatus): number {
+  if (!summary) return 0;
+  return DISPLAY_KEYS[s].reduce((acc, key) => acc + (summary.counts[key as keyof typeof summary.counts] ?? 0), 0);
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -34,142 +85,70 @@ function startOfDay(d: string): number {
   return date.getTime();
 }
 
-/** Số ngày từ "hôm nay" của dữ liệu mẫu tới ngày `d` (âm = đã qua). */
-export function daysFromToday(d: string): number {
-  return Math.round((startOfDay(d) - startOfDay(MOCK_TODAY)) / DAY_MS);
-}
-
-/** Giờ thao tác giả lập: ngày của dữ liệu mẫu + giờ thật trên máy. */
-export function mockNow(): string {
-  const now = new Date();
-  const pad = (v: number) => String(v).padStart(2, "0");
-  return `${MOCK_TODAY.slice(0, 10)}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+function daysBetween(from: string, to: string): number {
+  return Math.round((startOfDay(to) - startOfDay(from)) / DAY_MS);
 }
 
 export function timeOf(d: string): string {
   return formatDateTime(d).slice(11);
 }
 
+/** "01/10–31/12/2026" (cùng năm) hoặc "01/12/2026–31/01/2027". */
+export function formatRange(from: string, to: string): string {
+  const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  const full = (iso: string) => `${ddmm(iso)}/${iso.slice(0, 4)}`;
+  return from.slice(0, 4) === to.slice(0, 4) ? `${ddmm(from)}–${full(to)}` : `${full(from)}–${full(to)}`;
+}
+
 /** Dòng phụ dưới badge trạng thái trên bảng. */
-export function statusSubline(r: ReviewReport): string {
-  switch (r.status) {
+export function statusSubline(r: InputReportRecord): string {
+  const deadline = r.period.deadline;
+  switch (reviewStatus(r)) {
     case "approved":
-      return `Duyệt ${formatDate(r.approvedAt ?? "")} · ${r.approver ?? ""}`;
+      return `Duyệt ${r.approvedAt ? formatDate(r.approvedAt) : ""}${r.approvedBy ? ` · ${r.approvedBy}` : ""}`;
     case "pending": {
-      const late = r.submittedAt
-        ? daysBetween(r.period.deadline, r.submittedAt)
-        : 0;
+      if (!deadline || !r.submittedAt) return "Chờ Sở duyệt";
+      const late = daysBetween(deadline, r.submittedAt);
       return late > 0 ? `Nộp trễ ${late} ngày` : "Nộp đúng hạn";
     }
     case "returned":
-      return `Sở trả lại ${formatDate(r.returnedAt ?? "")} · ${r.returnReason ?? ""}`;
+      return `Sở đã trả lại ${r.returnedAt ? formatDate(r.returnedAt) : ""} · Lý do: ${r.returnReason ?? "—"} · Đang chờ đơn vị sửa và nộp lại`;
     case "notSubmitted": {
-      const left = daysFromToday(r.period.deadline);
-      const when =
-        left > 0 ? `còn ${left} ngày` : left === 0 ? "hết hạn hôm nay" : `quá hạn ${-left} ngày`;
-      return `Hạn nộp ${formatDate(r.period.deadline)} · ${when}`;
+      if (r.period.status === "overdue") {
+        return `Quá hạn nộp${deadline ? ` ${formatDate(deadline)}` : ""} · đơn vị bị khoá nhập`;
+      }
+      if (!deadline) return "Chưa nộp";
+      const left = daysBetween(new Date().toISOString().slice(0, 10), deadline);
+      const when = left > 0 ? `còn ${left} ngày` : left === 0 ? "hết hạn hôm nay" : `quá hạn ${-left} ngày`;
+      return `Hạn nộp ${formatDate(deadline)} · ${when}`;
     }
+    default:
+      return "Chỉ xem";
   }
 }
 
-function daysBetween(from: string, to: string): number {
-  return Math.round((startOfDay(to) - startOfDay(from)) / DAY_MS);
-}
-
 /** Phiếu chưa nhập biểu nào: không có gì để xem, xuất. */
-export function hasNoData(r: ReviewReport): boolean {
-  return r.doneSheets === 0;
+export function hasNoData(r: InputReportRecord): boolean {
+  return r.progress.done === 0 && r.submittedAt === null;
 }
 
 export const NO_DATA_REASON = "Đơn vị chưa nhập số liệu nào";
 
-/** Bỏ dấu, chữ thường — để tìm "phu huu" vẫn ra "Phú Hữu". */
-export function normalize(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase()
-    .trim();
+const BLOCK_LABEL: Record<NonNullable<InputReportRecord["unit"]["block"]>, string> = {
+  tinh: "Khối tỉnh",
+  huyen: "Khối huyện",
+  xa: "Khối xã",
+};
+
+/** "Khối xã · Huyện Long Thành" — dòng phụ cột Đơn vị. */
+export function unitSubline(r: InputReportRecord): string {
+  const parts = [r.unit.block ? BLOCK_LABEL[r.unit.block] : null, r.unit.parentName].filter(
+    (x): x is string => Boolean(x)
+  );
+  return parts.join(" · ");
 }
 
-export function periodLabel(r: ReviewReport): string {
-  return `${r.period.name} · ${r.orgName}`;
-}
-
-const round100 = (v: number) => Math.round(v / 100) * 100;
-
-/**
- * Dựng bảng tính chỉ đọc của một biểu: 4 dòng đầu biểu, dòng tiêu đề cột, các
- * chỉ tiêu, dòng "Tổng cộng". Cột "Cộng dồn" = kỳ trước + kỳ này; dòng tổng
- * cộng từ các dòng trên, nên số luôn khớp.
- */
-export function buildSheet(r: ReviewReport, code: string): SheetData {
-  const index = SHEET_DEFS.findIndex((s) => s.code === code);
-  const def = SHEET_DEFS[index] ?? SHEET_DEFS[0];
-  const filled = index >= 0 && index < r.doneSheets;
-
-  const title = (text: string, kind: SheetRow["kind"] = "title"): SheetRow => ({
-    cells: [null, text, null, null, null, null],
-    kind,
-  });
-
-  let sumPrev = 0;
-  let sumCur = 0;
-  const items: SheetRow[] = def.items.map(([name, prev, cur], i) => {
-    if (!filled) {
-      return { cells: [String(i + 1), name, null, null, null, null], kind: "normal" };
-    }
-    const p = round100(prev * r.scale);
-    const c = round100(cur * r.scale);
-    sumPrev += p;
-    sumCur += c;
-    return { cells: [String(i + 1), name, p, c, p + c, null], kind: "normal" };
-  });
-
-  return {
-    columns: [
-      { label: "STT", width: 64, align: "center" },
-      { label: "Chỉ tiêu", width: 440, align: "left" },
-      { label: "Số kỳ trước", width: 168, align: "right" },
-      { label: "Số kỳ này", width: 168, align: "right" },
-      { label: "Cộng dồn", width: 168, align: "right" },
-      { label: "Ghi chú", width: 280, align: "left" },
-    ],
-    rows: [
-      title(`ĐƠN VỊ: ${r.orgName}`),
-      title(`BIỂU ${def.code} — ${def.title}`),
-      title(`Kỳ báo cáo: ${r.period.name} (${r.period.range})`, "normal"),
-      title("Đơn vị tính: nghìn đồng", "normal"),
-      {
-        cells: ["STT", "Chỉ tiêu", "Số kỳ trước", "Số kỳ này", "Cộng dồn", "Ghi chú"],
-        kind: "header",
-      },
-      ...items,
-      {
-        cells: filled
-          ? [null, "Tổng cộng", sumPrev, sumCur, sumPrev + sumCur, null]
-          : [null, "Tổng cộng", null, null, null, null],
-        kind: "total",
-      },
-    ],
-  };
-}
-
-/** Số tiền trên giấy xác nhận kho bạc: tổng "Số kỳ này" của biểu 1b, ra đồng. */
-export function treasuryAmount(r: ReviewReport): number {
-  const sheet = buildSheet(r, "1b");
-  const total = sheet.rows[sheet.rows.length - 1]?.cells[3];
-  return typeof total === "number" ? total * 1000 : 0;
-}
-
-/** Tên tệp Excel của phiếu, không dấu. */
-export function exportFileName(r: ReviewReport, revision: number): string {
-  const slug = (s: string) =>
-    normalize(s)
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-  const ban = revision > 1 ? `_ban-${revision}` : "";
-  return `Phieu_${slug(r.orgName)}_${slug(r.period.name)}${ban}.xlsx`;
-}
+export const BLOCK_OPTIONS = (Object.keys(BLOCK_LABEL) as (keyof typeof BLOCK_LABEL)[]).map((key) => ({
+  key,
+  label: BLOCK_LABEL[key],
+}));

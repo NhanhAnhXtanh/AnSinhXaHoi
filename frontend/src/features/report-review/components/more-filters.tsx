@@ -19,14 +19,17 @@ import {
 } from "@/shared/ui/select";
 import { cn } from "@/shared/lib/utils";
 
-import type { ReviewStatus } from "../fixtures";
-import { STATUS_META, STATUS_ORDER } from "../model";
+import { STATUS_META, STATUS_ORDER, type ReviewStatus } from "../model";
+
+export type FilterOption = { id: string; name: string };
 
 export const ALL = "all";
 
 export type MoreFilterValue = {
   statuses: ReviewStatus[];
+  /** Id đơn vị cha (huyện / thành phố), hoặc ALL */
   district: string;
+  /** Id bộ biểu mẫu, hoặc ALL */
   templateSet: string;
 };
 
@@ -49,8 +52,8 @@ export function MoreFilters({
 }: {
   value: MoreFilterValue;
   onChange: (next: MoreFilterValue) => void;
-  districts: string[];
-  templateSets: string[];
+  districts: FilterOption[];
+  templateSets: FilterOption[];
 }) {
   const active = countMoreFilters(value);
 
@@ -126,8 +129,8 @@ export function MoreFilters({
             <SelectContent>
               <SelectItem value={ALL}>Tất cả các huyện</SelectItem>
               {districts.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {d}
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -146,8 +149,8 @@ export function MoreFilters({
             <SelectContent>
               <SelectItem value={ALL}>Tất cả bộ biểu mẫu</SelectItem>
               {templateSets.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
                 </SelectItem>
               ))}
             </SelectContent>

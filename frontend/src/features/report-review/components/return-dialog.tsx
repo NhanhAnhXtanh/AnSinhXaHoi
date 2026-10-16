@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 
 import { formatNumber } from "@/shared/components/asxh";
 import { Button } from "@/shared/ui/button";
@@ -13,21 +14,30 @@ import {
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 
-import type { ReviewReport } from "../fixtures";
-
 const MAX_REASON = 1000;
 
-/** Hộp "Trả lại phiếu": chỉ một ô lý do, bắt buộc, tối đa 1.000 ký tự. */
+/**
+ * Hộp "Trả lại phiếu": chỉ một ô lý do, bắt buộc, tối đa 1.000 ký tự. Trả lại
+ * sinh phiên bản phiếu mới cho đơn vị sửa (BR-42.1) — bản đang xem giữ nguyên để
+ * đối chiếu.
+ *
+ * `onConfirm` trả `true` khi máy chủ đã nhận: hộp xoá ô lý do; `false` thì giữ
+ * nguyên chữ đã gõ để người dùng thử lại.
+ */
 export function ReturnDialog({
-  report,
+  periodName,
+  unitName,
   open,
   onOpenChange,
   onConfirm,
+  pending = false,
 }: {
-  report: ReviewReport;
+  periodName: string;
+  unitName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => Promise<boolean>;
+  pending?: boolean;
 }) {
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
@@ -42,16 +52,18 @@ export function ReturnDialog({
     onOpenChange(next);
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (pending) return;
     const text = reason.trim();
     if (!text) {
       setError("Chưa nhập lý do trả lại.");
       document.getElementById(fieldId)?.focus();
       return;
     }
-    onConfirm(text);
-    setReason("");
-    setError(null);
+    if (await onConfirm(text)) {
+      setReason("");
+      setError(null);
+    }
   };
 
   return (
@@ -60,8 +72,8 @@ export function ReturnDialog({
         <DialogHeader className="text-left">
           <DialogTitle>Trả lại phiếu</DialogTitle>
           <DialogDescription>
-            Phiếu {report.period.name} của {report.orgName} sẽ về lại đơn vị để sửa và nộp lại. Đơn
-            vị sẽ thấy lý do bạn nhập bên dưới.
+            Phiếu {periodName} của {unitName} sẽ về lại đơn vị để sửa và nộp lại. Đơn vị sẽ thấy lý
+            do bạn nhập bên dưới.
           </DialogDescription>
         </DialogHeader>
 
@@ -99,7 +111,8 @@ export function ReturnDialog({
           <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
             Quay lại
           </Button>
-          <Button type="button" variant="destructive" onClick={submit}>
+          <Button type="button" variant="destructive" disabled={pending} onClick={() => void submit()}>
+            {pending && <LoaderCircle className="animate-spin" />}
             Trả lại phiếu
           </Button>
         </DialogFooter>

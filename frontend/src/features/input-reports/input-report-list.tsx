@@ -1,11 +1,23 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { ChevronLeft, ChevronRight, Download, Eye, FileText, Pencil, RotateCcwClock, SearchX } from "lucide-react";
-import { toast } from "sonner";
+import { useCustom, useList } from "@refinedev/core";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Ellipsis,
+  Eye,
+  FileText,
+  Pencil,
+  RotateCcwClock,
+  SearchX,
+  TriangleAlert,
+} from "lucide-react";
 
 import {
   AsxhPage,
   EmptyState,
+  LoadingState,
   ProgressCell,
   QuickFilterCards,
   RowActions,
@@ -13,39 +25,37 @@ import {
   TwoLineCell,
   YearSelect,
   formatDate,
+  formatNumber,
   useReportYear,
   type ActionItem,
   type PrimaryAction,
 } from "@/shared/components/asxh";
+import { customResult } from "@/shared/hooks/use-custom-result";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
-import { TEMPLATE_SETS, TEMPLATE_VERSIONS } from "./fixtures";
-import { ALL, EMPTY_FILTERS, type ListFilters } from "./filters";
-import { ListToolbar } from "./list-toolbar";
 import {
-  STATUS_META,
-  displayStatus,
-  doneCount,
-  dueLine,
-  formatRange,
-  hasAnyData,
-  type InputReport,
-} from "./model";
-import { exportFileName, reportKindLabel, statusLine, workPath } from "./report-text";
+  REPORTS_RESOURCE,
+  SUMMARY_URL,
+  type DisplayKey,
+  type InputReportRecord,
+  type InputReportSummary,
+} from "./api";
+import { useExportReport } from "./export-report";
+import { ALL, EMPTY_FILTERS, baseFilters, displayFilter, toQuery, type ListFilters } from "./filters";
+import { ListToolbar, type FilterOption } from "./list-toolbar";
+import { STATUS_META, displayStatus, dueLine, formatRange, hasAnyData } from "./model";
 import { RevisionHistoryDialog } from "./revision-history-dialog";
-import { useInputReports } from "./store";
-
-type QuickKey = "can-nhap" | "bi-tra-lai" | "cho-duyet" | "da-duyet";
+import { reportKindLabel, statusLine, workPath } from "./report-text";
 
 /** Bốn thẻ lọc nhanh (UC-33 bước 2). "Cần nhập" không tính phiếu của kỳ quá hạn (4a). */
-const QUICK: { key: QuickKey; label: string; match: (r: InputReport) => boolean }[] = [
-  { key: "can-nhap", label: "Cần nhập", match: (r) => displayStatus(r) === "draft" },
-  { key: "bi-tra-lai", label: "Bị trả lại", match: (r) => r.status === "returned" },
-  { key: "cho-duyet", label: "Chờ Sở duyệt", match: (r) => r.status === "submitted" },
-  { key: "da-duyet", label: "Đã phê duyệt", match: (r) => r.status === "approved" },
+const QUICK: { key: DisplayKey; label: string }[] = [
+  { key: "draft", label: "Cần nhập" },
+  { key: "returned", label: "Bị trả lại" },
+  { key: "submitted", label: "Chờ Sở duyệt" },
+  { key: "approved", label: "Đã phê duyệt" },
 ];
 
 const PAGE_SIZES = [10, 20, 50];
@@ -54,45 +64,53 @@ const PAGE_SIZES = [10, 20, 50];
 export function InputReportList() {
   const navigate = useNavigate();
   const { year } = useReportYear();
-  const all = useInputReports();
+  const { exportReport, exporting } = useExportReport();
 
-  const [quick, setQuick] = useState<QuickKey | null>(null);
+  const [quick, setQuick] = useState<DisplayKey | null>(null);
   const [filters, setFilters] = useState<ListFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [refreshing, setRefreshing] = useState(false);
-  const [historyFor, setHistoryFor] = useState<InputReport | null>(null);
+  const [historyFor, setHistoryFor] = useState<InputReportRecord | null>(null);
 
-  // Phiếu của năm dùng chung, kỳ mới nhất trước.
-  const ofYear = useMemo(
-    () =>
-      all
-        .filter((r) => Number(r.periodFrom.slice(0, 4)) === year)
-        .sort((a, b) => b.periodFrom.localeCompare(a.periodFrom) || a.orgName.localeCompare(b.orgName, "vi")),
-    [all, year]
+  // Đổi năm thì bỏ kỳ / bộ mẫu đã chọn của năm cũ và về trang 1.
+  const [yearOfFilters, setYearOfFilters] = useState(year);
+  if (yearOfFilters !== year) {
+    setYearOfFilters(year);
+    setFilters((f) => ({ ...f, period: ALL, templateSet: ALL }));
+    setPage(1);
+  }
+
+  const base = useMemo(() => baseFilters(year, filters), [year, filters]);
+
+  const { result, query } = useList<InputReportRecord>({
+    resource: REPORTS_RESOURCE,
+    pagination: { currentPage: page, pageSize, mode: "server" },
+    filters: [...base, ...displayFilter(quick, filters.statuses)],
+    errorNotification: false,
+  });
+
+  const { result: summaryResult, query: summaryQuery } = useCustom<InputReportSummary>({
+    url: SUMMARY_URL,
+    method: "get",
+    config: { query: toQuery(base) },
+    errorNotification: false,
+  });
+  const summary = customResult(summaryResult?.data, "counts");
+
+  const rows = result.data;
+  const total = result.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+
+  const periods: FilterOption[] = useMemo(
+    () => (summary?.periods ?? []).map((p) => ({ id: String(p.id), name: p.name })),
+    [summary]
   );
-
-  const periods = useMemo(() => [...new Set(ofYear.map((r) => r.periodName))], [ofYear]);
-
-  const rows = useMemo(() => {
-    const q = filters.search.trim().toLocaleLowerCase("vi");
-    const quickMatch = QUICK.find((x) => x.key === quick)?.match;
-    return ofYear.filter(
-      (r) =>
-        (!quickMatch || quickMatch(r)) &&
-        (q === "" || r.periodName.toLocaleLowerCase("vi").includes(q)) &&
-        (filters.period === ALL || r.periodName === filters.period) &&
-        (filters.statuses.length === 0 || filters.statuses.includes(displayStatus(r))) &&
-        (filters.templateSet === ALL || r.templateSet === filters.templateSet) &&
-        (filters.templateVersion === ALL || r.templateVersion === filters.templateVersion)
-    );
-  }, [ofYear, filters, quick]);
-
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const from = rows.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const to = Math.min(safePage * pageSize, rows.length);
+  const templateSets: FilterOption[] = useMemo(
+    () => (summary?.templateSets ?? []).map((t) => ({ id: String(t.id), name: t.name })),
+    [summary]
+  );
 
   const changeFilters = (next: ListFilters) => {
     setFilters(next);
@@ -104,29 +122,33 @@ export function InputReportList() {
     setPage(1);
   };
   const refresh = () => {
-    setRefreshing(true);
-    window.setTimeout(() => setRefreshing(false), 600);
+    void query.refetch();
+    void summaryQuery.refetch();
   };
 
-  const exportExcel = (r: InputReport) =>
-    toast.success(`Đã xuất phiếu ${r.periodName} ra tệp ${exportFileName(r)}.`);
-
-  const rowActions = (r: InputReport): { primary: PrimaryAction; items: ActionItem[] } => {
+  const rowActions = (r: InputReportRecord): { primary: PrimaryAction; items: ActionItem[] } => {
     const s = displayStatus(r);
-    const open = () => navigate(workPath(r));
+    const open = () => navigate(workPath(r.id));
     // UC-33 5a: phiếu quá hạn mà chưa nhập gì thì không có gì để xem.
     const nothingToSee = s === "overdue" && !hasAnyData(r);
     const reason = nothingToSee ? "Phiếu chưa có số liệu nào" : undefined;
 
     const primary: PrimaryAction =
-      s === "draft"
+      s === "draft" && r.period.status === "open"
         ? { label: "Nhập dữ liệu", icon: Pencil, onClick: open }
         : s === "returned"
           ? { label: "Sửa & nộp lại", icon: Pencil, onClick: open }
           : { label: "Xem phiếu", icon: Eye, onClick: open, disabled: nothingToSee, reason };
 
     const items: ActionItem[] = [
-      { key: "excel", label: "Xuất Excel", icon: Download, onSelect: () => exportExcel(r), disabled: nothingToSee, reason },
+      {
+        key: "excel",
+        label: "Xuất Excel",
+        icon: Download,
+        onSelect: () => void exportReport(r),
+        disabled: nothingToSee || exporting || r.progress.total === 0,
+        reason: reason ?? (r.progress.total === 0 ? "Phiếu chưa có biểu nào" : undefined),
+      },
       {
         key: "history",
         label: "Lịch sử phiên bản",
@@ -144,8 +166,48 @@ export function InputReportList() {
     filters.search.trim() !== "" ||
     filters.period !== ALL ||
     filters.statuses.length > 0 ||
-    filters.templateSet !== ALL ||
-    filters.templateVersion !== ALL;
+    filters.templateSet !== ALL;
+
+  const renderBody = () => {
+    if (query.isLoading) {
+      return <LoadingState label="Đang tải danh sách phiếu…" />;
+    }
+    if (query.isError) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Chưa tải được danh sách phiếu"
+          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          action={
+            <Button type="button" variant="outline" onClick={refresh}>
+              Thử lại
+            </Button>
+          }
+        />
+      );
+    }
+    if (isFiltered) {
+      return (
+        <EmptyState
+          icon={SearchX}
+          title="Không có phiếu nào khớp điều kiện lọc"
+          description="Bạn thử bỏ bớt điều kiện lọc hoặc chọn kỳ khác."
+          action={
+            <Button type="button" variant="outline" onClick={clearAll}>
+              Xoá lọc
+            </Button>
+          }
+        />
+      );
+    }
+    return (
+      <EmptyState
+        icon={FileText}
+        title={`Chưa có phiếu nào trong năm ${year}`}
+        description="Phiếu sẽ hiện ở đây khi Sở Tài chính mở đợt báo cáo cho đơn vị bạn."
+      />
+    );
+  };
 
   return (
     <AsxhPage
@@ -154,10 +216,10 @@ export function InputReportList() {
       actions={<YearSelect />}
     >
       <QuickFilterCards
-        items={QUICK.map((x) => ({ key: x.key, label: x.label, count: ofYear.filter(x.match).length }))}
+        items={QUICK.map((x) => ({ key: x.key, label: x.label, count: summary?.counts[x.key] ?? 0 }))}
         value={quick}
         onChange={(k) => {
-          setQuick(k as QuickKey | null);
+          setQuick(k as DisplayKey | null);
           setPage(1);
         }}
       />
@@ -168,14 +230,13 @@ export function InputReportList() {
           onChange={changeFilters}
           onClear={clearAll}
           periods={periods}
-          templateSets={TEMPLATE_SETS}
-          templateVersions={TEMPLATE_VERSIONS}
-          refreshing={refreshing}
+          templateSets={templateSets}
+          refreshing={query.isFetching || summaryQuery.isFetching}
           onRefresh={refresh}
           hasQuickFilter={quick !== null}
         />
 
-        <Table className="border-t">
+        <Table className="border-t" aria-busy={query.isFetching || undefined}>
           <TableHeader>
             <TableRow>
               <TableHead>Kỳ báo cáo</TableHead>
@@ -188,32 +249,15 @@ export function InputReportList() {
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {pageRows.length === 0 ? (
+          <TableBody className={cn(query.isFetching && !query.isLoading && "opacity-60 transition-opacity")}>
+            {rows.length === 0 || query.isError ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={6} className="h-auto py-0 whitespace-normal">
-                  {isFiltered ? (
-                    <EmptyState
-                      icon={SearchX}
-                      title="Không có phiếu nào khớp điều kiện lọc"
-                      description="Bạn thử bỏ bớt điều kiện lọc hoặc chọn kỳ khác."
-                      action={
-                        <Button type="button" variant="outline" onClick={clearAll}>
-                          Xoá lọc
-                        </Button>
-                      }
-                    />
-                  ) : (
-                    <EmptyState
-                      icon={FileText}
-                      title={`Chưa có phiếu nào trong năm ${year}`}
-                      description="Phiếu sẽ hiện ở đây khi Sở Tài chính mở đợt báo cáo cho đơn vị bạn."
-                    />
-                  )}
+                  {renderBody()}
                 </TableCell>
               </TableRow>
             ) : (
-              pageRows.map((r) => {
+              rows.map((r) => {
                 const s = displayStatus(r);
                 const due = dueLine(r);
                 const sub = statusLine(r);
@@ -221,17 +265,20 @@ export function InputReportList() {
                 return (
                   <TableRow key={r.id}>
                     <TableCell className="h-16">
-                      <TwoLineCell primary={r.periodName} secondary={formatRange(r.periodFrom, r.periodTo)} />
+                      <TwoLineCell
+                        primary={r.period.name}
+                        secondary={formatRange(r.period.fromDate, r.period.toDate)}
+                      />
                     </TableCell>
                     <TableCell>
-                      <TwoLineCell primary={reportKindLabel(r)} secondary={`Phiên bản ${r.revision}`} />
+                      <TwoLineCell primary={reportKindLabel(r)} secondary={`Phiên bản ${r.revisionNo}`} />
                     </TableCell>
                     <TableCell>
-                      <ProgressCell done={doneCount(r)} total={r.sheets.length} unit="biểu" />
+                      <ProgressCell done={r.progress.done} total={r.progress.total} unit="biểu" />
                     </TableCell>
                     <TableCell>
                       <TwoLineCell
-                        primary={formatDate(r.dueDate)}
+                        primary={r.period.deadline ? formatDate(r.period.deadline) : "—"}
                         secondary={
                           <span className={cn(due.tone === "destructive" && "text-destructive-text")}>{due.text}</span>
                         }
@@ -260,8 +307,8 @@ export function InputReportList() {
         <Pager
           from={from}
           to={to}
-          total={rows.length}
-          page={safePage}
+          total={total}
+          page={page}
           pageCount={pageCount}
           pageSize={pageSize}
           onPage={setPage}
@@ -276,14 +323,28 @@ export function InputReportList() {
         report={historyFor}
         open={historyFor !== null}
         onOpenChange={(o) => !o && setHistoryFor(null)}
-        onView={(revision) => {
-          const r = historyFor;
+        onView={(revisionId) => {
           setHistoryFor(null);
-          if (r) navigate(workPath(r, revision));
+          navigate(workPath(revisionId));
         }}
       />
     </AsxhPage>
   );
+}
+
+/** Dãy số trang gọn: 1 … 4 5 6 … 12. */
+function pageList(current: number, count: number): (number | "gap")[] {
+  if (count <= 7) return Array.from({ length: count }, (_, i) => i + 1);
+  const pages = [...new Set([1, count, current - 1, current, current + 1])]
+    .filter((p) => p >= 1 && p <= count)
+    .sort((a, b) => a - b);
+  const out: (number | "gap")[] = [];
+  pages.forEach((p, i) => {
+    const prev = pages[i - 1];
+    if (prev !== undefined && p - prev > 1) out.push("gap");
+    out.push(p);
+  });
+  return out;
 }
 
 /** Phân trang: "Hiển thị 1–7 trong 7 phiếu"  [‹] 1 2 [›]  [10 / trang] */
@@ -309,7 +370,9 @@ function Pager({
   return (
     <div className="flex flex-wrap items-center gap-3 border-t px-4 py-3">
       <span className="text-sm text-muted-foreground tabular-nums">
-        {total === 0 ? "Không có phiếu" : `Hiển thị ${from}–${to} trong ${total} phiếu`}
+        {total === 0
+          ? "Không có phiếu"
+          : `Hiển thị ${formatNumber(from)}–${formatNumber(to)} trong ${formatNumber(total)} phiếu`}
       </span>
       <div className="ms-auto flex items-center gap-1">
         <Button
@@ -322,19 +385,25 @@ function Pager({
         >
           <ChevronLeft />
         </Button>
-        {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
-          <Button
-            key={p}
-            type="button"
-            variant={p === page ? "default" : "ghost"}
-            size="icon-sm"
-            aria-label={`Trang ${p}`}
-            aria-current={p === page ? "page" : undefined}
-            onClick={() => onPage(p)}
-          >
-            {p}
-          </Button>
-        ))}
+        {pageList(page, pageCount).map((p, i) =>
+          p === "gap" ? (
+            <span key={`gap-${i}`} aria-hidden className="flex w-8 justify-center text-muted-foreground">
+              <Ellipsis className="size-4" />
+            </span>
+          ) : (
+            <Button
+              key={p}
+              type="button"
+              variant={p === page ? "default" : "ghost"}
+              size="icon-sm"
+              aria-label={`Trang ${p}`}
+              aria-current={p === page ? "page" : undefined}
+              onClick={() => onPage(p)}
+            >
+              {p}
+            </Button>
+          )
+        )}
         <Button
           type="button"
           variant="outline"

@@ -1,6 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
-import { CircleOff, Download, Maximize, Minimize, Pencil, RotateCcwClock, Save, SearchX } from "lucide-react";
+import { useNavigate, useParams } from "react-router";
+import {
+  useCustomMutation,
+  useDataProvider,
+  useInvalidate,
+  useList,
+  useOne,
+  useUpdate,
+  useWarnAboutChange,
+  type HttpError,
+} from "@refinedev/core";
+import {
+  CircleOff,
+  Download,
+  Maximize,
+  Minimize,
+  Pencil,
+  RotateCcwClock,
+  Save,
+  SearchX,
+  TriangleAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -10,65 +30,72 @@ import {
   HeaderActions,
   LoadingState,
   SheetTabs,
-  SpreadsheetView,
   StatusBadge,
   WorkCard,
-  formatDateTime,
   type ActionItem,
   type PrimaryAction,
-  type SheetCell,
 } from "@/shared/components/asxh";
+import {
+  SpreadWorkbook,
+  runClientScript,
+  type SpreadWorkbookApi,
+  type WorkbookJson,
+} from "@/shared/components/spreadsheet";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import {
-  STATUS_META,
-  displayStatus,
-  doneCount,
-  isEditable,
-  isSheetDone,
-  nowIso,
-  type InputReport,
-  type SheetState,
-  type TreasuryFile,
-} from "./model";
-import {
-  CURRENT_COL,
-  REVISION_PARAM,
-  buildSheetData,
-  exportFileName,
-  lineIndexOfRow,
-  sheetCurrentTotal,
-  statusLine,
-  validateSheet,
-  type SheetIssue,
-} from "./report-text";
+  JSON_HEADERS,
+  REPORTS_RESOURCE,
+  SHEETS_RESOURCE,
+  errorMessage,
+  errorStatus,
+  parseWorkbook,
+  reportActionUrl,
+  sheetActionUrl,
+  type InputReportRecord,
+  type InputReportSheetRecord,
+} from "./api";
+import { useExportReport } from "./export-report";
+import { STATUS_META, displayStatus, firstSheetToOpen, isEditable, isSheetDone } from "./model";
+import { LIST_PATH, readOnlyReason, statusLine, workPath } from "./report-text";
 import { RevisionHistoryDialog } from "./revision-history-dialog";
-import { updateInputReport, useInputReport } from "./store";
+import { SheetValidator, type ValidationJob } from "./sheet-validator";
 import { TreasurySubmitDialog } from "./treasury-submit-dialog";
-import { CheckErrorsDialog, SubmitConfirmDialog } from "./work-dialogs";
+import { CheckErrorsDialog, SubmitConfirmDialog, type SheetIssue } from "./work-dialogs";
 
-const LIST_PATH = "/input-reports";
+/** Đủ rộng cho mọi biểu của một phiếu (bộ mẫu thật ≈10 biểu). */
+const MAX_SHEETS = 200;
 
 /**
  * Màn nhập số liệu một phiếu (UC-34..38, 43..45; Figma 310:31610 và các khung
  * trạng thái 310:44251 · 47614 · 48786 · 50333 · 53871 · 56441 · 58133).
- * Thao tác theo nguyên tắc §4 Ví dụ 3.
+ * Thao tác theo nguyên tắc §4 Ví dụ 3. Không có đường dẫn trang — theo Figma,
+ * nút mũi tên ở đầu thẻ đưa về danh sách.
  */
 export function InputReportWork() {
   const { id } = useParams<{ id: string }>();
-  const report = useInputReport(id);
   const navigate = useNavigate();
+  const numericId = id && /^\d+$/.test(id) ? Number(id) : null;
 
-  if (!report) {
+  const { result: report, query } = useOne<InputReportRecord>({
+    resource: REPORTS_RESOURCE,
+    id: numericId ?? 0,
+    queryOptions: { enabled: numericId !== null },
+    errorNotification: false,
+  });
+
+  const notFound = numericId === null || (query.isError && errorStatus(query.error) === 404);
+
+  if (notFound) {
     return (
       <AsxhPage title="Không tìm thấy phiếu" backTo={LIST_PATH}>
         <EmptyState
           variant="page"
           icon={SearchX}
-          title="Không tìm thấy phiếu này"
-          description="Phiếu có thể đã được Sở thu hồi cùng kỳ báo cáo. Bạn quay lại danh sách để chọn phiếu khác."
+          title="Không tìm thấy phiếu"
+          description="Phiếu có thể đã được Sở thu hồi cùng kỳ báo cáo, hoặc đường dẫn không đúng. Bạn quay lại danh sách để chọn phiếu khác."
           action={
             <Button type="button" onClick={() => navigate(LIST_PATH)}>
               Về danh sách phiếu
@@ -78,188 +105,406 @@ export function InputReportWork() {
       </AsxhPage>
     );
   }
-  // key: đổi phiếu thì dựng lại toàn bộ trạng thái màn (biểu đang mở, thay đổi chưa lưu…).
+  if (query.isError) {
+    return (
+      <AsxhPage title="Chưa mở được phiếu" backTo={LIST_PATH}>
+        <EmptyState
+          variant="page"
+          icon={TriangleAlert}
+          title="Chưa mở được phiếu"
+          description={errorMessage(query.error, "Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây.")}
+          action={
+            <Button type="button" variant="outline" onClick={() => void query.refetch()}>
+              Thử lại
+            </Button>
+          }
+        />
+      </AsxhPage>
+    );
+  }
+  if (!report) {
+    return <LoadingState variant="page" label="Đang mở phiếu…" />;
+  }
+  // key: đổi phiếu (kể cả sang phiên bản khác) thì dựng lại toàn bộ trạng thái màn.
   return <WorkScreen key={report.id} report={report} />;
 }
 
-function firstSheetToOpen(r: InputReport): string {
-  const open = isEditable(r) ? r.sheets.find((s) => !isSheetDone(s)) : undefined;
-  return (open ?? r.sheets[0]).code;
-}
+/** Bảng tính đang hiện: biểu nào, nạp từ JSON nào, có đóng dấu khoá ô của khung mẫu không. */
+type Pane = { sheetId: number; workbook: WorkbookJson | null; stampLocks: boolean };
 
-function WorkScreen({ report }: { report: InputReport }) {
-  const [searchParams, setSearchParams] = useSearchParams();
+type Busy = "save" | "complete" | "no-data" | "reopen" | "validate" | "submit" | null;
 
-  // Xem bản cũ qua Lịch sử phiên bản: ?phienBan=1 — luôn chỉ xem.
-  const requested = Number(searchParams.get(REVISION_PARAM));
-  const oldEntry =
-    requested && requested !== report.revision ? report.history.find((h) => h.no === requested) : undefined;
+function WorkScreen({ report }: { report: InputReportRecord }) {
+  const navigate = useNavigate();
+  const invalidate = useInvalidate();
+  const dataProvider = useDataProvider();
+  const { setWarnWhen } = useWarnAboutChange();
+  const { exportReport, exporting } = useExportReport();
+  const { mutateAsync: updateSheet } = useUpdate<
+    InputReportSheetRecord,
+    HttpError,
+    { dataJson: string; version: number | null }
+  >();
+  const { mutateAsync: postAction } = useCustomMutation<InputReportRecord>();
 
-  const [loading, setLoading] = useState(true);
-  const [sheetCode, setSheetCode] = useState(() => firstSheetToOpen(report));
-  const [dirty, setDirty] = useState<ReadonlySet<string>>(new Set());
-  const [saving, setSaving] = useState(false);
+  // ------------------------------------------------------------ dữ liệu
+
+  const { result: sheetsResult, query: sheetsQuery } = useList<InputReportSheetRecord>({
+    resource: SHEETS_RESOURCE,
+    pagination: { currentPage: 1, pageSize: MAX_SHEETS, mode: "server" },
+    filters: [{ field: "report.id", operator: "eq", value: report.id }],
+    errorNotification: false,
+  });
+  const sheets = sheetsResult.data;
+
+  const [sheetId, setSheetId] = useState<number | undefined>(undefined);
+  if (sheetId === undefined && sheets.length > 0) {
+    setSheetId(firstSheetToOpen(report, sheets));
+  }
+  const sheet = sheets.find((s) => s.id === sheetId);
+
+  const { result: content, query: contentQuery } = useOne<InputReportSheetRecord>({
+    resource: SHEETS_RESOURCE,
+    id: sheetId ?? 0,
+    queryOptions: { enabled: sheetId !== undefined },
+    errorNotification: false,
+  });
+
+  // Số trên màn còn chưa lưu: bản nháp của các biểu đã rời tab, bản vừa lưu, số hiệu bản lưu.
+  const drafts = useRef(new Map<number, WorkbookJson>());
+  const saved = useRef(new Map<number, WorkbookJson>());
+  const versions = useRef(new Map<number, number>());
+  const apiRef = useRef<SpreadWorkbookApi | null>(null);
+
+  const [dirty, setDirty] = useState<ReadonlySet<number>>(new Set());
+  const [pane, setPane] = useState<Pane | null>(null);
+  const [busy, setBusy] = useState<Busy>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [noDataOpen, setNoDataOpen] = useState(false);
-  const [issues, setIssues] = useState<SheetIssue[]>([]);
+  const [issues, setIssues] = useState<{ purpose: "complete" | "submit"; list: SheetIssue[] } | null>(null);
+  const [validationJobs, setValidationJobs] = useState<ValidationJob[] | null>(null);
+  const pendingIssues = useRef<SheetIssue[]>([]);
   const [treasuryOpen, setTreasuryOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const anyDialogOpen = historyOpen || noDataOpen || issues.length > 0 || treasuryOpen || confirmOpen;
+  const anyDialogOpen =
+    historyOpen || noDataOpen || issues !== null || treasuryOpen || confirmOpen;
 
-  // Mở phiếu: giả lập thời gian tải bảng tính (Figma 310:56441).
-  useEffect(() => {
-    setLoading(true);
-    const t = window.setTimeout(() => setLoading(false), 600);
-    return () => window.clearTimeout(t);
-  }, [oldEntry?.no]);
+  // Số hiệu bản lưu chỉ tăng — lấy số lớn nhất từng thấy (bản đọc trong bộ đệm có thể cũ hơn bản vừa lưu).
+  if (content && sheetId !== undefined && content.id === sheetId) {
+    const known = versions.current.get(content.id);
+    if (known === undefined || content.version > known) versions.current.set(content.id, content.version);
+  }
 
-  const sheet = report.sheets.find((s) => s.code === sheetCode) ?? report.sheets[0];
+  // Mở biểu: ưu tiên bản nháp chưa lưu → bản vừa lưu ở màn này → số liệu đã lưu → khung mẫu.
+  if (content && content.id === sheetId && pane?.sheetId !== sheetId) {
+    const draft = drafts.current.get(sheetId) ?? saved.current.get(sheetId);
+    const data = draft ?? parseWorkbook(content.dataJson);
+    setPane({
+      sheetId,
+      workbook: data ?? parseWorkbook(content.templateWorkbookJson),
+      stampLocks: data === null,
+    });
+  }
+
+  // ------------------------------------------------------------ trạng thái màn
+
   const status = displayStatus(report);
-  const editable = !oldEntry && isEditable(report);
-  const sheetEditable = editable && sheet.state === "in_progress";
-  const done = doneCount(report);
-  const remaining = report.sheets.filter((s) => !isSheetDone(s)).map((s) => s.code);
-  const isDirty = dirty.has(sheet.code);
+  const editable = isEditable(report);
+  const sheetDone = sheet ? isSheetDone(sheet.completion) : false;
+  const sheetEditable = editable && sheet !== undefined && !sheetDone;
+  const done = sheets.filter((s) => isSheetDone(s.completion)).length;
+  const remaining = sheets.filter((s) => !isSheetDone(s.completion));
+  const isDirty = sheetId !== undefined && dirty.has(sheetId);
+  const scriptText = content?.id === sheetId ? (content?.scriptText ?? "") : "";
+  const paneReady = pane !== null && pane.sheetId === sheetId;
 
-  const sheetData = useMemo(() => buildSheetData(report, sheet, sheetEditable), [report, sheet, sheetEditable]);
+  const scriptContext = useMemo(
+    () => ({
+      unitName: report.unit.name,
+      periodName: report.period.name,
+      year: report.period.year ?? Number(report.period.fromDate.slice(0, 4)),
+      report: {
+        reportId: String(report.id),
+        sheetCode: sheet?.template.shortName ?? "",
+        status: report.status,
+        organizationCode: report.unit.budgetCode,
+      },
+    }),
+    [report, sheet?.template.shortName]
+  );
+
+  // Rời màn khi còn số chưa lưu: hộp hỏi chung của ứng dụng (UnsavedChangesGuard).
+  useEffect(() => {
+    setWarnWhen(dirty.size > 0);
+  }, [dirty, setWarnWhen]);
+  useEffect(() => () => setWarnWhen(false), [setWarnWhen]);
+
+  const markDirty = useCallback((id: number, on: boolean) => {
+    setDirty((prev) => {
+      if (prev.has(id) === on) return prev;
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const refreshAfterChange = useCallback(
+    () =>
+      Promise.all([
+        invalidate({ resource: SHEETS_RESOURCE, invalidates: ["list"] }),
+        invalidate({ resource: REPORTS_RESOURCE, invalidates: ["detail", "list"], id: report.id }),
+      ]),
+    [invalidate, report.id]
+  );
+
+  /** Giữ đúng số đang thấy trên màn khi bảng tính sắp nạp lại vì đổi chế độ sửa / chỉ xem. */
+  const freezePane = () => {
+    const api = apiRef.current;
+    if (!api || sheetId === undefined) return;
+    const json = api.toJSON();
+    saved.current.set(sheetId, json);
+    setPane({ sheetId, workbook: json, stampLocks: false });
+  };
 
   // ------------------------------------------------------------ thao tác
 
-  const clearDirty = (code: string) =>
-    setDirty((prev) => {
-      if (!prev.has(code)) return prev;
-      const next = new Set(prev);
-      next.delete(code);
-      return next;
-    });
-
-  const setSheetState = (code: string, state: SheetState) =>
-    updateInputReport(report.id, (r) => ({
-      ...r,
-      updatedAt: nowIso(),
-      sheets: r.sheets.map((s) => (s.code === code ? { ...s, state } : s)),
-    }));
-
-  const onCellChange = (rowIndex: number, colIndex: number, value: SheetCell) => {
-    if (!sheetEditable || colIndex !== CURRENT_COL) return;
-    const line = lineIndexOfRow(rowIndex, sheet.lines.length);
-    if (line === null) return;
-    let next: number | null;
-    if (typeof value === "number") next = value;
-    else if (value === null || value.trim() === "") next = null;
-    else {
-      toast.warning(`Ô D${rowIndex + 1} chỉ nhận số. Bạn gõ lại số liệu cho ô này.`);
-      return;
+  const selectSheet = (next: string) => {
+    const nextId = Number(next);
+    if (nextId === sheetId) return;
+    // Số đang gõ dở ở tab cũ được giữ trong bộ nhớ (UC-34 bước 2).
+    if (sheetId !== undefined && dirty.has(sheetId) && apiRef.current) {
+      drafts.current.set(sheetId, apiRef.current.toJSON());
     }
-    const code = sheet.code;
-    updateInputReport(report.id, (r) => ({
-      ...r,
-      sheets: r.sheets.map((s) =>
-        s.code === code
-          ? { ...s, lines: s.lines.map((l, i) => (i === line ? { ...l, current: next } : l)) }
-          : s
-      ),
-    }));
-    setDirty((prev) => new Set(prev).add(code));
+    apiRef.current = null;
+    setSheetId(nextId);
   };
 
-  // Lưu dữ liệu (nút viền + Ctrl+S): chỉ lưu bản nháp, không đổi trạng thái (UC-34).
-  const saveRef = useRef<() => void>(() => {});
-  const save = () => {
-    if (!sheetEditable || saving) return;
-    const code = sheet.code;
-    setSaving(true);
-    window.setTimeout(() => {
-      updateInputReport(report.id, (r) => ({ ...r, updatedAt: nowIso() }));
-      clearDirty(code);
-      setSaving(false);
-      toast.success(`Đã lưu số liệu biểu ${code}.`);
-    }, 400);
+  /** Lưu dữ liệu (nút viền + Ctrl+S): chỉ lưu bản nháp của biểu, không đổi trạng thái (UC-34). */
+  const save = async (quiet = false): Promise<boolean> => {
+    const api = apiRef.current;
+    if (!api || !sheetEditable || sheetId === undefined || !sheet) return false;
+    const json = api.toJSON();
+    setBusy("save");
+    try {
+      const { data } = await updateSheet({
+        resource: SHEETS_RESOURCE,
+        id: sheetId,
+        values: { dataJson: JSON.stringify(json), version: versions.current.get(sheetId) ?? null },
+        meta: { method: "put" },
+        mutationMode: "pessimistic",
+        invalidates: ["list"],
+        successNotification: false,
+        errorNotification: false,
+      });
+      versions.current.set(sheetId, Math.max(data.version, versions.current.get(sheetId) ?? 0));
+      saved.current.set(sheetId, json);
+      drafts.current.delete(sheetId);
+      markDirty(sheetId, false);
+      if (!quiet) toast.success(`Đã lưu số liệu biểu ${sheet.template.shortName}.`);
+      return true;
+    } catch (error) {
+      toast.error(errorMessage(error, "Chưa lưu được số liệu. Bạn thử lại sau ít phút."));
+      return false;
+    } finally {
+      setBusy(null);
+    }
   };
+  const saveRef = useRef(save);
   saveRef.current = save;
 
+  const runSheetAction = async (action: "complete" | "no_data" | "reopen"): Promise<boolean> => {
+    if (sheetId === undefined) return false;
+    try {
+      await postAction({
+        url: sheetActionUrl(sheetId, action),
+        method: "post",
+        values: {},
+        config: JSON_HEADERS,
+        successNotification: false,
+        errorNotification: false,
+      });
+      await refreshAfterChange();
+      return true;
+    } catch (error) {
+      toast.error(errorMessage(error, "Chưa đổi được đánh dấu của biểu. Bạn thử lại sau ít phút."));
+      await refreshAfterChange();
+      return false;
+    }
+  };
+
   /**
-   * Kiểm tra & hoàn tất biểu đang mở (UC-35). `thenSubmit`: phiếu bị trả lại
+   * Kiểm tra & hoàn tất biểu đang mở (UC-35): chạy bước kiểm tra của mẫu ngay
+   * trên trình duyệt, lưu, rồi đánh dấu xong. `thenSubmit`: phiếu bị trả lại
    * dùng một nút "Sửa & nộp lại" — hoàn tất biểu rồi, nếu mọi biểu đã xong,
-   * mở luôn hộp nộp phiếu.
+   * chuyển luôn sang nộp phiếu.
    */
-  const complete = (thenSubmit: boolean) => {
-    const found = validateSheet(sheet);
-    if (found.length > 0) {
-      setIssues(found);
-      return;
+  const complete = async (thenSubmit: boolean) => {
+    const api = apiRef.current;
+    if (!api || !sheet || busy) return;
+    const code = sheet.template.shortName;
+    setBusy("complete");
+    try {
+      const check = await runClientScript(api, scriptText, "validate", scriptContext);
+      if (!check.ok) {
+        setIssues({ purpose: "complete", list: check.messages.map((message) => ({ sheet: code, message })) });
+        return;
+      }
+      // Bản lưu rỗng (workbook không có sheet) coi như chưa lưu: lưu khung đang thấy trên màn.
+      const hasData = parseWorkbook(content?.dataJson) !== null || saved.current.has(sheet.id);
+      if ((isDirty || !hasData) && !(await save(true))) return;
+      freezePane();
+      if (!(await runSheetAction("complete"))) return;
+
+      const left = remaining.filter((s) => s.id !== sheet.id);
+      if (thenSubmit && left.length === 0) {
+        void startSubmit();
+        return;
+      }
+      toast.success(
+        left.length === 0
+          ? `Đã đánh dấu biểu ${code} là nhập xong. Mọi biểu đã xong — bạn bấm Nộp phiếu để gửi Sở.`
+          : `Đã đánh dấu biểu ${code} là nhập xong. Biểu chuyển sang chỉ xem; bấm "Sửa lại" nếu cần nhập tiếp.`
+      );
+    } finally {
+      setBusy((b) => (b === "complete" ? null : b));
     }
-    const code = sheet.code;
-    setSheetState(code, "completed");
-    clearDirty(code);
-    const left = remaining.filter((c) => c !== code);
-    if (thenSubmit && left.length === 0) {
-      setTreasuryOpen(true);
-      return;
-    }
-    toast.success(
-      left.length === 0
-        ? `Đã đánh dấu biểu ${code} là nhập xong. Mọi biểu đã xong — bạn bấm Nộp phiếu để gửi Sở.`
-        : `Đã đánh dấu biểu ${code} là nhập xong. Biểu chuyển sang chỉ xem; bấm "Sửa lại" nếu cần nhập tiếp.`
-    );
   };
 
-  const markNoData = () => {
-    const code = sheet.code;
-    setSheetState(code, "no_data");
-    clearDirty(code);
+  /** Không phát sinh số liệu (UC-36): không kiểm tra; số đã gõ dở được lưu lại rồi giữ nguyên. */
+  const markNoData = async () => {
+    if (!sheet || busy) return;
+    const code = sheet.template.shortName;
     setNoDataOpen(false);
-    toast.success(`Đã ghi nhận: kỳ này biểu ${code} không phát sinh số liệu.`);
+    setBusy("no-data");
+    try {
+      if (isDirty && !(await save(true))) return;
+      freezePane();
+      if (await runSheetAction("no_data")) {
+        toast.success(`Đã ghi nhận: kỳ này biểu ${code} không phát sinh số liệu.`);
+      }
+    } finally {
+      setBusy((b) => (b === "no-data" ? null : b));
+    }
   };
 
-  const reopen = () => {
-    setSheetState(sheet.code, "in_progress");
-    toast.success(`Đã mở lại biểu ${sheet.code} để nhập tiếp.`);
+  /** Sửa lại (UC-37): bỏ đánh dấu để nhập tiếp. */
+  const reopen = async () => {
+    if (!sheet || busy) return;
+    setBusy("reopen");
+    try {
+      freezePane();
+      if (await runSheetAction("reopen")) {
+        toast.success(`Đã mở lại biểu ${sheet.template.shortName} để nhập tiếp.`);
+      }
+    } finally {
+      setBusy((b) => (b === "reopen" ? null : b));
+    }
   };
 
-  const exportExcel = () =>
-    toast.success(`Đã xuất phiếu ${report.periodName} ra tệp ${exportFileName(report, oldEntry?.no)}.`);
+  /**
+   * Nộp phiếu, bước 1: chạy lại bước kiểm tra của mẫu trên MỌI biểu đã nhập xong
+   * (biểu "Không phát sinh số liệu" không kiểm — BR-36.2). Biểu đang mở kiểm ngay
+   * trên màn; các biểu khác nạp vào bảng tính ẩn (`SheetValidator`).
+   */
+  const startSubmit = async () => {
+    setBusy("validate");
+    const issuesHere: SheetIssue[] = [];
+    try {
+      const provider = dataProvider();
+      const jobs: ValidationJob[] = [];
+      for (const s of sheets) {
+        if (s.completion !== "COMPLETED") continue;
+        const code = s.template.shortName;
+        const context = {
+          ...scriptContext,
+          report: { ...scriptContext.report, sheetCode: code },
+        };
+        if (s.id === sheetId && apiRef.current) {
+          const result = await runClientScript(apiRef.current, scriptText, "validate", context);
+          if (!result.ok) issuesHere.push(...result.messages.map((message) => ({ sheet: code, message })));
+          continue;
+        }
+        const { data } = await provider.getOne<InputReportSheetRecord>({ resource: SHEETS_RESOURCE, id: s.id });
+        const script = data.scriptText ?? "";
+        if (script.trim() === "") continue;
+        jobs.push({
+          sheetId: s.id,
+          code,
+          workbook: parseWorkbook(data.dataJson) ?? parseWorkbook(data.templateWorkbookJson),
+          scriptText: script,
+          context,
+        });
+      }
+      if (jobs.length === 0) {
+        finishValidation(issuesHere);
+        return;
+      }
+      pendingIssues.current = issuesHere;
+      setValidationJobs(jobs);
+    } catch (error) {
+      setBusy(null);
+      toast.error(errorMessage(error, "Chưa kiểm tra được số liệu của phiếu. Bạn thử lại sau ít phút."));
+    }
+  };
 
-  const setFiles = (files: TreasuryFile[]) => updateInputReport(report.id, (r) => ({ ...r, attachments: files }));
-  const setConfirmed = (v: boolean) => updateInputReport(report.id, (r) => ({ ...r, treasuryConfirmed: v }));
+  const finishValidation = (found: SheetIssue[]) => {
+    setValidationJobs(null);
+    setBusy(null);
+    if (found.length > 0) {
+      setIssues({ purpose: "submit", list: found });
+      return;
+    }
+    setTreasuryOpen(true);
+  };
 
-  const submit = () => {
-    const at = nowIso();
-    updateInputReport(report.id, (r) => ({
-      ...r,
-      status: "submitted",
-      submittedAt: at,
-      updatedAt: at,
-      returnReason: undefined, // BR-38.4
-      history: r.history.map((h, i) =>
-        i === 0
-          ? {
-              ...h,
-              tone: STATUS_META.submitted.tone,
-              statusLabel: STATUS_META.submitted.label,
-              meta: `Nộp ngày ${formatDateTime(at)} · chờ Sở duyệt`,
-              reason: undefined,
-            }
-          : h
-      ),
-    }));
-    setDirty(new Set());
-    setConfirmOpen(false);
-    toast.success(`Đã nộp phiếu ${report.periodName}. Phiếu đang chờ Sở duyệt.`);
+  /** Nộp phiếu, bước cuối (UC-38, UC-43): cả phiếu một lần. */
+  const submit = async () => {
+    setBusy("submit");
+    try {
+      await postAction({
+        url: reportActionUrl(report.id, "submit"),
+        method: "post",
+        values: {},
+        config: JSON_HEADERS,
+        successNotification: false,
+        errorNotification: false,
+      });
+      setConfirmOpen(false);
+      drafts.current.clear();
+      setDirty(new Set());
+      setWarnWhen(false);
+      toast.success(
+        `Đã nộp phiếu ${report.period.name}; đang chờ Sở duyệt. Số liệu chỉ được ghi nhận khi phiếu được phê duyệt.`
+      );
+      await refreshAfterChange();
+    } catch (error) {
+      setConfirmOpen(false);
+      toast.error(errorMessage(error, "Chưa nộp được phiếu. Bạn thử lại sau ít phút."));
+      await refreshAfterChange();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const exportExcel = () => {
+    const overrides = new Map(drafts.current);
+    if (sheetId !== undefined && apiRef.current) overrides.set(sheetId, apiRef.current.toJSON());
+    void exportReport(report, overrides);
   };
 
   // ------------------------------------------------------------ phím tắt
 
   // Ctrl+S = Lưu, chặn hộp "Lưu trang" của trình duyệt (nguyên tắc §11).
   const editableRef = useRef(sheetEditable);
-  editableRef.current = sheetEditable && !loading;
+  editableRef.current = sheetEditable && paneReady;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (editableRef.current) saveRef.current();
+        if (editableRef.current) void saveRef.current();
         else toast.info("Biểu này đang ở chế độ chỉ xem nên không có gì để lưu.");
       }
     };
@@ -278,18 +523,16 @@ function WorkScreen({ report }: { report: InputReport }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [fullscreen, anyDialogOpen, exitFullscreen]);
 
-  // Đóng tab khi còn số chưa lưu: trình duyệt bắt buộc dùng hộp của nó.
-  useEffect(() => {
-    if (dirty.size === 0) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
-
   // ------------------------------------------------------------ nút theo trạng thái
 
   const commonItems: ActionItem[] = [
-    { key: "excel", label: "Xuất Excel", icon: Download, onSelect: exportExcel },
+    {
+      key: "excel",
+      label: "Xuất Excel",
+      icon: Download,
+      onSelect: exportExcel,
+      disabled: exporting || sheets.length === 0,
+    },
     { key: "history", label: "Lịch sử phiên bản", icon: RotateCcwClock, onSelect: () => setHistoryOpen(true) },
   ];
 
@@ -297,38 +540,40 @@ function WorkScreen({ report }: { report: InputReport }) {
   let secondary: PrimaryAction[] = [];
   let items: ActionItem[] = commonItems;
   let blockedReason: string | undefined;
+  const code = sheet?.template.shortName ?? "";
 
-  if (editable && sheet.state === "in_progress") {
+  if (sheetEditable) {
     // Biểu đang mở chưa xong: [Lưu dữ liệu] [Kiểm tra & hoàn tất | Sửa & nộp lại] ⋯
-    secondary = [{ label: "Lưu dữ liệu", icon: Save, onClick: save, loading: saving }];
+    secondary = [{ label: "Lưu dữ liệu", icon: Save, onClick: () => void save(), loading: busy === "save" }];
     primary =
-      report.status === "returned"
-        ? { label: "Sửa & nộp lại", onClick: () => complete(true) }
-        : { label: "Kiểm tra & hoàn tất", onClick: () => complete(false) };
+      report.status === "RETURNED"
+        ? { label: "Sửa & nộp lại", onClick: () => void complete(true), loading: busy === "complete" }
+        : { label: "Kiểm tra & hoàn tất", onClick: () => void complete(false), loading: busy === "complete" };
     items = [
       { key: "no-data", label: "Không phát sinh số liệu", icon: CircleOff, onSelect: () => setNoDataOpen(true) },
       ...commonItems,
     ];
-  } else if (editable) {
+  } else if (editable && sheet) {
     // Biểu đang mở đã xong: nút chính là Nộp phiếu (mờ + lý do nếu còn biểu chưa xong).
     blockedReason =
       remaining.length > 0
-        ? `Chưa nhập xong tất cả các biểu: còn biểu ${remaining.join(", ")}.`
+        ? `Chưa nhập xong tất cả các biểu: còn biểu ${remaining.map((s) => s.template.shortName).join(", ")}.`
         : undefined;
     primary = {
-      label: report.status === "returned" ? "Nộp lại phiếu" : "Nộp phiếu",
-      onClick: () => setTreasuryOpen(true),
+      label: report.status === "RETURNED" ? "Nộp lại phiếu" : "Nộp phiếu",
+      onClick: () => void startSubmit(),
       disabled: remaining.length > 0,
       reason: blockedReason,
+      loading: busy === "validate" || busy === "submit",
     };
     items = [
-      { key: "reopen", label: `Sửa lại biểu ${sheet.code}`, icon: Pencil, onSelect: reopen },
+      { key: "reopen", label: `Sửa lại biểu ${code}`, icon: Pencil, onSelect: () => void reopen() },
       ...commonItems,
     ];
   }
 
-  if (loading) {
-    // Đang mở phiếu: các nút hiện nhưng mờ (Figma 310:56441).
+  if (!paneReady || busy !== null) {
+    // Đang mở biểu / đang gửi: các nút hiện nhưng mờ (Figma 310:56441).
     primary = primary && { ...primary, disabled: true, reason: undefined };
     secondary = secondary.map((a) => ({ ...a, disabled: true }));
     items = items.map((i) => ({ ...i, disabled: true }));
@@ -336,21 +581,13 @@ function WorkScreen({ report }: { report: InputReport }) {
 
   // ------------------------------------------------------------ đầu thẻ
 
-  const badge = oldEntry ? (
-    <StatusBadge tone={oldEntry.tone}>{oldEntry.statusLabel}</StatusBadge>
-  ) : (
-    <StatusBadge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</StatusBadge>
-  );
-
-  const metaParts: string[] = [report.periodName, `Phiên bản ${oldEntry?.no ?? report.revision}`];
-  if (oldEntry) {
-    metaParts.push(oldEntry.meta, "chỉ xem");
-  } else {
-    metaParts.push(`${done}/${report.sheets.length} biểu`);
-    if (status !== "draft") metaParts.push(statusLine(report));
-    if (blockedReason) metaParts.push(blockedReason);
-  }
-  if (sheet.state === "no_data") metaParts.push(`Biểu ${sheet.code}: không phát sinh số liệu`);
+  const metaParts: string[] = [report.period.name, `Phiên bản ${report.revisionNo}`];
+  metaParts.push(`${done}/${sheets.length} biểu`);
+  if (status !== "draft") metaParts.push(statusLine(report));
+  const lockedReason = readOnlyReason(report);
+  if (lockedReason) metaParts.push(lockedReason);
+  if (blockedReason) metaParts.push(blockedReason);
+  if (sheet?.completion === "NO_DATA") metaParts.push(`Biểu ${code}: không phát sinh số liệu`);
 
   const meta = (
     <span>
@@ -382,88 +619,147 @@ function WorkScreen({ report }: { report: InputReport }) {
     </Tooltip>
   );
 
-  const confirmSummary = {
-    sheets: `Số biểu: ${report.sheets.length} biểu, đã nhập xong hết`,
-    total: (() => {
-      const main = report.sheets.find((s) => s.code === "1b");
-      return main && main.state !== "no_data"
-        ? `Tổng chi trả kỳ này (biểu 1b): ${sheetCurrentTotal(main)} ${main.unit}`
-        : null;
-    })(),
-    files: `Xác nhận của Kho bạc: ${report.attachments.length} tệp đã đính kèm`,
+  const renderBody = () => {
+    if (sheetsQuery.isError || contentQuery.isError) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Chưa mở được biểu"
+          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void sheetsQuery.refetch();
+                void contentQuery.refetch();
+              }}
+            >
+              Thử lại
+            </Button>
+          }
+        />
+      );
+    }
+    if (!sheetsQuery.isLoading && sheets.length === 0) {
+      return (
+        <EmptyState
+          icon={SearchX}
+          title="Phiếu chưa có biểu nào"
+          description="Sở Tài chính chưa giao biểu nào cho đơn vị trong phiếu này."
+        />
+      );
+    }
+    if (!paneReady || !pane || sheetId === undefined) {
+      return <LoadingState label="Đang mở phiếu…" />;
+    }
+    const paneSheetId = pane.sheetId;
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <SpreadWorkbook
+          key={paneSheetId}
+          workbook={pane.workbook}
+          readOnly={!sheetEditable}
+          hideTabs
+          stampInputLocks={pane.stampLocks}
+          scriptText={scriptText}
+          scriptContext={scriptContext}
+          onDirtyChange={(d) => {
+            if (d) markDirty(paneSheetId, true);
+          }}
+          onReady={(api) => {
+            apiRef.current = api;
+          }}
+          className="h-full min-h-[360px] flex-1"
+        />
+      </div>
+    );
   };
 
   const card = (
     <WorkCard
-      title={`${report.periodName} — ${report.orgName}`}
-      badge={badge}
+      title={`${report.period.name} — ${report.unit.name}`}
+      badge={<StatusBadge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</StatusBadge>}
       meta={meta}
       backTo={LIST_PATH}
       fill={!fullscreen}
       className={cn(fullscreen && "h-full rounded-none border-0 shadow-none")}
       actions={<HeaderActions primary={primary} secondary={secondary} items={items} />}
       footer={
-        <SheetTabs
-          tabs={report.sheets.map((s) => ({ key: s.code, label: s.code, done: isSheetDone(s) }))}
-          value={sheet.code}
-          onChange={setSheetCode}
-          maxVisible={6}
-          trailing={fullscreenButton}
-        />
+        sheets.length > 0 && sheetId !== undefined ? (
+          <SheetTabs
+            tabs={sheets.map((s) => ({
+              key: String(s.id),
+              label: s.template.shortName,
+              done: isSheetDone(s.completion),
+            }))}
+            value={String(sheetId)}
+            onChange={selectSheet}
+            maxVisible={6}
+            trailing={fullscreenButton}
+          />
+        ) : undefined
       }
     >
-      {loading ? (
-        <LoadingState label="Đang mở phiếu…" variant="panel" />
-      ) : (
-        <SpreadsheetView
-          sheet={sheetData}
-          readOnly={!sheetEditable}
-          minRows={30}
-          onCellChange={sheetEditable ? onCellChange : undefined}
-        />
-      )}
+      {renderBody()}
     </WorkCard>
   );
+
+  const doneSheets = sheets.filter((s) => isSheetDone(s.completion));
+  const confirmSummary = {
+    sheets: `Số biểu: ${sheets.length} biểu, đã nhập xong hết`,
+    total:
+      doneSheets.filter((s) => s.completion === "NO_DATA").length > 0
+        ? `Biểu không phát sinh số liệu: ${doneSheets
+            .filter((s) => s.completion === "NO_DATA")
+            .map((s) => s.template.shortName)
+            .join(", ")}`
+        : null,
+    files: "Xác nhận của Kho bạc: đã đính kèm tệp và tích xác nhận",
+  };
 
   return (
     <>
       {fullscreen ? <div className="fixed inset-0 z-40 flex flex-col bg-background">{card}</div> : card}
 
+      {validationJobs && (
+        <SheetValidator
+          jobs={validationJobs}
+          onDone={(found) => finishValidation([...pendingIssues.current, ...found])}
+        />
+      )}
+
       <RevisionHistoryDialog
         report={report}
         open={historyOpen}
         onOpenChange={setHistoryOpen}
-        viewingRevision={oldEntry?.no}
-        onView={(no) => {
+        onView={(revisionId) => {
           setHistoryOpen(false);
-          setSearchParams(no === report.revision ? {} : { [REVISION_PARAM]: String(no) });
+          navigate(workPath(revisionId));
         }}
       />
 
       <ConfirmDialog
         open={noDataOpen}
         onOpenChange={setNoDataOpen}
-        title={`Khai biểu ${sheet.code} không phát sinh số liệu?`}
-        description={`Biểu ${sheet.code} sẽ được tính là đã xong và chuyển sang chỉ xem. Số liệu bạn đã gõ dở vẫn được giữ lại nhưng sẽ không được kiểm tra khi nộp. Bạn có thể bấm Sửa lại để nhập tiếp.`}
+        title={`Khai biểu ${code} không phát sinh số liệu?`}
+        description={`Biểu ${code} sẽ được tính là đã xong và chuyển sang chỉ xem. Số liệu bạn đã gõ dở vẫn được giữ lại nhưng sẽ không được kiểm tra khi nộp. Bạn có thể bấm Sửa lại để nhập tiếp.`}
         confirmLabel="Không phát sinh số liệu"
         cancelLabel="Quay lại"
-        onConfirm={markNoData}
+        onConfirm={() => void markNoData()}
       />
 
       <CheckErrorsDialog
-        sheetCode={sheet.code}
-        issues={issues}
-        open={issues.length > 0}
-        onOpenChange={(o) => !o && setIssues([])}
+        purpose={issues?.purpose === "submit" ? { kind: "submit" } : { kind: "complete", sheetCode: code }}
+        issues={issues?.list ?? []}
+        open={issues !== null}
+        onOpenChange={(o) => !o && setIssues(null)}
       />
 
       <TreasurySubmitDialog
+        reportId={report.id}
         open={treasuryOpen}
         onOpenChange={setTreasuryOpen}
-        files={report.attachments}
-        onFilesChange={setFiles}
-        confirmed={report.treasuryConfirmed}
-        onConfirmedChange={setConfirmed}
         onSubmit={() => {
           setTreasuryOpen(false);
           setConfirmOpen(true);
@@ -471,11 +767,12 @@ function WorkScreen({ report }: { report: InputReport }) {
       />
 
       <SubmitConfirmDialog
-        periodName={report.periodName}
+        periodName={report.period.name}
         summary={confirmSummary}
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        onConfirm={submit}
+        onConfirm={() => void submit()}
+        pending={busy === "submit"}
       />
     </>
   );

@@ -1,86 +1,17 @@
 import type { StatusTone } from "@/shared/components/asxh";
 
+import type { ApiSheetCompletion, DisplayKey, InputReportRecord, InputReportSheetRecord } from "./api";
+
 /**
- * Kiểu dữ liệu và quy tắc hiển thị của phiếu nhập phía đơn vị.
+ * Quy tắc hiển thị của phiếu nhập phía đơn vị (UC-33..45).
  *
- * Tên trạng thái ở đây là tên nội bộ, KHÔNG đưa lên giao diện — chữ người dùng
- * thấy lấy từ `STATUS_META`.
+ * Mở nhập theo TRẠNG THÁI KỲ: phiếu Đang nhập liệu / Bị trả lại chỉ nhập được khi
+ * kỳ Đang mở. "Quá hạn" không phải trạng thái phiếu mà là phiếu chưa nộp của kỳ
+ * Quá hạn — bị khoá nhập hẳn (chờ Sở gia hạn).
  */
 
-/** Trạng thái phiếu (UC-33..38). "Quá hạn" không phải trạng thái riêng — xem `displayStatus`. */
-export type ReportStatus = "draft" | "returned" | "submitted" | "approved" | "locked";
-
-/** Trạng thái kỳ báo cáo — quyết định phiếu còn nhập được hay không. */
-export type PeriodState = "open" | "overdue" | "closed";
-
-/** Trạng thái một tờ biểu trong phiếu. */
-export type SheetState = "in_progress" | "completed" | "no_data";
-
-/** Trạng thái để hiển thị: thêm "overdue" = phiếu đang nhập của kỳ đã quá hạn. */
-export type DisplayStatus = ReportStatus | "overdue";
-
-export type SheetLine = {
-  label: string;
-  /** Cột C */
-  previous: number | null;
-  /** Cột D — cột đơn vị nhập */
-  current: number | null;
-  note?: string;
-};
-
-export type ReportSheet = {
-  /** Tên ngắn trên tab: "1a", "1b"… */
-  code: string;
-  title: string;
-  unit: string;
-  /** Tiêu đề ba cột số C, D, E (E = C + D). */
-  headers: [string, string, string];
-  lines: SheetLine[];
-  state: SheetState;
-};
-
-export type TreasuryFile = {
-  id: string;
-  name: string;
-  size: number;
-  /** Tệp thật người dùng vừa chọn (tệp mẫu thì không có). */
-  file?: File;
-};
-
-export type RevisionEntry = {
-  no: number;
-  tone: StatusTone;
-  statusLabel: string;
-  meta: string;
-  reason?: string;
-};
-
-export type InputReport = {
-  id: string;
-  periodName: string;
-  /** yyyy-MM-dd */
-  periodFrom: string;
-  periodTo: string;
-  dueDate: string;
-  periodState: PeriodState;
-  orgName: string;
-  templateSet: string;
-  templateVersion: string;
-  revision: number;
-  status: ReportStatus;
-  /** yyyy-MM-ddTHH:mm:ss */
-  updatedAt: string;
-  submittedAt?: string;
-  approvedAt?: string;
-  lockedAt?: string;
-  returnedAt?: string;
-  returnReason?: string;
-  sheets: ReportSheet[];
-  attachments: TreasuryFile[];
-  treasuryConfirmed: boolean;
-  /** Mới → cũ. Phần tử đầu là phiên bản hiện tại. */
-  history: RevisionEntry[];
-};
+/** Trạng thái để hiển thị. */
+export type DisplayStatus = DisplayKey | "cancelled" | "superseded";
 
 export const STATUS_META: Record<DisplayStatus, { label: string; tone: StatusTone }> = {
   draft: { label: "Đang nhập liệu", tone: "info" },
@@ -89,57 +20,77 @@ export const STATUS_META: Record<DisplayStatus, { label: string; tone: StatusTon
   overdue: { label: "Quá hạn", tone: "overdue" },
   locked: { label: "Đã chốt", tone: "locked" },
   approved: { label: "Đã phê duyệt", tone: "success" },
+  cancelled: { label: "Đã huỷ", tone: "neutral" },
+  superseded: { label: "Bản cũ", tone: "neutral" },
 };
 
 /** Thứ tự các lựa chọn trong ô lọc Trạng thái. */
-export const STATUS_OPTIONS: DisplayStatus[] = [
-  "draft",
-  "returned",
-  "submitted",
-  "overdue",
-  "locked",
-  "approved",
-];
+export const STATUS_OPTIONS: DisplayKey[] = ["draft", "returned", "submitted", "overdue", "locked", "approved"];
 
-export function displayStatus(r: InputReport): DisplayStatus {
-  if (r.status === "draft" && r.periodState === "overdue") return "overdue";
-  return r.status;
+export function displayStatus(r: InputReportRecord): DisplayStatus {
+  switch (r.status) {
+    case "DRAFT":
+      return r.period.status === "overdue" ? "overdue" : "draft";
+    case "RETURNED":
+      return "returned";
+    case "SUBMITTED":
+      return "submitted";
+    case "APPROVED":
+      return "approved";
+    case "LOCKED":
+      return "locked";
+    case "CANCELLED":
+      return "cancelled";
+    case "SUPERSEDED":
+      return "superseded";
+  }
 }
 
-/** BR-34.2: nhập được khi phiếu Đang nhập liệu / Bị trả lại VÀ kỳ đang mở. */
-export function isEditable(r: InputReport): boolean {
-  return (r.status === "draft" || r.status === "returned") && r.periodState === "open";
+/** BR-34.2: nhập được khi phiếu Đang nhập liệu / Bị trả lại VÀ kỳ Đang mở. */
+export function isEditable(r: InputReportRecord): boolean {
+  return (r.status === "DRAFT" || r.status === "RETURNED") && r.period.status === "open";
 }
 
-export function isSheetDone(s: ReportSheet): boolean {
-  return s.state !== "in_progress";
+export function isSheetDone(completion: ApiSheetCompletion): boolean {
+  return completion === "COMPLETED" || completion === "NO_DATA";
 }
 
-export function doneCount(r: InputReport): number {
-  return r.sheets.filter(isSheetDone).length;
+/**
+ * Phiếu đã có gì để xem chưa (UC-33 5a). Danh sách chỉ biết số biểu đã xong, nên
+ * "đã nhập" ở đây là đã xong ít nhất một biểu hoặc đã từng nộp.
+ */
+export function hasAnyData(r: InputReportRecord): boolean {
+  return r.progress.done > 0 || r.submittedAt !== null;
 }
 
-/** Phiếu đã có gì để xem chưa (UC-33 5a). */
-export function hasAnyData(r: InputReport): boolean {
-  return r.sheets.some((s) => isSheetDone(s) || s.lines.some((l) => l.current !== null));
+/** Biểu nên mở đầu tiên: biểu đầu chưa xong nếu còn nhập được, không thì biểu đầu. */
+export function firstSheetToOpen(r: InputReportRecord, sheets: InputReportSheetRecord[]): number | undefined {
+  const open = isEditable(r) ? sheets.find((s) => !isSheetDone(s.completion)) : undefined;
+  return (open ?? sheets[0])?.id;
 }
 
 // ---------------------------------------------------------------- ngày giờ
 
-/** "Hôm nay" của dữ liệu mẫu — để chữ "còn 3 ngày" khớp thiết kế. */
-export const TODAY = "2027-01-12";
-
-/** Thời điểm hiện tại trong dữ liệu mẫu: ngày TODAY + giờ thật của máy. */
-export function nowIso(): string {
-  const d = new Date();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${TODAY}T${hh}:${mm}:00`;
-}
-
 function dayNumber(isoDate: string): number {
   const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number);
   return Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
+}
+
+/** "Hôm nay" theo giờ máy, dạng yyyy-MM-dd. */
+export function todayIso(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/** Ngày lịch (yyyy-MM-dd, giờ máy) của một thời điểm ISO có múi giờ. */
+function localDateOf(instant: string): string {
+  const d = new Date(instant);
+  if (Number.isNaN(d.getTime())) return instant.slice(0, 10);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 /** b − a theo ngày lịch. */
@@ -168,15 +119,19 @@ export function formatRange(from: string, to: string): string {
 export type DueLine = { text: string; tone?: "destructive" };
 
 /** Dòng phụ dưới Hạn nộp (UC-33 bước 4). */
-export function dueLine(r: InputReport): DueLine {
-  if (r.status === "locked") return { text: "Kỳ đã chốt" };
-  if (r.submittedAt && (r.status === "submitted" || r.status === "approved")) {
-    const late = daysBetween(r.dueDate, r.submittedAt);
+export function dueLine(r: InputReportRecord): DueLine {
+  const due = r.period.deadline;
+  if (r.status === "LOCKED") return { text: "Kỳ đã chốt" };
+  if (r.submittedAt && (r.status === "SUBMITTED" || r.status === "APPROVED")) {
+    if (!due) return { text: "Đã nộp" };
+    const late = daysBetween(due, localDateOf(r.submittedAt));
     return late > 0 ? { text: `Nộp muộn ${late} ngày` } : { text: "Đã nộp đúng hạn" };
   }
-  if (r.status === "approved") return { text: "Đã nộp đúng hạn" };
-  if (r.periodState === "overdue") return { text: "Hết hạn nộp", tone: "destructive" };
-  const left = daysBetween(TODAY, r.dueDate);
+  if (r.status === "APPROVED") return { text: "Đã nộp đúng hạn" };
+  if (r.period.status === "overdue") return { text: "Hết hạn nộp", tone: "destructive" };
+  if (r.period.status === "published") return { text: "Kỳ chưa mở nhập" };
+  if (!due) return { text: "" };
+  const left = daysBetween(todayIso(), due);
   if (left > 0) return { text: `còn ${left} ngày` };
   if (left === 0) return { text: "Hạn chót hôm nay" };
   return { text: "Hết hạn nộp", tone: "destructive" };

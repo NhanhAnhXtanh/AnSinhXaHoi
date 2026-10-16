@@ -1,6 +1,14 @@
-import { Eye } from "lucide-react";
+import { useCustom } from "@refinedev/core";
+import { Eye, TriangleAlert } from "lucide-react";
 
-import { StatusBadge, formatDateTime, type StatusTone } from "@/shared/components/asxh";
+import {
+  EmptyState,
+  LoadingState,
+  StatusBadge,
+  formatDateTime,
+  type StatusTone,
+} from "@/shared/components/asxh";
+import { customResult } from "@/shared/hooks/use-custom-result";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -11,65 +19,65 @@ import {
 } from "@/shared/ui/dialog";
 import { cn } from "@/shared/lib/utils";
 
-import type { ReviewReport } from "../fixtures";
-import { STATUS_META } from "../model";
+import { historyUrl, type InputReportHistory, type InputReportRecord } from "../api";
 
-export type VersionEntry = {
-  no: number;
-  label: string;
-  tone: StatusTone;
-  detail: string;
-  reason?: string;
-};
+type Revision = InputReportHistory["revisions"][number];
 
-/** Mọi phiên bản của phiếu, mới → cũ. Bản cuối là bản đang xử lý. */
-export function versionsOf(r: ReviewReport): VersionEntry[] {
-  const old: VersionEntry[] = r.previousVersions.map((v) => ({
-    no: v.no,
-    label: "Bị trả lại",
-    tone: "destructive",
-    detail: `Nộp ngày ${formatDateTime(v.submittedAt)} · Sở trả lại ngày ${formatDateTime(v.returnedAt)}`,
-    reason: v.reason,
-  }));
-
-  const currentNo = r.previousVersions.length + 1;
-  const meta = STATUS_META[r.status];
-  let detail = "Đơn vị đang nhập số liệu, chưa nộp";
-  if (r.submittedAt) {
-    detail = `Nộp ngày ${formatDateTime(r.submittedAt)}`;
-    if (r.status === "approved" && r.approvedAt) {
-      detail += ` · Sở duyệt ngày ${formatDateTime(r.approvedAt)}`;
-    }
-    if (r.status === "returned" && r.returnedAt) {
-      detail += ` · Sở trả lại ngày ${formatDateTime(r.returnedAt)}`;
-    }
+function revisionBadge(r: Revision): { label: string; tone: StatusTone } {
+  switch (r.status) {
+    case "SUPERSEDED":
+    case "RETURNED":
+      return { label: "Bị trả lại", tone: "destructive" };
+    case "SUBMITTED":
+      return { label: "Chờ duyệt", tone: "warning" };
+    case "APPROVED":
+      return { label: "Đã phê duyệt", tone: "success" };
+    case "LOCKED":
+      return { label: "Đã chốt", tone: "locked" };
+    case "CANCELLED":
+      return { label: "Đã huỷ", tone: "neutral" };
+    case "DRAFT":
+      return { label: "Chưa nộp", tone: "neutral" };
   }
-  const current: VersionEntry = {
-    no: currentNo,
-    label: r.status === "returned" ? "Bị trả lại" : meta.label,
-    tone: meta.tone,
-    detail,
-    reason: r.status === "returned" ? r.returnReason : undefined,
-  };
-
-  return [current, ...old.reverse()];
 }
 
+function revisionDetail(r: Revision): string {
+  const parts: string[] = [];
+  if (r.submittedAt) parts.push(`Nộp ngày ${formatDateTime(r.submittedAt)}`);
+  if (r.status === "SUPERSEDED" && r.returnedAt) parts.push(`Sở trả lại ngày ${formatDateTime(r.returnedAt)}`);
+  if (r.approvedAt) parts.push(`Sở duyệt ngày ${formatDateTime(r.approvedAt)}`);
+  if (parts.length === 0) {
+    parts.push(r.status === "RETURNED" ? "Đơn vị đang sửa để nộp lại" : "Đơn vị đang nhập số liệu, chưa nộp");
+  }
+  return parts.join(" · ");
+}
+
+/**
+ * Mọi phiên bản của phiếu, mới → cũ (UC-44). Mỗi lần Sở trả lại sinh một phiên
+ * bản mới (BR-42.1); mỗi phiên bản có id riêng — "Xem" trả id đó để mở thẳng.
+ */
 export function VersionHistoryDialog({
   report,
   open,
   onOpenChange,
-  viewingNo,
+  viewingId,
   onView,
 }: {
-  report: ReviewReport;
+  report: InputReportRecord;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Phiên bản đang mở trên màn; bỏ trống khi mở từ danh sách. */
-  viewingNo?: number;
-  onView: (no: number) => void;
+  viewingId?: number;
+  onView: (revisionId: number) => void;
 }) {
-  const versions = versionsOf(report);
+  const { result, query } = useCustom<InputReportHistory>({
+    url: historyUrl(report.id),
+    method: "get",
+    queryOptions: { enabled: open },
+    errorNotification: false,
+  });
+  const history = customResult(result?.data, "revisions");
+  const versions = history?.revisions ?? [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,61 +85,74 @@ export function VersionHistoryDialog({
         <DialogHeader className="px-6 pt-6 pb-4 text-left">
           <DialogTitle>Lịch sử phiên bản</DialogTitle>
           <DialogDescription>
-            {report.period.name} · {report.orgName} · {versions.length} phiên bản
+            {report.period.name} · {report.unit.name}
+            {history ? ` · ${versions.length} phiên bản` : ""}
           </DialogDescription>
         </DialogHeader>
 
-        <ol className="flex flex-col px-6 pb-5">
-          {versions.map((v, i) => {
-            const isLast = i === versions.length - 1;
-            const isViewing = v.no === viewingNo;
-            return (
-              <li key={v.no} className="flex gap-3">
-                <div className="flex w-2 shrink-0 flex-col items-center pt-2.5">
-                  <span
-                    className={cn(
-                      "size-2 shrink-0 rounded-full",
-                      i === 0 ? "bg-primary" : "bg-muted-foreground/50"
-                    )}
-                  />
-                  {!isLast && <span className="bg-border mt-1 w-px flex-1" />}
-                </div>
-                <div className={cn("flex min-w-0 flex-1 flex-col gap-1.5", !isLast && "pb-4")}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Phiên bản {v.no}</span>
-                    <StatusBadge tone={v.tone}>{v.label}</StatusBadge>
-                    {isViewing ? (
-                      <span
-                        aria-current="true"
-                        className="bg-accent text-accent-foreground ms-auto inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium"
-                      >
-                        <Eye className="size-4" />
-                        Đang xem
-                      </span>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="ms-auto"
-                        onClick={() => onView(v.no)}
-                      >
-                        <Eye />
-                        Xem
-                      </Button>
+        {query.isLoading ? (
+          <LoadingState label="Đang tải lịch sử…" />
+        ) : query.isError ? (
+          <EmptyState
+            icon={TriangleAlert}
+            title="Chưa tải được lịch sử phiếu"
+            description="Bạn đóng hộp này rồi mở lại sau ít giây."
+          />
+        ) : (
+          <ol className="flex max-h-[60vh] flex-col overflow-y-auto px-6 pb-5">
+            {versions.map((v, i) => {
+              const isLast = i === versions.length - 1;
+              const isViewing = v.id === viewingId;
+              const badge = revisionBadge(v);
+              return (
+                <li key={v.id} className="flex gap-3">
+                  <div className="flex w-2 shrink-0 flex-col items-center pt-2.5">
+                    <span
+                      className={cn(
+                        "size-2 shrink-0 rounded-full",
+                        i === 0 ? "bg-primary" : "bg-muted-foreground/50"
+                      )}
+                    />
+                    {!isLast && <span className="bg-border mt-1 w-px flex-1" />}
+                  </div>
+                  <div className={cn("flex min-w-0 flex-1 flex-col gap-1.5", !isLast && "pb-4")}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Phiên bản {v.revisionNo}</span>
+                      <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                      {isViewing ? (
+                        <span
+                          aria-current="true"
+                          className="bg-accent text-accent-foreground ms-auto inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium"
+                        >
+                          <Eye className="size-4" />
+                          Đang xem
+                        </span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="ms-auto"
+                          onClick={() => onView(v.id)}
+                        >
+                          <Eye />
+                          Xem
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground text-xs">{revisionDetail(v)}</p>
+                    {/* Lý do nằm ở bản Sở đã chê; bản kế tiếp chỉ mang lại cùng lý do. */}
+                    {v.returnReason && v.status === "SUPERSEDED" && (
+                      <p className="bg-surface-subtle rounded-md border px-3 py-2 text-sm">
+                        Lý do: {v.returnReason}
+                      </p>
                     )}
                   </div>
-                  <p className="text-muted-foreground text-xs">{v.detail}</p>
-                  {v.reason && (
-                    <p className="bg-surface-subtle rounded-md border px-3 py-2 text-sm">
-                      Lý do: {v.reason}
-                    </p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+                </li>
+              );
+            })}
+          </ol>
+        )}
 
         <div className="bg-surface-subtle flex justify-end rounded-b-lg border-t px-6 py-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

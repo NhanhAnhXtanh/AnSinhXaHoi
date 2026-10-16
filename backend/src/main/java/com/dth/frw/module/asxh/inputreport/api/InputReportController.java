@@ -1,9 +1,12 @@
 package com.dth.frw.module.asxh.inputreport.api;
 
 import com.dth.frw.domain.asxh.report.InputReport;
+import com.dth.frw.module.asxh.inputreport.api.dto.InputReportHistoryResponse;
 import com.dth.frw.module.asxh.inputreport.api.dto.InputReportResponse;
+import com.dth.frw.module.asxh.inputreport.api.dto.InputReportSummaryResponse;
 import com.dth.frw.module.asxh.inputreport.api.dto.ReturnReportRequest;
 import com.dth.frw.module.asxh.inputreport.security.InputReportPermissions;
+import com.dth.frw.module.asxh.inputreport.service.InputReportQueryService;
 import com.dth.frw.module.asxh.inputreport.service.InputReportService;
 import com.dth.frw.shared.web.ListParams;
 import com.dth.frw.shared.web.ListResponse;
@@ -35,14 +38,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class InputReportController {
 
     private final InputReportService service;
+    private final InputReportQueryService queries;
 
-    public InputReportController(InputReportService service) {
+    public InputReportController(InputReportService service, InputReportQueryService queries) {
         this.service = service;
+        this.queries = queries;
     }
 
     /**
-     * {@code getList} và {@code getMany}. Lọc: {@code period.id}, {@code unit.id},
-     * {@code status}, {@code year}, {@code publication.id}, {@code includeSuperseded}, {@code q}.
+     * {@code getList} và {@code getMany}. Lọc: {@code period.id}, {@code period.status},
+     * {@code unit.id}, {@code status} (nhiều giá trị cách dấu phẩy), {@code display} (trạng thái
+     * hiển thị: draft, overdue, returned, submitted, approved, locked), {@code year},
+     * {@code templateSet.id}, {@code publication.id}, {@code includeSuperseded}, {@code q}.
      */
     @GetMapping
     @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_READ + "')")
@@ -60,10 +67,28 @@ public class InputReportController {
         return ListResponse.of(withProgress(page.getContent()), page.getTotalElements());
     }
 
+    /**
+     * Số đếm thẻ lọc nhanh + lựa chọn ô Kỳ / Bộ biểu mẫu (UC-33, UC-39). Nhận cùng tham số lọc
+     * như {@code getList}; lọc trạng thái ({@code status}, {@code display}) bị bỏ qua khi đếm.
+     * Khai trước {@code /{id}} cho rõ — đường dẫn chữ luôn thắng biến đường dẫn.
+     */
+    @GetMapping("/summary")
+    @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_READ + "')")
+    public InputReportSummaryResponse summary(@RequestParam MultiValueMap<String, String> query) {
+        return queries.summary(query);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_READ + "')")
     public InputReportResponse get(@PathVariable Long id) {
         return one(service.get(id));
+    }
+
+    /** Lịch sử phiên bản và lịch sử thao tác (UC-44), tính từ phiên bản bất kỳ trong chuỗi. */
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_READ + "')")
+    public InputReportHistoryResponse history(@PathVariable Long id) {
+        return queries.history(id);
     }
 
     /** Nộp phiếu lên Sở (UC-38, UC-43). */
@@ -91,14 +116,17 @@ public class InputReportController {
     }
 
     private InputReportResponse one(InputReport report) {
-        Map<Long, InputReportService.Progress> progress = service.progress(List.of(report.getId()));
-        return InputReportResponse.from(report, progress.get(report.getId()));
+        return withProgress(List.of(report)).getFirst();
     }
 
+    /** Tiến độ và tên đơn vị cha của cả trang trong hai câu truy vấn, không phải hai câu mỗi dòng. */
     private List<InputReportResponse> withProgress(List<InputReport> rows) {
-        Map<Long, InputReportService.Progress> progress = service.progress(InputReportService.idsOf(rows));
+        List<Long> ids = InputReportService.idsOf(rows);
+        Map<Long, InputReportService.Progress> progress = service.progress(ids);
+        Map<Long, String> parents = queries.parentNames(ids);
         return rows.stream()
-                .map(row -> InputReportResponse.from(row, progress.get(row.getId())))
+                .map(row -> InputReportResponse.from(
+                        row, progress.get(row.getId()), parents.get(row.getUnit().getId())))
                 .toList();
     }
 }

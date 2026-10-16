@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Download, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
 
-import { formatDate, formatNumber } from "@/shared/components/asxh";
+import { LoadingState, formatDateTime } from "@/shared/components/asxh";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -13,154 +13,111 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 
-import type { ReviewReport } from "../fixtures";
-import { treasuryAmount } from "../model";
+import { errorMessage } from "../api";
+import { listAttachments, openAttachment, type AttachmentRecord } from "../treasury-api";
 
-const ZOOM_STEPS = [50, 75, 100, 125, 150, 200];
-const FIT_ZOOM = 100;
+/** "1,2 MB" / "850 KB" */
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("vi-VN")} KB`;
+}
 
 /**
- * Xem file xác nhận của Kho bạc đơn vị đính kèm khi nộp. Chưa có tệp thật:
- * trang giấy được giả lập từ số liệu của phiếu.
+ * Xem file xác nhận của Kho bạc đơn vị đính kèm khi nộp (UC-40 bước 3): ảnh / PDF
+ * mở xem ở thẻ mới, Word / Excel tải về máy.
  */
 export function TreasuryDialog({
-  report,
+  reportId,
+  periodName,
+  unitName,
   open,
   onOpenChange,
 }: {
-  report: ReviewReport;
+  reportId: number;
+  periodName: string;
+  unitName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [fileIndex, setFileIndex] = useState(0);
-  const [zoom, setZoom] = useState(FIT_ZOOM);
+  const [files, setFiles] = useState<AttachmentRecord[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  const files = report.treasuryFiles;
-  const file = files[Math.min(fileIndex, files.length - 1)];
-  const zoomPos = ZOOM_STEPS.indexOf(zoom);
-  const amount = treasuryAmount(report);
-
-  const handleOpenChange = (next: boolean) => {
-    if (!next) {
-      setFileIndex(0);
-      setZoom(FIT_ZOOM);
+  const load = useCallback(async () => {
+    setFailed(false);
+    try {
+      setFiles(await listAttachments(reportId));
+    } catch {
+      setFailed(true);
     }
-    onOpenChange(next);
+  }, [reportId]);
+
+  useEffect(() => {
+    if (open) void load();
+  }, [open, load]);
+
+  const show = async (f: AttachmentRecord, mode: "view" | "download") => {
+    try {
+      await openAttachment(reportId, f, mode);
+    } catch (error) {
+      toast.error(errorMessage(error, `Chưa mở được tệp ${f.fileName}. Bạn thử lại sau ít phút.`));
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[720px]">
         <DialogHeader className="text-left">
           <DialogTitle>Xác nhận của Kho bạc</DialogTitle>
           <DialogDescription>
-            Phiếu {report.period.name} · {report.orgName}
+            Phiếu {periodName} · {unitName}
           </DialogDescription>
         </DialogHeader>
 
-        {!file ? (
+        {failed ? (
+          <div className="flex flex-col items-center gap-2 rounded-md border px-4 py-8 text-center text-sm">
+            <p className="text-muted-foreground">Chưa tải được tệp đính kèm của phiếu.</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+              Thử lại
+            </Button>
+          </div>
+        ) : files === null ? (
+          <LoadingState label="Đang tải tệp đính kèm…" />
+        ) : files.length === 0 ? (
           <p className="bg-surface-subtle text-muted-foreground rounded-md px-4 py-10 text-center text-sm">
             Đơn vị chưa đính kèm file xác nhận của Kho bạc.
           </p>
         ) : (
-          <>
-            <div className="bg-surface-subtle flex flex-wrap items-center gap-2 rounded-md border p-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Thu nhỏ"
-                disabled={zoomPos <= 0}
-                onClick={() => setZoom(ZOOM_STEPS[Math.max(0, zoomPos - 1)] ?? FIT_ZOOM)}
-              >
-                <ZoomOut />
-              </Button>
-              <span className="w-12 text-center text-sm tabular-nums">{zoom}%</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Phóng to"
-                disabled={zoomPos >= ZOOM_STEPS.length - 1}
-                onClick={() =>
-                  setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, zoomPos + 1)] ?? FIT_ZOOM)
-                }
-              >
-                <ZoomIn />
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setZoom(FIT_ZOOM)}>
-                Vừa khung
-              </Button>
-
-              <div className="mx-auto flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Tệp trước"
-                  disabled={fileIndex === 0}
-                  onClick={() => setFileIndex((i) => Math.max(0, i - 1))}
-                >
-                  <ChevronLeft />
-                </Button>
-                <span className="text-sm tabular-nums">
-                  Tệp {fileIndex + 1} / {files.length}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Tệp sau"
-                  disabled={fileIndex >= files.length - 1}
-                  onClick={() => setFileIndex((i) => Math.min(files.length - 1, i + 1))}
-                >
-                  <ChevronRight />
-                </Button>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => toast.success(`Đã tải về tệp "${file.name}".`)}
-              >
-                <Download />
-                Tải về
-              </Button>
-            </div>
-
-            <div className="bg-surface-subtle flex h-[22rem] items-center justify-center overflow-auto rounded-md p-6">
-              <div
-                className="origin-center transition-transform duration-150"
-                style={{ transform: `scale(${zoom / 100})` }}
-              >
-                <article
-                  aria-label={file.name}
-                  className="bg-card text-card-foreground shadow-e2 flex w-[17rem] flex-col gap-1.5 border px-6 py-6 text-[11px] leading-relaxed"
-                >
-                  <p className="text-muted-foreground text-center text-[10px] font-medium uppercase">
-                    Kho bạc Nhà nước Đồng Nai
+          <ul className="flex flex-col gap-2">
+            {files.map((f) => (
+              <li key={f.id} className="flex items-center gap-3 rounded-md border px-3 py-2">
+                <FileText className="text-muted-foreground size-4 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium" title={f.fileName}>
+                    {f.fileName}
                   </p>
-                  <p className="text-center text-sm font-bold">{file.title}</p>
-                  <p className="text-muted-foreground mb-2 text-center">{report.period.name}</p>
-                  <p>Đơn vị: {report.orgName}</p>
-                  <p>Nội dung: Chi trả các chế độ an sinh xã hội</p>
-                  <p className="font-semibold">Số tiền: {formatNumber(amount)} đồng</p>
-                  <p>Ngày xác nhận: {formatDate(file.confirmedAt)}</p>
-                  <div className="mt-2 flex flex-col gap-1.5" aria-hidden>
-                    <span className="bg-muted h-1.5 w-full rounded-full" />
-                    <span className="bg-muted h-1.5 w-full rounded-full" />
-                    <span className="bg-muted h-1.5 w-full rounded-full" />
-                    <span className="bg-muted mx-auto h-1.5 w-2/3 rounded-full" />
-                  </div>
-                </article>
-              </div>
-            </div>
-          </>
+                  <p className="text-muted-foreground text-xs">
+                    {formatFileSize(f.fileSize)} · Tải lên {formatDateTime(f.createdAt)}
+                  </p>
+                </div>
+                {f.previewable && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => void show(f, "view")}>
+                    <Eye />
+                    Xem
+                  </Button>
+                )}
+                <Button type="button" variant="ghost" size="sm" onClick={() => void show(f, "download")}>
+                  <Download />
+                  Tải về
+                </Button>
+              </li>
+            ))}
+          </ul>
         )}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Đóng
           </Button>
         </DialogFooter>
