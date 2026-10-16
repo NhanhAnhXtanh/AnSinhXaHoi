@@ -19,7 +19,8 @@ import { ThemeProvider } from "@/shared/components/theme/theme-provider";
 import { UnsavedChangesGuard } from "@/shared/components/form/unsaved-changes-guard";
 import { resources } from "./resources";
 import { AppRoutes } from "./router/routes";
-import { LayersIcon } from "lucide-react";
+import { Landmark } from "lucide-react";
+import { ReportYearProvider } from "@/shared/components/asxh";
 // The `@font-face` behind `"Inter Variable"` in `--font-sans`. Without it the
 // name resolves only where Inter happens to be installed.
 import "@fontsource-variable/inter";
@@ -50,14 +51,16 @@ function App() {
                 projectId: "OjKL83-Rc63sQ-E2vtK1",
                 // Drives the sidebar brand block and the document title.
                 title: {
-                  icon: <LayersIcon />,
-                  text: "DTH Framework",
+                  icon: <Landmark />,
+                  text: "Quyết toán ASXH",
                 },
               }}
             >
-              <UnsavedChangesGuard>
-                <AppRoutes />
-              </UnsavedChangesGuard>
+              <ReportYearProvider>
+                <UnsavedChangesGuard>
+                  <AppRoutes />
+                </UnsavedChangesGuard>
+              </ReportYearProvider>
 
               <Toaster />
               <RefineKbar />

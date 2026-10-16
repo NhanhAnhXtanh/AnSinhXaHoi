@@ -2,13 +2,21 @@ import type { ResourceProps } from "@refinedev/core";
 import {
   Bell,
   BuildingComplex,
-  LayoutDashboard,
+  CalendarDays,
+  ChartColumn,
+  ClipboardCheck,
+  FileSpreadsheet,
+  House,
   KeyRound,
   ListChecks,
+  ListTodo,
   Network,
   Newspaper,
+  RotateCcwClock,
   ShieldCheck,
   ShieldHalf,
+  SquareCheckBig,
+  SquarePen,
   Tags,
   Users,
 } from "lucide-react";
@@ -50,47 +58,119 @@ import {
  * silently navigate nowhere.
  */
 export const resources: ResourceProps[] = [
-  // The landing screen, and the one resource here with nothing behind it: no
-  // endpoint, no rows, no permission. It is declared so `useMenu` has an item
-  // to render and so the breadcrumb and document title have a label; the code
-  // that would otherwise be derived from this name (`dashboard:read`) is
-  // suppressed in `shared/lib/permissions.ts`, or the sidebar would hide the
-  // item from everybody.
   {
     name: "dashboard",
     list: "/dashboard",
-    meta: {
-      label: "DTH-FRAMEWORK",
-      icon: <LayoutDashboard className="h-4 w-4" />,
-    },
+    meta: { label: "Trang chủ", icon: <House className="h-4 w-4" /> },
   },
 
-  // Work. Top-level rather than in a group, like `notifications`: a group
-  // header wrapping a single item is a heading that explains nothing. It gets
-  // one when the rest of `module/bpm` arrives.
+  // Màn nghiệp vụ ASXH. Các màn đang chạy trên dữ liệu mẫu (chưa có API) nằm
+  // trong UNGUARDED_RESOURCES ở `shared/lib/permissions.ts`; gỡ khỏi đó khi nối
+  // API và seed quyền tương ứng.
+  { name: "bao_cao", meta: { label: "Báo cáo", group: true } },
+  {
+    name: "input_reports",
+    list: "/input-reports",
+    show: "/input-reports/:id",
+    meta: { label: "Nhập liệu báo cáo", icon: <SquarePen className="h-4 w-4" />, parent: "bao_cao" },
+  },
+  {
+    name: "report_review",
+    list: "/report-review",
+    show: "/report-review/:id",
+    meta: { label: "Duyệt phiếu nhập", icon: <ClipboardCheck className="h-4 w-4" />, parent: "bao_cao" },
+  },
+  {
+    name: "period_setup",
+    list: "/period-setup",
+    meta: { label: "Thiết lập & điều hành", icon: <ListTodo className="h-4 w-4" />, parent: "bao_cao" },
+  },
+  {
+    name: "summary",
+    list: "/summary",
+    meta: { label: "Tổng hợp báo cáo", icon: <ChartColumn className="h-4 w-4" />, parent: "bao_cao" },
+  },
+  {
+    name: "annual_review",
+    list: "/annual-review",
+    show: "/annual-review/:id",
+    meta: { label: "Duyệt báo cáo năm", icon: <SquareCheckBig className="h-4 w-4" />, parent: "bao_cao" },
+  },
+
+  { name: "bieu_mau", meta: { label: "Biểu mẫu", group: true } },
+  {
+    name: "templates",
+    list: "/templates",
+    meta: { label: "Bộ biểu mẫu", icon: <FileSpreadsheet className="h-4 w-4" />, parent: "bieu_mau" },
+  },
+  {
+    name: "report_calendar",
+    list: "/report-calendar",
+    meta: { label: "Lịch và kỳ báo cáo", icon: <CalendarDays className="h-4 w-4" />, parent: "bieu_mau" },
+  },
+  {
+    name: "publication_history",
+    list: "/publication-history",
+    meta: { label: "Lịch sử mở đợt", icon: <RotateCcwClock className="h-4 w-4" />, parent: "bieu_mau" },
+  },
+
+  // Administration. The whole section disappears for anyone without the
+  // matching permissions -- but not by itself: `useMenu` does not consult
+  // access control, so `sidebar.tsx` filters the tree it returns. See
+  // `useAccessibleMenuItems` there.
+  { name: "administration", meta: { label: "Danh mục & quản trị", group: true } },
+  {
+    name: "report_units",
+    list: "/report-units",
+    create: "/report-units/create",
+    edit: "/report-units/edit/:id",
+    meta: { label: "Danh sách đơn vị", icon: <BuildingComplex className="h-4 w-4" />, parent: "administration" },
+  },
+  {
+    name: "users",
+    list: "/users",
+    create: "/users/create",
+    edit: "/users/edit/:id",
+    show: "/users/show/:id",
+    meta: { label: "Người dùng", canDelete: true, icon: <Users className="h-4 w-4" />, parent: "administration" },
+  },
+  {
+    name: "roles",
+    list: "/roles",
+    create: "/roles/create",
+    edit: "/roles/edit/:id",
+    show: "/roles/show/:id",
+    meta: { label: "Vai trò", canDelete: true, icon: <ShieldCheck className="h-4 w-4" />, parent: "administration" },
+  },
+  {
+    name: "row_level_policies",
+    list: "/row-level-policies",
+    create: "/row-level-policies/create",
+    edit: "/row-level-policies/edit/:id",
+    show: "/row-level-policies/show/:id",
+    meta: { label: "Phạm vi dữ liệu", canDelete: true, icon: <ShieldHalf className="h-4 w-4" />, parent: "administration" },
+  },
+
+  // Màn mẫu của base dth-framework: giữ route để không gãy liên kết, ẩn khỏi
+  // menu ASXH (`meta.hide`).
+  {
+    name: "permissions",
+    list: "/permissions",
+    show: "/permissions/show/:id",
+    meta: { label: "Quyền", canDelete: false, hide: true, icon: <KeyRound className="h-4 w-4" />, parent: "administration" },
+  },
+  {
+    name: "notifications",
+    list: "/notifications",
+    meta: { label: "Thông báo", canDelete: true, hide: true, icon: <Bell className="h-4 w-4" /> },
+  },
   {
     name: "tasks",
     list: "/tasks",
     create: "/tasks/create",
     edit: "/tasks/edit/:id",
     show: "/tasks/show/:id",
-    meta: {
-      label: "Tasks",
-      canDelete: true,
-      icon: <ListChecks className="h-4 w-4" />,
-    },
-  },
-
-  // Section header. A resource with no route acts purely as a grouping node:
-  // `useMenu` keeps it because it has children (it drops items that have
-  // neither a `list` route nor children), and the sidebar renders it as a
-  // section because of `meta.group`.
-  {
-    name: "content",
-    meta: {
-      label: "Content",
-      group: true,
-    },
+    meta: { label: "Tasks", canDelete: true, hide: true, icon: <ListChecks className="h-4 w-4" /> },
   },
   {
     name: "blog_posts",
@@ -99,11 +179,7 @@ export const resources: ResourceProps[] = [
     edit: "/blog-posts/edit/:id",
     show: "/blog-posts/show/:id",
     clone: "/blog-posts/clone/:id",
-    meta: {
-      canDelete: false,
-      icon: <Newspaper className="h-4 w-4" />,
-      parent: "content",
-    },
+    meta: { canDelete: false, hide: true, icon: <Newspaper className="h-4 w-4" /> },
   },
   {
     name: "categories",
@@ -112,22 +188,7 @@ export const resources: ResourceProps[] = [
     edit: "/categories/edit/:id",
     show: "/categories/show/:id",
     clone: "/categories/clone/:id",
-    meta: {
-      canDelete: false,
-      icon: <Tags className="h-4 w-4" />,
-      parent: "content",
-    },
-  },
-
-  // Organization structure. Two resources rather than one screen with a
-  // nesting level, because they are two grants: the seed data lets MANAGER
-  // maintain departments while only reading the organizations they hang off.
-  {
-    name: "structure",
-    meta: {
-      label: "Organization",
-      group: true,
-    },
+    meta: { canDelete: false, hide: true, icon: <Tags className="h-4 w-4" /> },
   },
   {
     name: "organizations",
@@ -135,12 +196,7 @@ export const resources: ResourceProps[] = [
     create: "/organizations/create",
     edit: "/organizations/edit/:id",
     show: "/organizations/show/:id",
-    meta: {
-      label: "Organizations",
-      canDelete: true,
-      icon: <BuildingComplex className="h-4 w-4" />,
-      parent: "structure",
-    },
+    meta: { label: "Organizations", canDelete: true, hide: true, icon: <BuildingComplex className="h-4 w-4" /> },
   },
   {
     name: "departments",
@@ -148,96 +204,6 @@ export const resources: ResourceProps[] = [
     create: "/departments/create",
     edit: "/departments/edit/:id",
     show: "/departments/show/:id",
-    meta: {
-      label: "Departments",
-      canDelete: true,
-      icon: <Network className="h-4 w-4" />,
-      parent: "structure",
-    },
-  },
-
-  // Administration. The whole section disappears for anyone without the
-  // matching permissions -- but not by itself: `useMenu` does not consult
-  // access control, so `sidebar.tsx` filters the tree it returns. See
-  // `useAccessibleMenuItems` there.
-  {
-    name: "administration",
-    meta: {
-      label: "Administration",
-      group: true,
-    },
-  },
-  {
-    name: "users",
-    list: "/users",
-    create: "/users/create",
-    edit: "/users/edit/:id",
-    show: "/users/show/:id",
-    meta: {
-      label: "Users",
-      canDelete: true,
-      icon: <Users className="h-4 w-4" />,
-      parent: "administration",
-    },
-  },
-  {
-    name: "roles",
-    list: "/roles",
-    create: "/roles/create",
-    edit: "/roles/edit/:id",
-    show: "/roles/show/:id",
-    meta: {
-      label: "Roles",
-      canDelete: true,
-      icon: <ShieldCheck className="h-4 w-4" />,
-      parent: "administration",
-    },
-  },
-  // Read-only: a list and a show, and no create, edit or delete action. The
-  // absent actions are what stops the screen promising something the API will
-  // not do — a permission only means something once an endpoint checks for it,
-  // so the catalogue is written by migrations. Refine derives no route it was
-  // not given, and `permissions:write` / `permissions:delete` are not codes any
-  // migration seeds, so the buttons would be hidden even if they were.
-  {
-    name: "permissions",
-    list: "/permissions",
-    show: "/permissions/show/:id",
-    meta: {
-      label: "Permissions",
-      canDelete: false,
-      icon: <KeyRound className="h-4 w-4" />,
-      parent: "administration",
-    },
-  },
-  // Data scopes: which rows each role may reach, as opposed to which resources
-  // it may open at all. Only ADMIN holds `row_level_policies:read`, so
-  // `useAccessibleMenuItems` in the sidebar hides this from everybody else --
-  // and hides the whole Administration group with it if nothing else survives.
-  //
-  // Plain full-page routes rather than dialogs, for the same reason `roles` and
-  // `users` are: the condition builder needs vertical room a dialog over a list
-  // does not have.
-  {
-    name: "row_level_policies",
-    list: "/row-level-policies",
-    create: "/row-level-policies/create",
-    edit: "/row-level-policies/edit/:id",
-    show: "/row-level-policies/show/:id",
-    meta: {
-      label: "Data scopes",
-      canDelete: true,
-      icon: <ShieldHalf className="h-4 w-4" />,
-      parent: "administration",
-    },
-  },
-  {
-    name: "notifications",
-    list: "/notifications",
-    meta: {
-      label: "Notifications",
-      canDelete: true,
-      icon: <Bell className="h-4 w-4" />,
-    },
+    meta: { label: "Departments", canDelete: true, hide: true, icon: <Network className="h-4 w-4" /> },
   },
 ];

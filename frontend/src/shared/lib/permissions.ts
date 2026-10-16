@@ -41,7 +41,20 @@ export const ACTION_TO_PERMISSION: Record<string, "read" | "write" | "delete"> =
  * are `useList` calls that carry their own permission checks, and the tiles
  * around them need gating with `useCan` rather than an entry here.
  */
-const UNGUARDED_RESOURCES = new Set(["dashboard"]);
+const UNGUARDED_RESOURCES = new Set([
+  "dashboard",
+  // TẠM: màn ASXH đang chạy trên dữ liệu mẫu trong feature, chưa gọi API nào.
+  // Khi nối API thì bỏ tên khỏi đây và seed quyền `<tên>:read|write|delete`.
+  "input_reports",
+  "report_review",
+  "period_setup",
+  "summary",
+  "annual_review",
+  "templates",
+  "report_calendar",
+  "publication_history",
+  "report_units",
+]);
 
 /**
  * The permission code a resource and action need, or `null` where no code

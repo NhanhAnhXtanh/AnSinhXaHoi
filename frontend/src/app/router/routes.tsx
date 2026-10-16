@@ -45,6 +45,23 @@ import {
   RowLevelPolicyShow,
 } from "@/features/administration";
 import { Login, Profile } from "@/features/identity";
+import { InputReportList, InputReportWork } from "@/features/input-reports";
+import { ReviewList, ReviewWork } from "@/features/report-review";
+import { PeriodSetup } from "@/features/period-setup";
+import { PublicationHistoryList } from "@/features/publication-history";
+import { SummaryPage } from "@/features/summary";
+import {
+  AnnualReviewList,
+  AnnualReviewWork,
+  AnnualSubmissionHistory,
+} from "@/features/annual-review";
+import {
+  ReportUnitList,
+  ReportUnitCreate,
+  ReportUnitEdit,
+} from "@/features/report-units";
+import { ReportCalendar } from "@/features/report-calendar";
+import { TemplateSets, TemplateDesigner } from "@/features/templates";
 import { ErrorComponent } from "@/shared/components/layout/error-component";
 import { Forbidden } from "@/shared/components/layout/forbidden";
 import { Layout } from "@/shared/components/layout/layout";
@@ -251,6 +268,27 @@ export function AppRoutes() {
           there is no URL to guard against.
         */}
         <Route path="/notifications" element={<NotificationList />} />
+
+        {/*
+          Màn nghiệp vụ ASXH. Đang dùng dữ liệu mẫu trong từng feature nên chưa
+          bọc <CanAccess>; thêm guard khi nối API và seed quyền.
+        */}
+        <Route path="/input-reports" element={<InputReportList />} />
+        <Route path="/input-reports/:id" element={<InputReportWork />} />
+        <Route path="/report-review" element={<ReviewList />} />
+        <Route path="/report-review/:id" element={<ReviewWork />} />
+        <Route path="/period-setup" element={<PeriodSetup />} />
+        <Route path="/publication-history" element={<PublicationHistoryList />} />
+        <Route path="/summary" element={<SummaryPage />} />
+        <Route path="/annual-review" element={<AnnualReviewList />} />
+        <Route path="/annual-review/history" element={<AnnualSubmissionHistory />} />
+        <Route path="/annual-review/:id" element={<AnnualReviewWork />} />
+        <Route path="/report-units" element={<ReportUnitList />} />
+        <Route path="/report-units/create" element={<ReportUnitCreate />} />
+        <Route path="/report-units/edit/:id" element={<ReportUnitEdit />} />
+        <Route path="/report-calendar" element={<ReportCalendar />} />
+        <Route path="/templates" element={<TemplateSets />} />
+        <Route path="/templates/designer/:id" element={<TemplateDesigner />} />
 
         {/* Not a resource: no list of "my accounts", no id in the URL. */}
         <Route path="/profile" element={<Profile />} />
