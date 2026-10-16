@@ -35,3 +35,11 @@ databaseChangeLog:
       file: db/changelog/changes/016-seed-row-level-permissions.sql
   - include:
       file: db/changelog/changes/017-add-row-level-check-scope.yaml
+  - include:
+      file: db/changelog/changes/100-create-report-units.yaml
+  - include:
+      file: db/changelog/changes/101-seed-report-units.sql
+  - include:
+      file: db/changelog/changes/102-create-report-calendars.yaml
+  - include:
+      file: db/changelog/changes/103-seed-report-calendars.sql

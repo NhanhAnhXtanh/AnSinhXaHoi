@@ -1,0 +1,166 @@
+# Lịch báo cáo năm và các kỳ của nó. Port từ QT_REPORT_CALENDAR và QT_REPORTING_PERIOD
+# của bản Jmix; bỏ mã lịch / trạng thái lịch (đã gỡ có chủ ý, BR-06.4), tên lịch (suy ra
+# từ năm) và xoá mềm.
+#
+# Hai bảng một changeSet vì kỳ không có nghĩa nếu thiếu lịch (calendar_id NOT NULL).
+databaseChangeLog:
+  - changeSet:
+      id: 102-create-report-calendars
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_report_calendars
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_report_calendars
+              # Mỗi năm tối đa một lịch (BR-06.1). year_no thay cho "year" để khỏi
+              # đụng tên hàm/từ khoá.
+              - column:
+                  name: year_no
+                  type: integer
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_asxh_report_calendars_year_no
+              # Hạn nộp mặc định: số ngày sau khi hết kỳ, 1..365.
+              - column:
+                  name: deadline_days
+                  type: integer
+                  defaultValueNumeric: 5
+                  constraints:
+                    nullable: false
+              # Loại kỳ đã chọn, CSV tên hằng PeriodKind: "THANG,QUY,SAU_THANG,NAM".
+              - column:
+                  name: kinds
+                  type: varchar(64)
+                  defaultValue: ''
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        - sql:
+            sql: >-
+              ALTER TABLE asxh_report_calendars ADD CONSTRAINT ck_asxh_report_calendars_deadline_days CHECK (deadline_days BETWEEN 1 AND 365)
+            rollbackSql: >-
+              ALTER TABLE asxh_report_calendars DROP CONSTRAINT ck_asxh_report_calendars_deadline_days
+
+        - createTable:
+            tableName: asxh_report_periods
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_report_periods
+              - column:
+                  name: calendar_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # THANG | QUY | SAU_THANG | NAM
+              - column:
+                  name: kind
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              # Số thứ tự trong loại kỳ của năm: tháng 1-12, quý 1-4, sáu tháng 1-2, năm 1.
+              - column:
+                  name: seq
+                  type: integer
+                  constraints:
+                    nullable: false
+              # Mã ngắn T1..T12, Q1..Q4, 6TĐN/6TCN, NAM.
+              - column:
+                  name: code
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              # Nhãn đầy đủ, ví dụ "Quý IV/2026".
+              - column:
+                  name: name
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              # Khoảng số liệu, phủ trọn các tháng của kỳ.
+              - column:
+                  name: from_date
+                  type: date
+                  constraints:
+                    nullable: false
+              - column:
+                  name: to_date
+                  type: date
+                  constraints:
+                    nullable: false
+              # Cửa sổ nhận nhập liệu: mở từ open_from, hạn nộp là deadline.
+              - column:
+                  name: open_from
+                  type: date
+              - column:
+                  name: deadline
+                  type: date
+              - column:
+                  name: status
+                  type: varchar(16)
+                  defaultValue: DRAFT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # RESTRICT: lịch còn kỳ thì không xoá được bằng tay ở DB; service xoá kỳ trước.
+        - addForeignKeyConstraint:
+            baseTableName: asxh_report_periods
+            baseColumnNames: calendar_id
+            constraintName: fk_asxh_report_periods_calendar
+            referencedTableName: asxh_report_calendars
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addUniqueConstraint:
+            tableName: asxh_report_periods
+            columnNames: calendar_id, kind, seq
+            constraintName: uq_asxh_report_periods_calendar_kind_seq
+        # BR-20.2: ngày kết thúc không được trước ngày bắt đầu (cả khoảng số liệu lẫn cửa sổ).
+        - sql:
+            sql: >-
+              ALTER TABLE asxh_report_periods ADD CONSTRAINT ck_asxh_report_periods_range CHECK (to_date >= from_date)
+            rollbackSql: >-
+              ALTER TABLE asxh_report_periods DROP CONSTRAINT ck_asxh_report_periods_range
+        - sql:
+            sql: >-
+              ALTER TABLE asxh_report_periods ADD CONSTRAINT ck_asxh_report_periods_window CHECK (open_from IS NULL OR deadline IS NULL OR deadline >= open_from)
+            rollbackSql: >-
+              ALTER TABLE asxh_report_periods DROP CONSTRAINT ck_asxh_report_periods_window
+        # Danh sách lọc theo trạng thái; luật trùng thời gian (UC-31) quét theo khoảng ngày.
+        - createIndex:
+            tableName: asxh_report_periods
+            indexName: idx_asxh_report_periods_status
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            tableName: asxh_report_periods
+            indexName: idx_asxh_report_periods_dates
+            columns:
+              - column:
+                  name: from_date
+              - column:
+                  name: to_date
