@@ -7,6 +7,7 @@ import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetSpecifications;
 import com.dth.frw.module.asxh.ledger.service.ReportSubmitValidationService;
+import com.dth.frw.module.asxh.script.WorkbookJsonCellReader;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
@@ -78,7 +79,8 @@ public class InputReportSheetService {
     public SheetContent getWithContent(Long id) {
         InputReportSheet sheet = get(id);
         TemplateVersion version = sheet.getTemplateVersion();
-        boolean hasData = sheet.getDataJson() != null && !sheet.getDataJson().isBlank();
+        // Workbook rỗng (`"sheets":{}` — dữ liệu mẫu cũ) cũng coi như chưa nhập: gửi khung.
+        boolean hasData = !WorkbookJsonCellReader.isEmptyWorkbook(sheet.getDataJson());
         return new SheetContent(
                 sheet,
                 hasData ? null : version.getWorkbookJson(),

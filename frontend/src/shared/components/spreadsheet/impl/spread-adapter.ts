@@ -85,6 +85,10 @@ export function wrapSpreadWorkbook(
   options: SpreadAdapterOptions
 ): SpreadAdapter {
   let destroyed = false;
+  // Lần nạp incremental đang chạy: SpreadJS còn tác vụ hẹn giờ trên workbook, huỷ
+  // giữa chừng làm tác vụ đó đọc vào workbook đã huỷ ("reading 'clear'"). Huỷ thật
+  // được hoãn tới khi lần nạp xong (gặp khi React gắn lại component, đổi biểu nhanh).
+  let pendingLoad: Promise<void> | null = null;
 
   function assertNotDestroyed(): void {
     if (destroyed) throw new Error("Bảng tính đã đóng.");
@@ -208,7 +212,7 @@ export function wrapSpreadWorkbook(
         return Promise.resolve(workbook.fromJSON(data)).then(() => undefined);
       }
       // Workbook lớn nạp KHÔNG đồng bộ: chỉ resolve ở callback `loaded`.
-      return new Promise<void>((resolve, reject) => {
+      const load = new Promise<void>((resolve, reject) => {
         try {
           const pending = workbook.fromJSON(data, {
             incrementalLoading: { loaded: () => resolve() },
@@ -218,6 +222,12 @@ export function wrapSpreadWorkbook(
           reject(error);
         }
       });
+      pendingLoad = load;
+      const settle = () => {
+        if (pendingLoad === load) pendingLoad = null;
+      };
+      load.then(settle, settle);
+      return load;
     },
     importFile(file) {
       assertNotDestroyed();
@@ -411,7 +421,13 @@ export function wrapSpreadWorkbook(
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      if (options.destroyWorkbook) workbook.destroy();
+      if (!options.destroyWorkbook) return;
+      if (pendingLoad) {
+        const destroyLater = () => workbook.destroy();
+        pendingLoad.then(destroyLater, destroyLater);
+      } else {
+        workbook.destroy();
+      }
     },
   };
 }
