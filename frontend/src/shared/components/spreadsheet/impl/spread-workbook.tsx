@@ -104,7 +104,14 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
     };
 
     const initial = latestRef.current;
-    const workbook = new GC.Spread.Sheets.Workbook(host, {
+    // Mỗi lần nạp dùng một thẻ con riêng: workbook cũ có thể bị huỷ TRỄ (đợi lần nạp
+    // incremental của nó xong — xem spread-adapter destroy), khi đó chỉ gỡ thẻ của nó,
+    // không đụng workbook mới đã dựng trên cùng khung.
+    const mount = document.createElement("div");
+    mount.style.width = "100%";
+    mount.style.height = "100%";
+    host.appendChild(mount);
+    const workbook = new GC.Spread.Sheets.Workbook(mount, {
       tabStripVisible: !initial.hideTabs,
       newTabVisible: false,
       tabEditable: false,
@@ -293,7 +300,9 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
         }
       });
       adapterRef.current = null;
-      adapter.destroy();
+      // Ẩn ngay để khung không hiện hai bảng; gỡ hẳn khi workbook đã huỷ xong.
+      mount.style.display = "none";
+      adapter.destroy(() => mount.remove());
     };
     // Nạp lại khi NỘI DUNG workbook, chế độ chỉ xem hoặc script đổi. Các prop khác
     // (scriptContext, callback) đọc qua latestRef tại thời điểm nạp.

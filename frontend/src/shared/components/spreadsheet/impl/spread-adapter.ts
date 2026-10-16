@@ -42,7 +42,8 @@ export interface SpreadAdapter extends ScriptWorkbookAdapter {
   blockAllEdits(): () => void;
   /** Bắn khi người dùng sửa workbook (gõ ô, dán, thêm/xoá dòng, đổi định dạng…). */
   subscribeWorkbookChanged(listener: () => void): () => void;
-  destroy(): void;
+  /** Huỷ workbook; `onDestroyed` chạy khi đã huỷ thật (có thể trễ nếu đang nạp dở). */
+  destroy(onDestroyed?: () => void): void;
 }
 
 export type SpreadAdapterOptions = {
@@ -418,15 +419,21 @@ export function wrapSpreadWorkbook(
       if (!used) return;
       sheet.getRange(used.row, used.col, used.rowCount, used.colCount).cellButtons([]);
     },
-    destroy() {
+    destroy(onDestroyed) {
       if (destroyed) return;
       destroyed = true;
-      if (!options.destroyWorkbook) return;
-      if (pendingLoad) {
-        const destroyLater = () => workbook.destroy();
-        pendingLoad.then(destroyLater, destroyLater);
-      } else {
+      if (!options.destroyWorkbook) {
+        onDestroyed?.();
+        return;
+      }
+      const destroyNow = () => {
         workbook.destroy();
+        onDestroyed?.();
+      };
+      if (pendingLoad) {
+        pendingLoad.then(destroyNow, destroyNow);
+      } else {
+        destroyNow();
       }
     },
   };
