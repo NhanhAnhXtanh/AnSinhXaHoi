@@ -41,7 +41,10 @@ public class PeriodLifecycleService {
             ReportPeriod period,
             boolean locked,
             String lockReason,
+            Long lockSourceId,
+            String lockSourceName,
             long assignmentCount,
+            List<IssuedCell> issuedCells,
             boolean initialPublished,
             boolean canAssign,
             boolean canRemove,
@@ -53,8 +56,16 @@ public class PeriodLifecycleService {
             String readOnlyReason) {
     }
 
-    /** Lý do khoá cả kỳ của một kỳ (UC-31). */
-    public record PeriodLockInfo(Long periodId, String kind, String reason) {
+    /** Một ô (đơn vị × biểu) đã phát phiếu — ô này không bỏ tích được nữa (UC-22 5a). */
+    public record IssuedCell(Long unitId, Long templateId) {
+    }
+
+    /**
+     * Lý do khoá cả kỳ của một kỳ (UC-31), kèm kỳ gây khoá để màn hình nêu tên
+     * ("Hãy thiết lập ở …").
+     */
+    public record PeriodLockInfo(Long periodId, String kind, String reason, Long sourcePeriodId,
+                                 String sourcePeriodName) {
     }
 
     private final ReportPeriodService periodService;
@@ -96,7 +107,10 @@ public class PeriodLifecycleService {
                 period,
                 locked,
                 lock.map(PeriodSetupLockService.PeriodLock::reason).orElse(null),
+                lock.map(PeriodSetupLockService.PeriodLock::sourceId).orElse(null),
+                lock.map(PeriodSetupLockService.PeriodLock::sourceName).orElse(null),
                 assignments,
+                issuedCells(periodId),
                 initial,
                 !locked && (configurable || open),
                 configurable && assignments > 0,
@@ -116,8 +130,26 @@ public class PeriodLifecycleService {
         }
         Map<Long, PeriodSetupLockService.PeriodLock> locks = lockService.locks(periods);
         List<PeriodLockInfo> result = new ArrayList<>();
-        locks.forEach((id, lock) -> result.add(new PeriodLockInfo(id, lock.kind().name(), lock.reason())));
+        locks.forEach((id, lock) -> result.add(new PeriodLockInfo(
+                id, lock.kind().name(), lock.reason(), lock.sourceId(), lock.sourceName())));
         return result;
+    }
+
+    /** Các ô đã phát phiếu của kỳ, đọc từ dạng {@code "unitId:templateId"} của slice phiếu. */
+    private List<IssuedCell> issuedCells(Long periodId) {
+        List<IssuedCell> cells = new ArrayList<>();
+        for (String pair : inputReportService.issuedPairs(periodId)) {
+            int colon = pair.indexOf(':');
+            if (colon <= 0) {
+                continue;
+            }
+            try {
+                cells.add(new IssuedCell(Long.valueOf(pair.substring(0, colon)), Long.valueOf(pair.substring(colon + 1))));
+            } catch (NumberFormatException ignored) {
+                // cặp hỏng không thể khớp ô nào trên ma trận
+            }
+        }
+        return cells;
     }
 
     /**

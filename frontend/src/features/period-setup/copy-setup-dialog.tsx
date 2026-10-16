@@ -13,24 +13,36 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 
-import { fmtRange, lockSource, overlaps, periodView, type Period } from "./model";
+import {
+  fmtRange,
+  lockShortReason,
+  periodView,
+  type Period,
+  type PeriodLock,
+} from "./model";
 
 /**
- * Áp dụng thiết lập cho kỳ khác (UC-23). Ứng viên là các kỳ còn ở bước thiết
- * lập; kỳ trùng thời gian với kỳ nguồn, kỳ bị khoá, hoặc trùng với kỳ vừa tích
- * thì hiện lý do và không tích được.
+ * Áp dụng thiết lập cho kỳ khác (UC-23, `POST /api/period_assignments/copy`).
+ * Ứng viên là các kỳ còn ở bước thiết lập. Trùng thời gian chỉ xét theo CẢ KỲ:
+ * kỳ bị khoá vì trùng một kỳ đã mở đợt hiện lý do khoá và không tích được; kỳ
+ * chỉ trùng thời gian với kỳ đang chọn (chưa mở đợt) vẫn áp dụng được.
  */
 export function CopySetupDialog({
   open,
   onOpenChange,
   source,
   periods,
+  locks,
+  pending,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   source: Period;
   periods: Period[];
+  /** Khoá cả kỳ theo id kỳ (máy chủ tính). */
+  locks: ReadonlyMap<string, PeriodLock>;
+  pending?: boolean;
   onConfirm: (targetIds: string[]) => void;
 }) {
   const [picked, setPicked] = useState<string[]>([]);
@@ -48,13 +60,8 @@ export function CopySetupDialog({
   );
 
   const reasonOf = (p: Period): string | null => {
-    if (overlaps(p, source)) return "Trùng thời gian với kỳ đang chọn";
-    if (lockSource(p, periods)) return "Kỳ đã khoá, không áp dụng được";
-    if (picked.includes(p.id)) return null;
-    const clash = candidates.find(
-      (o) => o.id !== p.id && picked.includes(o.id) && overlaps(o, p)
-    );
-    return clash ? `Trùng thời gian với ${clash.name} vừa chọn` : null;
+    const lock = locks.get(p.id);
+    return lock ? lockShortReason(lock) : null;
   };
 
   const toggle = (id: string, on: boolean) =>
@@ -78,7 +85,7 @@ export function CopySetupDialog({
           <ul className="max-h-80 divide-y overflow-y-auto rounded-lg border">
             {candidates.map((p) => {
               const reason = reasonOf(p);
-              const view = periodView(p, periods);
+              const view = periodView(p, locks.get(p.id) ?? null);
               const checked = picked.includes(p.id);
               const inputId = `copy-${p.id}`;
               return (
@@ -119,7 +126,10 @@ export function CopySetupDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Quay lại
           </Button>
-          <Button disabled={picked.length === 0} onClick={() => onConfirm(picked)}>
+          <Button
+            disabled={picked.length === 0 || pending}
+            onClick={() => onConfirm(picked)}
+          >
             {picked.length > 0 ? `Áp dụng cho ${picked.length} kỳ` : "Áp dụng"}
           </Button>
         </DialogFooter>

@@ -11,6 +11,7 @@ import com.dth.frw.module.asxh.period.service.ReportPeriodService;
 import com.dth.frw.module.asxh.setup.repo.PeriodAssignmentRepository;
 import com.dth.frw.module.asxh.setup.repo.PeriodAssignmentSpecifications;
 import com.dth.frw.module.asxh.template.service.TemplateService;
+import com.dth.frw.module.asxh.template.service.TemplateVersionService;
 import com.dth.frw.module.asxh.unit.service.ReportUnitService;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.exception.ConflictException;
@@ -18,15 +19,17 @@ import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.CurrentUser;
 import com.dth.frw.shared.security.rowlevel.Action;
 import com.dth.frw.shared.web.ListParams;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -36,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Ma trận thiết lập Đơn vị × Biểu của một kỳ (UC-22), port
  * {@code PeriodTemplateAssignmentService} (phần ma trận dùng: {@code assignSheetPlanToPeriods},
  * {@code unassignOrganizations}, {@code assignSheetsForSupplement}, {@code refreshPeriodReadiness},
- * {@code assertNoOverlappingPeriods}).
+ * {@code copyConfigurations}).
  *
  * <p>Quy tắc:
  * <ul>
@@ -46,8 +49,10 @@ import org.springframework.transaction.annotation.Transactional;
  *       (BR-26.1) — không có thiết lập "mồ côi".</li>
  *   <li>Kỳ khác: chỉ xem (gồm cả Quá hạn — chốt 19/09: kỳ quá hạn không thiết lập).</li>
  *   <li>Khoá cả kỳ (UC-31) chặn gán thêm; gỡ thiết lập thừa ở kỳ bị khoá vì trùng kỳ vẫn cho (1a).</li>
- *   <li>Chống chồng kỳ theo đơn vị (BR-22.2): một đơn vị không được thiết lập ở hai kỳ giao
- *       thời gian, không phụ thuộc biểu.</li>
+ *   <li>Trùng thời gian chỉ xét THEO CẢ KỲ (luật user chốt 16/10): kỳ trùng với kỳ khác đã mở
+ *       đợt thì khoá cả kỳ; KHÔNG còn khoá từng đơn vị như BR-22.2 / UC-22 4a của bản Jmix.
+ *       Hai kỳ trùng nhau mà chưa kỳ nào mở đợt thì đều thiết lập được; kỳ nào mở đợt trước
+ *       thì kỳ kia bị khoá cả kỳ.</li>
  * </ul>
  */
 @Service
@@ -64,6 +69,13 @@ public class PeriodAssignmentService {
     public record Cell(Long unitId, Long templateId) {
     }
 
+    /**
+     * Kết quả áp dụng thiết lập sang kỳ khác (UC-23): số ô thêm mới, số ô đã có sẵn ở kỳ đích,
+     * số ô bỏ qua vì biểu không còn ban hành / đơn vị không còn nhận báo cáo (BR-23.2).
+     */
+    public record CopyResult(int added, int unchanged, int skipped, List<ReportPeriod> targets, String message) {
+    }
+
     /** Kết quả lưu ma trận; {@code publication} khác {@code null} khi đã mở đợt bổ sung. */
     public record MatrixResult(
             ReportPeriod period, int added, int removed, int unchanged, Publication publication, String message) {
@@ -76,6 +88,7 @@ public class PeriodAssignmentService {
     private final ReportPeriodService periodService;
     private final ReportUnitService unitService;
     private final TemplateService templateService;
+    private final TemplateVersionService templateVersionService;
     private final RowLevelSecurity rowLevel;
 
     public PeriodAssignmentService(PeriodAssignmentRepository repository,
@@ -85,6 +98,7 @@ public class PeriodAssignmentService {
                                    ReportPeriodService periodService,
                                    ReportUnitService unitService,
                                    TemplateService templateService,
+                                   TemplateVersionService templateVersionService,
                                    RowLevelSecurity rowLevel) {
         this.repository = repository;
         this.lockService = lockService;
@@ -93,6 +107,7 @@ public class PeriodAssignmentService {
         this.periodService = periodService;
         this.unitService = unitService;
         this.templateService = templateService;
+        this.templateVersionService = templateVersionService;
         this.rowLevel = rowLevel;
     }
 
@@ -174,7 +189,6 @@ public class PeriodAssignmentService {
         if (!toAdd.isEmpty()) {
             Map<Long, ReportUnit> units = resolveUnits(toAdd);
             Map<Long, Template> templates = resolveTemplates(toAdd);
-            assertNoOverlap(period, units);
 
             String user = CurrentUser.username().orElse(null);
             for (Cell cell : toAdd) {
@@ -213,6 +227,110 @@ public class PeriodAssignmentService {
         return new MatrixResult(period, added, removed, unchanged, publication, message);
     }
 
+    /**
+     * Áp dụng thiết lập của kỳ {@code fromPeriodId} cho các kỳ {@code toPeriodIds} (UC-23,
+     * {@code POST /api/period_assignments/copy}), một giao dịch cho mọi kỳ đích.
+     *
+     * <ul>
+     *   <li>Chỉ CỘNG THÊM vào kỳ đích, không gỡ ô sẵn có (BR-23.1).</li>
+     *   <li>Chỉ sao biểu còn phiên bản đã ban hành áp dụng tới hôm nay và đơn vị còn hoạt động,
+     *       còn nhận báo cáo; ô khác bỏ qua và được đếm (BR-23.2).</li>
+     *   <li>Kỳ đích phải cùng năm với kỳ nguồn và đang ở bước thiết lập (Chưa thiết lập / Đã
+     *       thiết lập) — kỳ đang mở thêm ô phải đi đường đợt bổ sung trên ma trận.</li>
+     *   <li>Luật trùng thời gian chỉ xét CẢ KỲ: kỳ đích bị khoá vì trùng kỳ khác đã mở đợt
+     *       thì từ chối cả lượt, không ghi gì (4a); không còn kiểm trùng theo từng đơn vị.</li>
+     *   <li>Kỳ đích DRAFT có ô thì sang READY (UC-22 bước 7).</li>
+     * </ul>
+     */
+    @Transactional
+    public CopyResult copy(Long fromPeriodId, Collection<Long> toPeriodIds) {
+        ReportPeriod source = periodService.get(fromPeriodId);
+        Set<Long> targetIds = new LinkedHashSet<>();
+        if (toPeriodIds != null) {
+            for (Long id : toPeriodIds) {
+                if (id != null && !id.equals(fromPeriodId)) {
+                    targetIds.add(id);
+                }
+            }
+        }
+        if (targetIds.isEmpty()) {
+            throw new ConflictException("Chưa chọn kỳ nào để áp dụng thiết lập.");
+        }
+
+        List<PeriodAssignment> sourceCells = repository.findByPeriodId(fromPeriodId);
+        if (sourceCells.isEmpty()) {
+            throw new ConflictException("Kỳ " + source.getName() + " chưa có thiết lập nào để áp dụng.");
+        }
+
+        List<ReportPeriod> targets = new ArrayList<>(targetIds.size());
+        for (Long id : targetIds) {
+            ReportPeriod target = periodService.get(id);
+            if (source.getYear() != null && !source.getYear().equals(target.getYear())) {
+                throw new ConflictException("Chỉ áp dụng được cho các kỳ cùng năm " + source.getYear()
+                        + "; kỳ " + target.getName() + " thuộc năm khác.");
+            }
+            if (!CONFIGURABLE.contains(target.getStatus())) {
+                throw new ConflictException("Chỉ áp dụng được cho kỳ chưa mở đợt; kỳ " + target.getName()
+                        + " đang ở trạng thái " + PublicationService.statusLabel(target.getStatus()) + ".");
+            }
+            targets.add(target);
+        }
+        Map<Long, PeriodSetupLockService.PeriodLock> locks = lockService.locks(targets);
+        if (!locks.isEmpty()) {
+            throw new ConflictException("Chưa áp dụng được. " + PeriodSetupLockService.joinReasons(locks.values()));
+        }
+
+        // Lọc ô của kỳ nguồn theo BR-23.2 một lần cho mọi kỳ đích.
+        LocalDate today = LocalDate.now();
+        Map<Long, Boolean> templateUsable = new HashMap<>();
+        List<PeriodAssignment> usable = new ArrayList<>(sourceCells.size());
+        int skippedPerTarget = 0;
+        for (PeriodAssignment cell : sourceCells) {
+            ReportUnit unit = cell.getUnit();
+            Template template = cell.getTemplate();
+            boolean templateOk = templateUsable.computeIfAbsent(template.getId(),
+                    id -> templateVersionService.findEffective(id, today).isPresent());
+            if (templateOk && unit.isActive() && unit.isReceivesReports()) {
+                usable.add(cell);
+            } else {
+                skippedPerTarget++;
+            }
+        }
+        if (usable.isEmpty()) {
+            throw new ConflictException("Kỳ " + source.getName() + " không còn ô nào áp dụng được: các biểu đã "
+                    + "ngừng ban hành hoặc các đơn vị không còn nhận báo cáo.");
+        }
+
+        String user = CurrentUser.username().orElse(null);
+        int added = 0;
+        int unchanged = 0;
+        for (ReportPeriod target : targets) {
+            Set<String> existing = new HashSet<>();
+            for (PeriodAssignment assignment : repository.findByPeriodId(target.getId())) {
+                existing.add(key(assignment.getUnit().getId(), assignment.getTemplate().getId()));
+            }
+            for (PeriodAssignment cell : usable) {
+                if (!existing.add(key(cell.getUnit().getId(), cell.getTemplate().getId()))) {
+                    unchanged++;
+                    continue;
+                }
+                repository.persist(new PeriodAssignment(target, cell.getUnit(), cell.getTemplate(), user));
+                added++;
+            }
+            repository.flush();
+            if (target.getStatus() == PeriodStatus.DRAFT && !existing.isEmpty()) {
+                periodService.transition(target.getId(), PeriodStatus.READY);
+            }
+        }
+
+        String message = "Đã áp dụng %d ô cho %d kỳ.".formatted(added, targets.size());
+        if (skippedPerTarget > 0) {
+            message += " Bỏ qua %d ô vì biểu đã ngừng ban hành hoặc đơn vị không còn nhận báo cáo."
+                    .formatted(skippedPerTarget);
+        }
+        return new CopyResult(added, unchanged, skippedPerTarget * targets.size(), targets, message);
+    }
+
     // ------------------------------------------------------------- nội bộ
 
     /**
@@ -237,39 +355,6 @@ public class PeriodAssignmentService {
             templates.computeIfAbsent(cell.templateId(), templateService::get);
         }
         return templates;
-    }
-
-    /**
-     * Chống chồng kỳ theo đơn vị (BR-22.2): đơn vị đã được thiết lập ở một kỳ khác giao thời
-     * gian thì không gán được ở kỳ này, dù khác biểu. Báo tối đa ba tên đơn vị.
-     */
-    private void assertNoOverlap(ReportPeriod period, Map<Long, ReportUnit> units) {
-        if (period.getFromDate() == null || period.getToDate() == null) {
-            throw new ConflictException("Kỳ " + period.getName()
-                    + " chưa có mốc thời gian hợp lệ để kiểm tra chồng kỳ.");
-        }
-        List<PeriodAssignment> clashes = repository.findOverlapping(
-                units.keySet(), period.getId(), period.getFromDate(), period.getToDate());
-        if (clashes.isEmpty()) {
-            return;
-        }
-        // Gom theo kỳ trùng, giữ thứ tự gặp.
-        Map<String, Set<String>> unitNamesByPeriod = new LinkedHashMap<>();
-        for (PeriodAssignment clash : clashes) {
-            unitNamesByPeriod
-                    .computeIfAbsent(clash.getPeriod().getName(), key -> new LinkedHashSet<>())
-                    .add(clash.getUnit().getName());
-        }
-        List<String> parts = new ArrayList<>();
-        unitNamesByPeriod.forEach((periodName, unitNames) -> {
-            List<String> names = new ArrayList<>(unitNames);
-            String shown = names.stream().limit(3).collect(Collectors.joining(", "));
-            if (names.size() > 3) {
-                shown += " và " + (names.size() - 3) + " đơn vị khác";
-            }
-            parts.add(shown + " đã được thiết lập ở kỳ " + periodName + " (trùng thời gian).");
-        });
-        throw new ConflictException("Không thể thiết lập kỳ " + period.getName() + ". " + String.join(" ", parts));
     }
 
     private static String key(Long unitId, Long templateId) {

@@ -53,7 +53,10 @@ public class PeriodOperationController {
         this.publicationService = publicationService;
     }
 
-    /** Bare JSON array {@code [{periodId, kind, reason}]}; kỳ không bị khoá không có dòng. */
+    /**
+     * Bare JSON array {@code [{periodId, kind, reason, sourcePeriodId, sourcePeriodName}]}; kỳ
+     * không bị khoá không có dòng.
+     */
     @GetMapping("/setup_locks")
     @PreAuthorize("hasAuthority('" + SetupPermissions.PERIOD_ASSIGNMENTS_READ + "')")
     public List<PeriodLifecycleService.PeriodLockInfo> locks(@RequestParam MultiValueMap<String, String> query) {

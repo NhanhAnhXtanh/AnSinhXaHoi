@@ -50,8 +50,16 @@ public class PeriodSetupLockService {
         OVERLAP
     }
 
-    public record PeriodLock(LockKind kind, String reason) {
+    /**
+     * Khoá của một kỳ. {@code sourceId} / {@code sourceName} là kỳ gây khoá (kỳ trùng thời gian
+     * đã mở đợt) — màn hình dựng câu "Hãy thiết lập ở …" từ đó; {@code reason} là câu đầy đủ,
+     * dùng cho thông báo lỗi khi ghi.
+     */
+    public record PeriodLock(LockKind kind, String reason, Long sourceId, String sourceName) {
     }
+
+    /** Kỳ đã chốt / đã khoá xếp sau kỳ còn chạy khi chọn kỳ gây khoá để nêu tên. */
+    private static final Set<PeriodStatus> FINISHED = EnumSet.of(PeriodStatus.CLOSED, PeriodStatus.LOCKED);
 
     private final PublicationRepository publicationRepository;
 
@@ -72,19 +80,25 @@ public class PeriodSetupLockService {
         if (from == null || to == null) {
             return locks;
         }
+        // Kỳ còn đang chạy (chưa chốt) được nêu tên trước — đó là nơi người dùng cần sang
+        // thiết lập tiếp; trong cùng nhóm thì kỳ bắt đầu sớm hơn trước.
         List<ReportPeriod> opened = publicationRepository.findOpenedPeriodsOverlapping(
                         PublicationStatus.PUBLISHED, OPENED_STATUSES, from, to).stream()
-                .sorted(Comparator.comparing(ReportPeriod::getFromDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .sorted(Comparator.comparing((ReportPeriod p) -> FINISHED.contains(p.getStatus()))
+                        .thenComparing(ReportPeriod::getFromDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(ReportPeriod::getToDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
         for (ReportPeriod period : periods) {
+            // Kỳ đã mở đợt thì chính nó là nguồn khoá của kỳ khác, không tự bị khoá vì trùng.
+            if (period.getStatus() != null && OPENED_STATUSES.contains(period.getStatus())) {
+                continue;
+            }
             opened.stream()
                     .filter(other -> !Objects.equals(other.getId(), period.getId()))
                     .filter(other -> overlaps(period, other))
                     .findFirst()
                     .ifPresent(other -> locks.put(period.getId(), new PeriodLock(LockKind.OVERLAP,
-                            "Kỳ " + period.getName() + " không thiết lập hay mở đợt được nữa vì kỳ "
-                                    + other.getName() + " đã mở đợt báo cáo cho cùng khoảng thời gian.")));
+                            overlapReason(period, other), other.getId(), other.getName())));
         }
         return locks;
     }
@@ -103,6 +117,15 @@ public class PeriodSetupLockService {
     /** Lý do gộp của nhiều kỳ, mỗi lý do một lần — cho câu báo lỗi khi ghi nhiều kỳ cùng lúc. */
     public static String joinReasons(Collection<PeriodLock> locks) {
         return locks.stream().map(PeriodLock::reason).distinct().collect(Collectors.joining(" "));
+    }
+
+    /**
+     * Câu lý do khoá vì trùng kỳ — cùng ý với dòng ở đầu ma trận (khung Figma 310:60180), nhưng
+     * nêu tên kỳ bị khoá để còn đọc được khi đứng một mình trong thông báo lỗi.
+     */
+    static String overlapReason(ReportPeriod period, ReportPeriod source) {
+        return "Kỳ " + period.getName() + " trùng thời gian với " + source.getName()
+                + " đã mở đợt nên không thiết lập được. Hãy thiết lập ở " + source.getName() + ".";
     }
 
     static boolean overlaps(ReportPeriod first, ReportPeriod second) {

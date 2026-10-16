@@ -67,7 +67,7 @@ export function SetupMatrix({
   };
 
   const keysOf = (us: Unit[], ts: Template[]) =>
-    us.flatMap((u) => ts.map((t) => cellKey(u.id, t.code)));
+    us.flatMap((u) => ts.map((t) => cellKey(u.id, t.id)));
 
   const cornerKeys = keysOf(scopeUnits, templates);
   const corner = aggregate(cornerKeys);
@@ -105,7 +105,7 @@ export function SetupMatrix({
               const col = aggregate(keys);
               return (
                 <th
-                  key={t.code}
+                  key={t.id}
                   scope="col"
                   title={`Biểu ${t.code} — ${t.name}`}
                   className={cn(
@@ -166,17 +166,17 @@ export function SetupMatrix({
                         {u.name}
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
-                        {UNIT_GROUP_LABEL[u.group]}
+                        {u.group ? UNIT_GROUP_LABEL[u.group] : "Đơn vị khác"}
                       </div>
                     </div>
                   </div>
                 </th>
                 {templates.map((t) => {
-                  const key = cellKey(u.id, t.code);
+                  const key = cellKey(u.id, t.id);
                   const cell = getCell(key);
                   return (
                     <td
-                      key={t.code}
+                      key={t.id}
                       className={cn(
                         FORM_COL,
                         "h-[52px] border-b text-center align-middle",

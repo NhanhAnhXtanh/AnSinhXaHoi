@@ -17,8 +17,6 @@ import { Textarea } from "@/shared/ui/textarea";
 import { addDays, fmt, parseVnDate, type Period, type PeriodProgress } from "./model";
 import { SummaryBox } from "./summary-box";
 
-const EMPTY_PROGRESS: PeriodProgress = { approved: 0, pendingReview: 0, notSubmitted: 0 };
-
 /* ------------------------------------------------------------------ */
 /* Chốt đợt báo cáo (UC-27)                                            */
 /* ------------------------------------------------------------------ */
@@ -27,14 +25,18 @@ export function ClosePeriodDialog({
   open,
   onOpenChange,
   period,
+  progress: p,
+  pending,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   period: Period;
+  /** Tình hình phiếu thật của kỳ. */
+  progress: PeriodProgress;
+  pending?: boolean;
   onConfirm: () => void;
 }) {
-  const p = period.progress ?? EMPTY_PROGRESS;
   const blocked = p.pendingReview > 0;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,7 +68,7 @@ export function ClosePeriodDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Quay lại
           </Button>
-          <Button disabled={blocked} onClick={onConfirm}>
+          <Button disabled={blocked || pending} onClick={onConfirm}>
             Chốt đợt {period.name}
           </Button>
         </DialogFooter>
@@ -84,12 +86,14 @@ export function ReopenDialog({
   onOpenChange,
   period,
   today,
+  pending,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   period: Period;
   today: string;
+  pending?: boolean;
   onConfirm: (newDeadline: string, reason: string) => void;
 }) {
   const dateId = useId();
@@ -175,7 +179,9 @@ export function ReopenDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Quay lại
           </Button>
-          <Button onClick={submit}>Gia hạn và mở lại</Button>
+          <Button disabled={pending} onClick={submit}>
+            Gia hạn và mở lại
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -190,15 +196,18 @@ export function WithdrawDialog({
   open,
   onOpenChange,
   period,
-  ticketCount,
+  progress,
+  pending,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   period: Period;
-  /** Số phiếu đã phát của kỳ (sẽ bị xoá). */
-  ticketCount: number;
-  onConfirm: () => void;
+  /** Tình hình phiếu thật của kỳ — mọi phiếu này sẽ bị xoá. */
+  progress: PeriodProgress;
+  pending?: boolean;
+  /** Gửi kèm tên kỳ đã gõ — máy chủ kiểm lại (BR-29.1). */
+  onConfirm: (confirmName: string) => void;
 }) {
   const inputId = useId();
   const [typed, setTyped] = useState("");
@@ -208,7 +217,8 @@ export function WithdrawDialog({
   }, [open]);
 
   const matches = typed.trim() === period.name;
-  const approved = period.progress?.approved ?? 0;
+  const ticketCount = progress.total;
+  const approved = progress.approved;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -249,7 +259,11 @@ export function WithdrawDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Quay lại
           </Button>
-          <Button variant="destructive" disabled={!matches} onClick={onConfirm}>
+          <Button
+            variant="destructive"
+            disabled={!matches || pending}
+            onClick={() => onConfirm(typed.trim())}
+          >
             Thu hồi kỳ {period.name}
           </Button>
         </DialogFooter>

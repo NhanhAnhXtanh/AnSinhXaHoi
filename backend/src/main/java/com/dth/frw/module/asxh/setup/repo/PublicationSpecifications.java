@@ -12,7 +12,7 @@ import org.springframework.data.jpa.domain.Specification;
  * Chuỗi truy vấn → {@link Specification} cho {@code /api/publications} (lịch sử mở đợt, UC-30).
  *
  * <p>Trường lọc: {@code id}, {@code period.id}, {@code kind}, {@code status},
- * {@code period.calendar.year} (bí danh {@code year}). {@code q} tìm theo tên kỳ.
+ * {@code period.calendar.year} (bí danh {@code year}). {@code q} tìm theo tên kỳ hoặc người mở.
  */
 public final class PublicationSpecifications {
 
@@ -36,8 +36,13 @@ public final class PublicationSpecifications {
             }
         }
 
-        params.search().ifPresent(term -> specs.add((root, query, cb) ->
-                cb.like(cb.lower(root.get("period").get("name")), ListParams.likePattern(term))));
+        // Ô tìm của màn Lịch sử mở đợt: "Tìm theo kỳ báo cáo hoặc người mở…".
+        params.search().ifPresent(term -> specs.add((root, query, cb) -> {
+            String pattern = ListParams.likePattern(term);
+            return cb.or(
+                    cb.like(cb.lower(root.get("period").get("name")), pattern),
+                    cb.like(cb.lower(cb.coalesce(root.<String>get("createdBy"), "")), pattern));
+        }));
 
         List<Long> ids = params.ids();
         if (!ids.isEmpty()) {
