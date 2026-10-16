@@ -186,7 +186,7 @@ export function PlacementPicker({
   return (
     <div className={cn("flex flex-col gap-8", className)}>
       <FormItem className={itemClassName}>
-        <FormLabel>Organization</FormLabel>
+        <FormLabel>Đơn vị công tác</FormLabel>
         <Select
           onValueChange={handleOrganization}
           value={organizationId == null ? NONE : String(organizationId)}
@@ -195,12 +195,14 @@ export function PlacementPicker({
           <FormControl>
             <SelectTrigger className="w-full">
               <SelectValue
-                placeholder={organizationsLoading ? "Loading..." : "Not placed"}
+                placeholder={
+                  organizationsLoading ? "Đang tải..." : "Chưa gắn đơn vị"
+                }
               />
             </SelectTrigger>
           </FormControl>
           <SelectContent>
-            <SelectItem value={NONE}>Not placed</SelectItem>
+            <SelectItem value={NONE}>Chưa gắn đơn vị</SelectItem>
             {organizationOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -210,13 +212,13 @@ export function PlacementPicker({
         </Select>
         <FormDescription>
           {mayReadOrganizations
-            ? "Optional. An account can sign in without belonging to one."
-            : "You need the organizations:read permission to change this."}
+            ? "Để trống nếu là tài khoản không thuộc đơn vị nào."
+            : "Bạn chưa có quyền xem danh sách đơn vị nên không đổi được ô này."}
         </FormDescription>
       </FormItem>
 
       <FormItem className={itemClassName}>
-        <FormLabel>Department</FormLabel>
+        <FormLabel>Phòng ban</FormLabel>
         <Select
           onValueChange={(raw) =>
             onDepartmentChange({ id: raw === NONE ? null : Number(raw) })
@@ -227,12 +229,14 @@ export function PlacementPicker({
           <FormControl>
             <SelectTrigger className="w-full">
               <SelectValue
-                placeholder={departmentsLoading ? "Loading..." : "None"}
+                placeholder={
+                  departmentsLoading ? "Đang tải..." : "Không thuộc phòng ban nào"
+                }
               />
             </SelectTrigger>
           </FormControl>
           <SelectContent>
-            <SelectItem value={NONE}>None</SelectItem>
+            <SelectItem value={NONE}>Không thuộc phòng ban nào</SelectItem>
             {departmentOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -242,10 +246,10 @@ export function PlacementPicker({
         </Select>
         <FormDescription>
           {!mayReadDepartments
-            ? "You need the departments:read permission to change this."
+            ? "Bạn chưa có quyền xem danh sách phòng ban nên không đổi được ô này."
             : !organizationId
-            ? "Choose an organization first — a department only exists inside one."
-            : "Optional, and limited to the organization above."}
+            ? "Chọn đơn vị trước — phòng ban chỉ có trong một đơn vị."
+            : "Không bắt buộc; chỉ gồm phòng ban của đơn vị đã chọn."}
         </FormDescription>
       </FormItem>
     </div>

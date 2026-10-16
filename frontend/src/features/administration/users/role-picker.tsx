@@ -68,7 +68,7 @@ export function RolePicker({ value, onChange }: RolePickerProps) {
   if (roles.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        No roles are available. Create one on the Roles screen first.
+        Chưa có vai trò nào. Hãy tạo vai trò ở màn Vai trò trước.
       </p>
     );
   }
@@ -98,9 +98,6 @@ export function RolePicker({ value, onChange }: RolePickerProps) {
             />
             <div className="flex min-w-0 flex-col">
               <span className="text-sm font-medium">{role.name}</span>
-              <span className="text-muted-foreground font-mono text-xs">
-                {role.code}
-              </span>
               {role.description && (
                 <span className="text-muted-foreground mt-1 line-clamp-2 text-xs">
                   {role.description}

@@ -24,6 +24,13 @@ import {
 } from "@/shared/ui/select";
 import { Separator } from "@/shared/ui/separator";
 import { ACTIONS, type ExplainResponse } from "@/domains/row-level-policy/types";
+import { actionLabel, resourceLabel } from "../labels";
+
+const EVALUATED_LABELS: Record<string, string> = {
+  TRUE: "đúng",
+  FALSE: "sai",
+  UNKNOWN: "không xác định",
+};
 
 type SimulateResult = {
   allowed: boolean;
@@ -60,7 +67,7 @@ export function ExplainPanel({
 
   const { options: userOptions } = useSelect({
     resource: "users",
-    optionLabel: "username",
+    optionLabel: "fullName",
     optionValue: "id",
     sorters: [{ field: "username", order: "asc" }],
   });
@@ -90,6 +97,15 @@ export function ExplainPanel({
           userId: Number(userId),
           recordId: Number(recordId),
         },
+        successNotification: false,
+        errorNotification: (error) => ({
+          type: "error",
+          message: "Không kiểm tra được dòng dữ liệu",
+          description:
+            error && typeof error === "object" && "message" in error
+              ? String((error as { message?: unknown }).message ?? "")
+              : undefined,
+        }),
       },
       {
         onSuccess: (response) => setSimulation(response.data as SimulateResult),
@@ -100,20 +116,20 @@ export function ExplainPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Why somebody sees what they see</CardTitle>
+        <CardTitle>Kiểm tra ai thấy gì</CardTitle>
         <CardDescription>
-          Pick an account to work out what the rules add up to for them, on{" "}
-          <span className="font-mono">{resource}</span>. Naming a record answers
-          the harder question: why a particular row is or is not reachable.
+          Chọn một tài khoản để xem các phạm vi cộng lại cho tài khoản đó thấy
+          gì trên {resourceLabel(resource)}. Nhập thêm mã số một dòng dữ liệu để
+          biết vì sao dòng đó được thấy hay không.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label>Account</Label>
+            <Label>Tài khoản</Label>
             <Select value={userId} onValueChange={setUserId}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Select an account" />
+              <SelectTrigger className="w-[240px]">
+                <SelectValue placeholder="Chọn tài khoản" />
               </SelectTrigger>
               <SelectContent>
                 {(userOptions ?? []).map((option) => (
@@ -126,7 +142,7 @@ export function ExplainPanel({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>Action</Label>
+            <Label>Thao tác</Label>
             <Select value={action} onValueChange={setAction}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
@@ -134,7 +150,7 @@ export function ExplainPanel({
               <SelectContent>
                 {ACTIONS.map((candidate) => (
                   <SelectItem key={candidate} value={candidate}>
-                    {candidate}
+                    {actionLabel(candidate)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -142,12 +158,12 @@ export function ExplainPanel({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>Record id</Label>
+            <Label>Mã số dòng dữ liệu</Label>
             <Input
-              className="w-[140px]"
+              className="w-[160px]"
               type="number"
               value={recordId}
-              placeholder="optional"
+              placeholder="Không bắt buộc"
               onChange={(e) => setRecordId(e.target.value)}
             />
           </div>
@@ -158,7 +174,7 @@ export function ExplainPanel({
             disabled={!userId || !recordId || mutation.isPending}
             onClick={runSimulation}
           >
-            {mutation.isPending ? "Checking..." : "Check this record"}
+            {mutation.isPending ? "Đang kiểm tra..." : "Kiểm tra dòng này"}
           </Button>
         </div>
 
@@ -166,8 +182,8 @@ export function ExplainPanel({
           <Alert variant={simulation.allowed ? "default" : "destructive"}>
             <AlertDescription className="flex flex-col gap-1">
               <span className="font-medium">
-                {simulation.allowed ? "Allowed" : "Refused"} — evaluated as{" "}
-                {simulation.evaluatedAs}
+                {simulation.allowed ? "Được phép" : "Bị từ chối"} — kết quả{" "}
+                {EVALUATED_LABELS[simulation.evaluatedAs] ?? simulation.evaluatedAs}
               </span>
               {simulation.failedAt && (
                 <span className="font-mono text-xs">{simulation.failedAt}</span>
@@ -175,8 +191,9 @@ export function ExplainPanel({
               {simulation.because && <span>{simulation.because}</span>}
               {simulation.evaluatedAs === "UNKNOWN" && (
                 <span className="text-xs">
-                  Unknown is a refusal, not a maybe. A condition against an empty
-                  value has no answer, and a row with no answer is not shown.
+                  “Không xác định” nghĩa là từ chối, không phải “có thể”. Điều
+                  kiện so với một giá trị trống thì không có kết quả, và dòng
+                  không có kết quả sẽ không được hiện.
                 </span>
               )}
             </AlertDescription>
@@ -188,13 +205,13 @@ export function ExplainPanel({
             <Separator />
 
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Roles:</span>
+              <span className="text-muted-foreground">Vai trò:</span>
               {explanation.principal.roleCodes.map((role) => (
                 <Badge key={role} variant="secondary" className="font-mono text-[11px]">
                   {role}
                 </Badge>
               ))}
-              <span className="text-muted-foreground">Department:</span>
+              <span className="text-muted-foreground">Phòng ban:</span>
               <span className="font-mono text-xs">
                 {explanation.principal.departmentId ?? "—"}
               </span>
@@ -202,7 +219,7 @@ export function ExplainPanel({
 
             <div className="flex flex-col gap-2">
               <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                Effective scope
+                Điều kiện đang áp dụng
               </span>
               <code className="bg-muted rounded-md p-3 text-xs break-words">
                 {explanation.effective}
@@ -210,13 +227,13 @@ export function ExplainPanel({
             </div>
 
             <RuleList
-              title="Scopes"
-              hint="These union with each other, so holding one more role only ever widens."
+              title="Phạm vi mở rộng"
+              hint="Các phạm vi này cộng dồn với nhau, nên có thêm vai trò chỉ thấy rộng hơn."
               rules={explanation.scopes}
             />
             <RuleList
-              title="Filters"
-              hint="These always intersect and belong to nobody, so there is no role to not-hold in order to escape one."
+              title="Phạm vi hạn chế"
+              hint="Các phạm vi này luôn thu hẹp và không thuộc vai trò nào, nên không ai thoát được."
               rules={explanation.filters}
             />
 
@@ -251,7 +268,7 @@ function RuleList({
         {title}
       </span>
       {rules.length === 0 ? (
-        <p className="text-muted-foreground text-sm">None.</p>
+        <p className="text-muted-foreground text-sm">Không có.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {rules.map((rule) => (
@@ -261,7 +278,7 @@ function RuleList({
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={rule.applies ? "default" : "outline"}>
-                  {rule.applies ? "applies" : "not held"}
+                  {rule.applies ? "Đang áp dụng" : "Không giữ vai trò"}
                 </Badge>
                 <span className="text-sm font-medium">{rule.name}</span>
                 <span className="text-muted-foreground font-mono text-[11px]">
@@ -282,7 +299,7 @@ function RuleList({
               */}
               {rule.checks && (
                 <code className="text-muted-foreground text-xs break-words">
-                  after a save: {rule.checks}
+                  sau khi lưu: {rule.checks}
                 </code>
               )}
             </div>

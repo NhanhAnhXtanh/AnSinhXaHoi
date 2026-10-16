@@ -9,14 +9,11 @@ import {
   type AdvancedFilterField,
 } from "@/shared/components/data-table/data-table-advanced-filter";
 import {
-  actionsColumnWidth,
   DataTable,
   RESIZABLE_COLUMN_DEFAULTS,
 } from "@/shared/components/data-table/data-table";
 import { DataTableQuickFilter } from "@/shared/components/data-table/data-table-quick-filter";
-import { DeleteButton } from "@/shared/components/buttons/delete";
-import { EditButton } from "@/shared/components/buttons/edit";
-import { ShowButton } from "@/shared/components/buttons/show";
+import { CreateButton } from "@/shared/components/buttons/create";
 import {
   ListToolbar,
   ListView,
@@ -28,38 +25,65 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/shared/ui/tooltip";
+import { Plus } from "lucide-react";
 import { CoverageMatrix } from "./coverage-matrix";
+import { KIND_LABELS } from "./labels";
+import { useManagedResources } from "./use-managed-resources";
 import { ACTIONS, type RowLevelPolicy } from "@/domains/row-level-policy/types";
+import { actionLabel, resourceLabel } from "../labels";
+import {
+  ActionsCell,
+  ActionsHeader,
+  MENU_ONLY_COLUMN,
+  RecordActionsMenu,
+} from "../record-actions";
 
 const ADVANCED_FILTER_FIELDS: AdvancedFilterField[] = [
-  { field: "resource", label: "Resource", type: "text", placeholder: "Any" },
   {
     field: "action",
-    label: "Action",
+    label: "Thao tác",
     type: "select",
-    options: ACTIONS.map((action) => ({ label: action, value: action })),
+    options: ACTIONS.map((action) => ({ label: actionLabel(action), value: action })),
   },
   {
     field: "kind",
-    label: "Kind",
+    label: "Loại",
     type: "select",
     options: [
-      { label: "Scope", value: "SCOPE" },
-      { label: "Filter", value: "FILTER" },
+      { label: KIND_LABELS.SCOPE, value: "SCOPE" },
+      { label: KIND_LABELS.FILTER, value: "FILTER" },
     ],
   },
   {
     field: "enabled",
-    label: "Enabled",
+    label: "Trạng thái",
     type: "select",
     options: [
-      { label: "Yes", value: "true" },
-      { label: "No", value: "false" },
+      { label: "Đang bật", value: "true" },
+      { label: "Tạm tắt", value: "false" },
     ],
   },
 ];
 
 export const RowLevelPolicyList = () => {
+  const resources = useManagedResources();
+  // Lọc theo dữ liệu áp dụng: chọn từ danh sách tên tiếng Việt thay cho ô gõ mã.
+  const filterFields = React.useMemo<AdvancedFilterField[]>(
+    () => [
+      {
+        field: "resource",
+        label: "Dữ liệu áp dụng",
+        type: "select",
+        options: resources.map((resource) => ({
+          label: resourceLabel(resource),
+          value: resource,
+        })),
+      },
+      ...ADVANCED_FILTER_FIELDS,
+    ],
+    [resources]
+  );
+
   const columns = React.useMemo(() => {
     const columnHelper = createColumnHelper<RowLevelPolicy>();
 
@@ -67,76 +91,80 @@ export const RowLevelPolicyList = () => {
       columnHelper.accessor("name", {
         id: "name",
         enableResizing: true,
-        header: "Policy",
+        header: "Phạm vi",
         enableSorting: true,
         cell: ({ row }) => (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{row.original.name}</span>
-              {!row.original.enabled && (
-                <Badge variant="outline" className="text-[10px]">
-                  Off
-                </Badge>
-              )}
-            </div>
-            {row.original.policyGroup && (
+          <div className="flex flex-col">
+            <span className="font-medium">{row.original.name}</span>
+            {(row.original.description || row.original.policyGroup) && (
               <span className="text-muted-foreground text-xs">
-                {row.original.policyGroup}
+                {row.original.description || row.original.policyGroup}
               </span>
             )}
           </div>
         ),
+        size: 320,
+      }),
+      columnHelper.accessor("resource", {
+        id: "resource",
+        header: "Dữ liệu áp dụng",
+        enableSorting: true,
+        cell: ({ row }) => (
+          <div className="flex flex-col">
+            <span className="text-sm">{resourceLabel(row.original.resource)}</span>
+            <span className="text-muted-foreground text-xs">
+              Thao tác: {actionLabel(row.original.action)}
+            </span>
+          </div>
+        ),
+        size: 200,
+      }),
+      columnHelper.display({
+        id: "role",
+        header: "Vai trò",
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.role ? (
+            <Badge variant="outline">
+              {row.original.role.name || row.original.role.code}
+            </Badge>
+          ) : (
+            // Không phải "thiếu": phạm vi hạn chế không gắn vai trò nào.
+            <Badge variant="outline">Mọi vai trò</Badge>
+          ),
+        size: 180,
       }),
       columnHelper.accessor("kind", {
         id: "kind",
-        header: "Kind",
+        header: "Loại",
         enableSorting: true,
         cell: ({ row }) => (
           <Tooltip>
             <TooltipTrigger asChild>
               <Badge
-                variant={row.original.kind === "FILTER" ? "default" : "secondary"}
+                variant={row.original.kind === "FILTER" ? "warning" : "info"}
+                dot
               >
-                {row.original.kind}
+                {KIND_LABELS[row.original.kind] ?? row.original.kind}
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
               {row.original.kind === "FILTER"
-                ? "Applies to everyone and always intersects — there is no role to not-hold in order to escape it."
-                : "Belongs to one role and unions with the caller's other scopes, so holding one more role only ever widens."}
+                ? "Áp dụng cho mọi người và luôn thu hẹp dữ liệu — không vai trò nào thoát được."
+                : "Thuộc một vai trò và cộng thêm với các phạm vi khác của cán bộ, nên có thêm vai trò chỉ thấy rộng hơn."}
             </TooltipContent>
           </Tooltip>
         ),
         size: 120,
       }),
-      columnHelper.display({
-        id: "role",
-        header: "Role",
+      columnHelper.accessor("enabled", {
+        id: "enabled",
+        header: "Trạng thái",
         enableSorting: false,
-        cell: ({ row }) =>
-          row.original.role ? (
-            <span className="font-mono text-xs">{row.original.role.code}</span>
-          ) : (
-            // Not "missing": a filter has no role by design.
-            <span className="text-muted-foreground text-sm">everyone</span>
-          ),
-        size: 140,
-      }),
-      columnHelper.accessor("resource", {
-        id: "resource",
-        header: "Resource",
-        enableSorting: true,
         cell: ({ getValue }) => (
-          <span className="font-mono text-xs">{getValue()}</span>
+          <span className="text-sm">{getValue() ? "Đang bật" : "Tạm tắt"}</span>
         ),
-        size: 160,
-      }),
-      columnHelper.accessor("action", {
-        id: "action",
-        header: "Action",
-        enableSorting: true,
-        cell: ({ getValue }) => <Badge variant="outline">{getValue()}</Badge>,
-        size: 110,
+        size: 120,
       }),
       columnHelper.display({
         id: "health",
@@ -151,7 +179,7 @@ export const RowLevelPolicyList = () => {
                 <TriangleAlert className="text-destructive h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">
-                Disabled at startup because it no longer compiles:{" "}
+                Đã bị tắt khi khởi động vì điều kiện không còn hợp lệ:{" "}
                 {row.original.invalidReason}
               </TooltipContent>
             </Tooltip>
@@ -164,16 +192,25 @@ export const RowLevelPolicyList = () => {
       }),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
+        header: () => <ActionsHeader />,
         enableSorting: false,
         cell: ({ row }) => (
-          <div className="flex gap-1">
-            <EditButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            <ShowButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            <DeleteButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-          </div>
+          <ActionsCell>
+            <RecordActionsMenu
+              resource="row_level_policies"
+              id={row.original.id}
+              editLabel="Sửa phạm vi"
+              remove={{
+                label: "Xoá phạm vi",
+                title: `Xoá phạm vi “${row.original.name}”?`,
+                description:
+                  "Phần dữ liệu phạm vi này mở ra hoặc giới hạn sẽ trở về mặc định. Việc xoá không lấy lại được.",
+                successMessage: `Đã xoá phạm vi ${row.original.name}`,
+              }}
+            />
+          </ActionsCell>
         ),
-        ...actionsColumnWidth(3),
+        ...MENU_ONLY_COLUMN,
       }),
     ];
   }, []);
@@ -206,17 +243,32 @@ export const RowLevelPolicyList = () => {
 
   return (
     <ListView>
-      <ListViewHeader description="Which rows a role can reach, and the prohibitions that apply to everybody." />
+      <ListViewHeader
+        title="Phạm vi dữ liệu"
+        description="Mỗi vai trò được thấy những dòng dữ liệu nào, và những giới hạn áp dụng cho mọi người."
+        canCreate={false}
+        actions={
+          <CreateButton resource="row_level_policies">
+            <Plus className="size-4" />
+            Thêm phạm vi dữ liệu
+          </CreateButton>
+        }
+      />
       <DataTable
         table={table}
         toolbar={
           <>
             <ListToolbar
               table={table}
-              search={<DataTableQuickFilter table={table} />}
-              filters={<DataTableAdvancedFilter table={table} fields={ADVANCED_FILTER_FIELDS} />}
+              search={
+                <DataTableQuickFilter
+                  table={table}
+                  placeholder="Tìm theo tên phạm vi..."
+                />
+              }
+              filters={<DataTableAdvancedFilter table={table} fields={filterFields} />}
             />
-            <DataTableFilterChips table={table} fields={ADVANCED_FILTER_FIELDS} />
+            <DataTableFilterChips table={table} fields={filterFields} />
           </>
         }
       />

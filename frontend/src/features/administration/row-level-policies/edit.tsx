@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import { useForm } from "@refinedev/react-hook-form";
 import { useNavigate } from "react-router";
 
-import {
-  EditView,
-  EditViewHeader,
-} from "@/shared/components/views/edit-view";
+import { EditView } from "@/shared/components/views/edit-view";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
+import {
+  FormSectionActions,
+  SectionedFormPanel,
+} from "@/shared/components/form/form-section";
 import { TriangleAlert } from "lucide-react";
+import { AdminPageHeader, RecordHeaderActions } from "../record-actions";
+import { errorDescription } from "../labels";
 import { PolicyForm, type PolicyFormValues } from "./policy-form";
 import { DEFAULT_POLICY, normalize } from "./policy-values";
 import { useManagedResources } from "./use-managed-resources";
@@ -26,7 +29,17 @@ export const RowLevelPolicyEdit = () => {
     // Defaults as well as the reset below: they are what types the form (see
     // create.tsx), and they give the condition builder something coherent to
     // render in the moment before the record arrives.
-    refineCoreProps: {},
+    refineCoreProps: {
+      successNotification: () => ({
+        type: "success",
+        message: "Đã lưu phạm vi dữ liệu",
+      }),
+      errorNotification: (error) => ({
+        type: "error",
+        message: "Không lưu được phạm vi dữ liệu",
+        description: errorDescription(error),
+      }),
+    },
     defaultValues: DEFAULT_POLICY,
   });
 
@@ -97,41 +110,69 @@ export const RowLevelPolicyEdit = () => {
 
   return (
     <EditView>
-      <EditViewHeader />
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <AdminPageHeader
+        title="Sửa phạm vi dữ liệu"
+        description={policy?.name}
+        actions={
+          <RecordHeaderActions
+            resource="row_level_policies"
+            id={policy?.id}
+            editLabel={false}
+            showLabel="Xem chi tiết"
+            remove={
+              policy
+                ? {
+                    label: "Xoá phạm vi",
+                    title: `Xoá phạm vi “${policy.name}”?`,
+                    description:
+                      "Phần dữ liệu phạm vi này mở ra hoặc giới hạn sẽ trở về mặc định. Việc xoá không lấy lại được.",
+                    successMessage: `Đã xoá phạm vi ${policy.name}`,
+                  }
+                : false
+            }
+          />
+        }
+      />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-w-0 flex-col gap-4">
         {policy?.invalidReason && (
           <Alert variant="destructive">
             <TriangleAlert className="h-4 w-4" />
             <AlertDescription>
-              This policy was disabled at startup because it no longer compiles:{" "}
-              {policy.invalidReason}. Fix the condition and switch it back on —
-              saving re-checks it, and the reason is cleared when it passes.
+              Phạm vi này đã bị tắt khi khởi động vì điều kiện không còn hợp lệ:{" "}
+              {policy.invalidReason}. Sửa điều kiện rồi bật lại — khi lưu hệ
+              thống kiểm tra lại và xoá lý do nếu đã đúng.
             </AlertDescription>
           </Alert>
         )}
 
-        {hydrated ? (
-          <PolicyForm
-            form={form}
-            resources={resources}
-            currentRole={policy?.role}
-            lockIdentity
-          />
-        ) : (
-          <div className="space-y-4">
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-        )}
+        <SectionedFormPanel>
+          {hydrated ? (
+            <PolicyForm
+              form={form}
+              resources={resources}
+              currentRole={
+                policy?.role
+                  ? { id: policy.role.id, code: policy.role.name || policy.role.code }
+                  : policy?.role
+              }
+              lockIdentity
+            />
+          ) : (
+            <div className="space-y-4 p-6">
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+          )}
 
-        <div className="flex gap-2">
-          <Button type="submit" disabled={!hydrated || form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Saving..." : "Save"}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-            Cancel
-          </Button>
-        </div>
+          <FormSectionActions>
+            <Button type="submit" disabled={!hydrated || form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+              Huỷ
+            </Button>
+          </FormSectionActions>
+        </SectionedFormPanel>
       </form>
     </EditView>
   );

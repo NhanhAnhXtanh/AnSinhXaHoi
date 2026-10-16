@@ -1,20 +1,10 @@
 import { useForm } from "@refinedev/react-hook-form";
 import { useNavigate } from "react-router";
 
-import {
-  CreateView,
-  CreateViewHeader,
-} from "@/shared/components/views/create-view";
+import { CreateView } from "@/shared/components/views/create-view";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { InputPassword } from "@/shared/components/form/input-password";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select";
 import {
   Form,
   FormControl,
@@ -31,53 +21,53 @@ import {
 } from "@/shared/components/form/form-section";
 import { RolePicker, type RoleRef } from "./role-picker";
 import { PlacementPicker, type PlacementRef } from "./placement-picker";
-import { STATUS_OPTIONS, type UserStatus } from "@/domains/user/types";
+import { StatusSwitchField } from "./status-switch-field";
+import { RequiredMark, joinFullName, USER_FIELD_RULES } from "./user-form-fields";
+import { AdminPageHeader } from "../record-actions";
+import { errorDescription } from "../labels";
+import type { UserStatus } from "@/domains/user/types";
 
 /**
- * The create payload, which is `UserRequest` on the backend rather than the
- * `UserResponse` shape the rest of the resource speaks. Naming it keeps the
- * defaults below and the submit handler agreeing on one type.
+ * Giá trị của form tạo. `familyName` / `givenName` / `confirmPassword` chỉ sống
+ * trên form: API nhận `fullName` một ô và một mật khẩu, nên khi gửi họ tên được
+ * ghép lại và ô nhập lại mật khẩu được bỏ đi. Payload gửi đi vẫn đúng
+ * `UserRequest` như trước.
  */
 type UserFormValues = {
+  familyName: string;
+  givenName: string;
   username: string;
   email: string;
-  fullName: string;
   password: string;
+  confirmPassword: string;
   status: UserStatus;
   roles: RoleRef[];
   organization: PlacementRef;
   department: PlacementRef;
 };
 
-/**
- * Annotated rather than inferred, so `status` widens to the union instead of
- * being pinned to the literal "active" the object happens to start with.
- */
 const DEFAULT_VALUES: UserFormValues = {
+  familyName: "",
+  givenName: "",
   username: "",
   email: "",
-  fullName: "",
   password: "",
+  confirmPassword: "",
   status: "active",
   roles: [],
-  // `{ id: null }` rather than omitted: it is the shape the API reads as "no
-  // placement", and it keeps the picker's value a stable object either way.
+  // `{ id: null }` thay vì bỏ trống: API đọc đó là "chưa gắn đơn vị", và giữ
+  // giá trị của ô chọn luôn là một đối tượng ổn định.
   organization: { id: null },
   department: { id: null },
 };
 
 /**
- * Creating an account.
+ * Thêm người dùng.
  *
- * This is the only way a user comes into existence — there is no
- * self-registration — so the password is set here by whoever creates the
- * account and handed over out of band.
+ * Đây là cách duy nhất để có tài khoản — không có tự đăng ký — nên mật khẩu do
+ * người tạo đặt ở đây và báo riêng cho cán bộ.
  *
- * The same three zones as the edit screen, in the same order and the same
- * column spans, with sign-in credentials as a fourth: making an account and
- * changing one should not be two different shapes, and the one real difference
- * between them — a password that is set once and never shown again — is the
- * thing that gets its own heading.
+ * Lưới 12 cột, mỗi ô 4 cột: ba ô một hàng như Figma (310:26715).
  */
 export const UserCreate = () => {
   const navigate = useNavigate();
@@ -86,51 +76,91 @@ export const UserCreate = () => {
     refineCore: { onFinish },
     ...form
   } = useForm({
-    refineCoreProps: {},
+    refineCoreProps: {
+      successNotification: (_data, values) => ({
+        type: "success",
+        message: `Đã tạo người dùng ${
+          (values as { fullName?: string } | undefined)?.fullName ?? ""
+        }`.trim(),
+      }),
+      errorNotification: (error) => ({
+        type: "error",
+        message: "Không tạo được người dùng",
+        description: errorDescription(error),
+      }),
+    },
     defaultValues: DEFAULT_VALUES,
   });
 
   function onSubmit(values: UserFormValues) {
-    onFinish(values);
+    // Đúng `UserRequest` của API: họ tên ghép lại thành một ô, không gửi ô
+    // nhập lại mật khẩu. Ép kiểu vì `onFinish` nhận kiểu của form.
+    const payload = {
+      username: values.username,
+      email: values.email,
+      fullName: joinFullName(values.familyName, values.givenName),
+      password: values.password,
+      status: values.status,
+      roles: values.roles,
+      organization: values.organization,
+      department: values.department,
+    };
+    onFinish(payload as unknown as UserFormValues);
   }
 
   return (
     <CreateView>
-      <CreateViewHeader />
+      <AdminPageHeader
+        title="Thêm người dùng"
+        description="Nhập thông tin tài khoản, chọn đơn vị công tác và vai trò cho cán bộ."
+      />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="min-w-0">
           <SectionedFormPanel>
             <FormSection
-              title="Identity"
-              description="Who this account belongs to, and what they sign in with."
+              title="Thông tin tài khoản"
+              description="Họ tên, tên đăng nhập và mật khẩu đầu tiên của cán bộ."
             >
               <FormField
                 control={form.control}
-                name="username"
-                rules={{
-                  required: "Username is required",
-                  minLength: { value: 3, message: "At least 3 characters" },
-                  // Mirrors the pattern the API enforces, so the message
-                  // arrives before the round trip rather than after it.
-                  pattern: {
-                    value: /^[a-zA-Z0-9._-]+$/,
-                    message:
-                      "Letters, digits, dots, underscores and hyphens only",
-                  },
-                }}
+                name="familyName"
+                rules={{ required: "Vui lòng nhập họ và tên đệm của cán bộ." }}
                 render={({ field }) => (
                   <FormItem className="md:col-span-4">
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>
+                      Họ và tên đệm <RequiredMark />
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         value={field.value ?? ""}
-                        placeholder="jdoe"
-                        className="font-mono"
+                        placeholder="Ví dụ: Nguyễn Văn"
+                      />
+                    </FormControl>
+                    <FormDescription>Họ và chữ đệm của cán bộ.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="givenName"
+                rules={{ required: "Vui lòng nhập tên của cán bộ." }}
+                render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>
+                      Tên <RequiredMark />
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        placeholder="Ví dụ: An"
                       />
                     </FormControl>
                     <FormDescription>
-                      Used to sign in. Must be unique.
+                      Tên gọi của cán bộ, hiện trên các màn hình.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -140,26 +170,22 @@ export const UserCreate = () => {
               <FormField
                 control={form.control}
                 name="email"
-                rules={{
-                  required: "Email is required",
-                  pattern: {
-                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: "Enter a valid email address",
-                  },
-                }}
+                rules={USER_FIELD_RULES.email}
                 render={({ field }) => (
                   <FormItem className="md:col-span-4">
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>
+                      Thư điện tử <RequiredMark />
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         type="email"
                         value={field.value ?? ""}
-                        placeholder="jdoe@example.com"
+                        placeholder="Ví dụ: an.nv@dongnai.gov.vn"
                       />
                     </FormControl>
                     <FormDescription>
-                      Also accepted in place of the username when signing in.
+                      Dùng để liên hệ; cũng đăng nhập được thay cho tên đăng nhập.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -168,53 +194,80 @@ export const UserCreate = () => {
 
               <FormField
                 control={form.control}
-                name="fullName"
-                rules={{ required: "Full name is required" }}
+                name="username"
+                rules={USER_FIELD_RULES.username}
                 render={({ field }) => (
                   <FormItem className="md:col-span-4">
-                    <FormLabel>Full name</FormLabel>
+                    <FormLabel>
+                      Tên đăng nhập <RequiredMark />
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         value={field.value ?? ""}
-                        placeholder="Jane Doe"
+                        placeholder="Ví dụ: an.nv"
                       />
                     </FormControl>
                     <FormDescription>
-                      What people see in the UI.
+                      Dùng để đăng nhập. Không được trùng với tài khoản khác.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </FormSection>
 
-            <FormSection
-              title="Sign-in"
-              description="Set once, here. There is no self-registration and no password reset by email."
-            >
               <FormField
                 control={form.control}
                 name="password"
                 rules={{
-                  required: "Password is required",
-                  minLength: { value: 8, message: "At least 8 characters" },
+                  required: "Vui lòng đặt mật khẩu ban đầu.",
+                  minLength: { value: 8, message: "Mật khẩu cần ít nhất 8 ký tự." },
                 }}
                 render={({ field }) => (
                   <FormItem className="md:col-span-4">
-                    <FormLabel>Initial password</FormLabel>
+                    <FormLabel>
+                      Mật khẩu ban đầu <RequiredMark />
+                    </FormLabel>
                     <FormControl>
                       <InputPassword
                         {...field}
                         value={field.value ?? ""}
                         autoComplete="new-password"
-                        placeholder="At least 8 characters"
+                        placeholder="Tối thiểu 8 ký tự"
                       />
                     </FormControl>
                     <FormDescription>
-                      Hashed before it is stored and never shown again. Share it
-                      with the account holder and ask them to change it.
+                      Hãy gửi mật khẩu này cho cán bộ và nhắc đổi sau lần đăng
+                      nhập đầu.
                     </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                rules={{
+                  required: "Vui lòng nhập lại mật khẩu.",
+                  validate: (value) =>
+                    value === form.getValues("password") ||
+                    "Mật khẩu nhập lại chưa giống mật khẩu ban đầu.",
+                }}
+                render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>
+                      Nhập lại mật khẩu <RequiredMark />
+                    </FormLabel>
+                    <FormControl>
+                      <InputPassword
+                        {...field}
+                        value={field.value ?? ""}
+                        autoComplete="new-password"
+                        placeholder="Nhập lại mật khẩu vừa đặt"
+                      />
+                    </FormControl>
+                    <FormDescription>Phải giống mật khẩu ban đầu.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -222,48 +275,13 @@ export const UserCreate = () => {
             </FormSection>
 
             <FormSection
-              title="Placement and status"
-              description="Where the account sits in the company, and whether it may sign in at all."
+              title="Đơn vị công tác và trạng thái"
+              description="Nơi cán bộ làm việc và việc cho phép hay không cho phép đăng nhập."
             >
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-4">
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ?? "active"}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Only an active account can sign in.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               {/*
-                Two fields, one control: the department list is filtered by the
-                organization chosen beside it, and changing the organization
-                clears the department. See `placement-picker.tsx` for why the
-                API leaves no room for them to disagree.
-
-                `contents` puts both on this section's own grid rather than in a
-                column of their own.
+                Hai ô, một điều khiển: danh sách phòng ban lọc theo đơn vị chọn
+                bên cạnh, đổi đơn vị thì phòng ban bị xoá. `contents` để hai ô
+                nằm thẳng trên lưới của mục này.
               */}
               <PlacementPicker
                 className="contents"
@@ -277,11 +295,23 @@ export const UserCreate = () => {
                   form.setValue("department", value)
                 }
               />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <StatusSwitchField
+                    className="md:col-span-4"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
             </FormSection>
 
             <FormSection
-              title="Roles"
-              description="What the account may do. An account with none can sign in and see nothing."
+              title="Vai trò"
+              description="Việc cán bộ được làm trên hệ thống. Chọn ít nhất một vai trò để cán bộ thấy được màn hình làm việc."
             >
               <FormField
                 control={form.control}
@@ -289,7 +319,7 @@ export const UserCreate = () => {
                 rules={{
                   validate: (value) =>
                     (Array.isArray(value) && value.length > 0) ||
-                    "Select at least one role",
+                    "Vui lòng chọn ít nhất một vai trò.",
                 }}
                 render={({ field }) => (
                   <FormItem className="md:col-span-12">
@@ -307,14 +337,14 @@ export const UserCreate = () => {
 
             <FormSectionActions>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Creating..." : "Create"}
+                {form.formState.isSubmitting ? "Đang tạo..." : "Tạo người dùng"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate(-1)}
               >
-                Cancel
+                Huỷ
               </Button>
             </FormSectionActions>
           </SectionedFormPanel>

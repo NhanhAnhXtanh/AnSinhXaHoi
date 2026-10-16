@@ -4,7 +4,6 @@ import { createColumnHelper } from "@tanstack/react-table";
 import React from "react";
 
 import {
-  actionsColumnWidth,
   DataTable,
   RESIZABLE_COLUMN_DEFAULTS,
 } from "@/shared/components/data-table/data-table";
@@ -19,15 +18,20 @@ import {
   ListView,
   ListViewHeader,
 } from "@/shared/components/views/list-view";
-import { EditButton } from "@/shared/components/buttons/edit";
-import { ShowButton } from "@/shared/components/buttons/show";
-import { DeleteButton } from "@/shared/components/buttons/delete";
+import { CreateButton } from "@/shared/components/buttons/create";
 import { Badge } from "@/shared/ui/badge";
 import type { Organization as OrganizationRow } from "@/domains/organization/types";
 import type { Department as DepartmentRow } from "@/domains/department/types";
 import type { User } from "@/domains/user/types";
-import { STATUS_LABELS } from "@/domains/user/types";
-import { USER_STATUS_VARIANTS } from "@/shared/lib/status-variants";
+import { Plus } from "lucide-react";
+import { formatDateTimeVi, USER_STATUS_FILTER_OPTIONS } from "../labels";
+import {
+  ActionsCell,
+  ActionsHeader,
+  MENU_ONLY_COLUMN,
+} from "../record-actions";
+import { UserRowActions } from "./user-actions";
+import { UserStatusBadge } from "./user-status-badge";
 
 /**
  * The fixed half of the filter panel.
@@ -39,30 +43,16 @@ import { USER_STATUS_VARIANTS } from "@/shared/lib/status-variants";
  * options come from resources this account may not be allowed to read.
  */
 const STATIC_FILTER_FIELDS: AdvancedFilterField[] = [
-  { field: "id", label: "ID", type: "number", placeholder: "Any" },
-  { field: "username", label: "Username", type: "text", placeholder: "Any" },
-  { field: "email", label: "Email", type: "text", placeholder: "Any" },
-  { field: "fullName", label: "Full name", type: "text", placeholder: "Any" },
+  { field: "fullName", label: "Họ tên", type: "text", placeholder: "Tất cả" },
+  { field: "username", label: "Tên đăng nhập", type: "text", placeholder: "Tất cả" },
+  { field: "email", label: "Thư điện tử", type: "text", placeholder: "Tất cả" },
   {
     field: "status",
-    label: "Status",
+    label: "Trạng thái",
     type: "select",
-    options: [
-      { label: "Active", value: "active" },
-      { label: "Inactive", value: "inactive" },
-      { label: "Locked", value: "locked" },
-    ],
+    options: USER_STATUS_FILTER_OPTIONS,
   },
 ];
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export const UserList = () => {
   // Reading organizations and departments are separate grants from reading
@@ -98,30 +88,26 @@ export const UserList = () => {
     const columnHelper = createColumnHelper<User>();
 
     return [
-      columnHelper.accessor("username", {
-        id: "username",
+      columnHelper.accessor("fullName", {
+        id: "fullName",
         enableResizing: true,
-        header: "Username",
+        header: "Họ tên",
         enableSorting: true,
         cell: ({ row }) => (
           <div className="flex flex-col">
-            <span className="font-medium">{row.original.username}</span>
+            <span className="font-medium">
+              {row.original.fullName || row.original.username}
+            </span>
             <span className="text-muted-foreground text-xs">
-              {row.original.email}
+              {row.original.username}
             </span>
           </div>
         ),
       }),
-      columnHelper.accessor("fullName", {
-        id: "fullName",
-        enableResizing: true,
-        header: "Full name",
-        enableSorting: true,
-      }),
       columnHelper.display({
         id: "placement",
         enableResizing: true,
-        header: "Placement",
+        header: "Đơn vị công tác",
         // Not sortable: `_sort=organization` is not a property the API accepts,
         // and offering the header would produce a sort that quietly does
         // nothing. Filter by organization or department instead.
@@ -135,7 +121,7 @@ export const UserList = () => {
             <div className="flex flex-col">
               <span className="text-sm">{organization.name}</span>
               <span className="text-muted-foreground text-xs">
-                {department?.name ?? "No department"}
+                {department?.name ?? "Không thuộc phòng ban nào"}
               </span>
             </div>
           );
@@ -143,20 +129,13 @@ export const UserList = () => {
       }),
       columnHelper.accessor("status", {
         id: "status",
-        header: "Status",
+        header: "Trạng thái",
         enableSorting: true,
-        cell: ({ getValue }) => {
-          const status = getValue();
-          return (
-            <Badge variant={USER_STATUS_VARIANTS[status] ?? "secondary"}>
-              {STATUS_LABELS[status] ?? status}
-            </Badge>
-          );
-        },
+        cell: ({ getValue }) => <UserStatusBadge status={getValue()} />,
       }),
       columnHelper.display({
         id: "roles",
-        header: "Roles",
+        header: "Vai trò",
         // Not sortable: the value is a collection, and sorting a row by "its
         // roles" has no meaning the API could implement.
         enableSorting: false,
@@ -172,26 +151,33 @@ export const UserList = () => {
       }),
       columnHelper.accessor("lastLoginAt", {
         id: "lastLoginAt",
-        header: "Last sign-in",
+        header: "Đăng nhập gần nhất",
         enableSorting: true,
-        cell: ({ getValue }) => (
-          <span className="text-muted-foreground text-sm">
-            {formatDate(getValue())}
-          </span>
-        ),
+        cell: ({ getValue }) => {
+          const value = getValue();
+          return (
+            <span className="text-sm tabular-nums">
+              {value ? (
+                formatDateTimeVi(value)
+              ) : (
+                <span className="text-muted-foreground">Chưa đăng nhập</span>
+              )}
+            </span>
+          );
+        },
       }),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
+        header: () => <ActionsHeader />,
+        // Chỉ một nút ⋯: Sửa, Xem chi tiết, Đặt lại mật khẩu, Khoá và Xoá đều
+        // nằm trong menu, mục nào tài khoản này không có quyền thì ẩn.
         cell: ({ row }) => (
-          <div className="flex gap-1">
-            <EditButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            <ShowButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            <DeleteButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-          </div>
+          <ActionsCell>
+            <UserRowActions user={row.original} />
+          </ActionsCell>
         ),
         enableSorting: false,
-        ...actionsColumnWidth(3),
+        ...MENU_ONLY_COLUMN,
       }),
     ];
   }, []);
@@ -206,9 +192,9 @@ export const UserList = () => {
         ? [
             {
               field: "organization.id",
-              label: "Organization",
+              label: "Đơn vị",
               type: "select" as const,
-              placeholder: "Any organization",
+              placeholder: "Tất cả đơn vị",
               options: (organizationResult?.data ?? []).map((item) => ({
                 label: item.name,
                 value: String(item.id),
@@ -225,9 +211,9 @@ export const UserList = () => {
         ? [
             {
               field: "department.id",
-              label: "Department",
+              label: "Phòng ban",
               type: "select" as const,
-              placeholder: "Any department",
+              placeholder: "Tất cả phòng ban",
               options: (departmentResult?.data ?? []).map((item) => ({
                 label: `${item.organization.name} · ${item.name}`,
                 value: String(item.id),
@@ -272,14 +258,29 @@ export const UserList = () => {
 
   return (
     <ListView>
-      <ListViewHeader description="Accounts that can sign in, the roles they hold and where they are placed." />
+      <ListViewHeader
+        title="Người dùng"
+        description="Tài khoản đăng nhập, vai trò và đơn vị công tác của từng cán bộ."
+        canCreate={false}
+        actions={
+          <CreateButton resource="users">
+            <Plus className="size-4" />
+            Thêm người dùng
+          </CreateButton>
+        }
+      />
       <DataTable
         table={table}
         toolbar={
           <>
             <ListToolbar
               table={table}
-              search={<DataTableQuickFilter table={table} />}
+              search={
+                <DataTableQuickFilter
+                  table={table}
+                  placeholder="Tìm theo họ tên hoặc tên đăng nhập..."
+                />
+              }
               filters={<DataTableAdvancedFilter table={table} fields={advancedFilterFields} />}
             />
             <DataTableFilterChips table={table} fields={advancedFilterFields} />

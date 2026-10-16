@@ -17,13 +17,13 @@ import {
   NULLARY_OPERATORS,
   RANGE_OPERATORS,
   SET_OPERATORS,
-  operatorLabel,
   type MetadataField,
   type PolicyMetadata,
   type ScopeLeaf,
   type ScopeNode,
   type ScopeValue,
 } from "@/domains/row-level-policy/types";
+import { contextLabel, fieldLabel, operatorLabelVi } from "./labels";
 
 /**
  * The condition builder.
@@ -60,8 +60,8 @@ export function ScopeBuilder({
   if (!metadata) {
     return (
       <p className="text-muted-foreground text-sm">
-        Pick a resource first — the fields a condition may use are declared per
-        resource.
+        Chọn “Dữ liệu áp dụng” trước — mỗi loại dữ liệu có các trường điều kiện
+        riêng.
       </p>
     );
   }
@@ -78,8 +78,8 @@ export function ScopeBuilder({
         depth={0}
       />
       <p className="text-muted-foreground text-xs">
-        An empty <span className="font-mono">all</span> group matches every row
-        — that is the full scope, not an unfinished condition.
+        Nhóm “khớp tất cả” để trống sẽ cho thấy mọi dòng; đó là phạm vi đầy đủ,
+        không phải điều kiện chưa xong.
       </p>
     </div>
   );
@@ -149,12 +149,12 @@ function GroupEditor({
             onChange(next === "all" ? { all: children } : { any: children })
           }
         >
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-[260px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Match all of</SelectItem>
-            <SelectItem value="any">Match any of</SelectItem>
+            <SelectItem value="all">Khớp tất cả điều kiện sau</SelectItem>
+            <SelectItem value="any">Khớp một trong các điều kiện sau</SelectItem>
           </SelectContent>
         </Select>
 
@@ -168,7 +168,7 @@ function GroupEditor({
           onClick={() => add(newLeaf(metadata))}
         >
           <Plus className="h-3.5 w-3.5" />
-          Condition
+          Điều kiện
         </Button>
         <Button
           type="button"
@@ -178,7 +178,7 @@ function GroupEditor({
           onClick={() => add({ any: [] })}
         >
           <Plus className="h-3.5 w-3.5" />
-          Group
+          Nhóm
         </Button>
         {onRemove && (
           <Button
@@ -187,7 +187,7 @@ function GroupEditor({
             size="icon-sm"
             disabled={disabled}
             onClick={onRemove}
-            aria-label="Remove group"
+            aria-label="Bỏ nhóm"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -197,8 +197,8 @@ function GroupEditor({
       {children.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {kind === "all"
-            ? "Empty — matches every row."
-            : "Empty — matches no rows."}
+            ? "Chưa có điều kiện nào: nhóm này khớp mọi dòng dữ liệu."
+            : "Chưa có điều kiện nào: nhóm này không khớp dòng dữ liệu nào."}
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -236,7 +236,7 @@ function NotEditor({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-dashed p-3">
       <div className="flex items-center gap-2">
-        <Badge variant="outline">NOT</Badge>
+        <Badge variant="outline">Không phải</Badge>
         <div className="flex-1" />
         <Button
           type="button"
@@ -245,7 +245,7 @@ function NotEditor({
           disabled={disabled}
           onClick={() => onChange(inner)}
         >
-          Remove NOT
+          Bỏ đảo điều kiện
         </Button>
         {onRemove && (
           <Button
@@ -254,7 +254,7 @@ function NotEditor({
             size="icon-sm"
             disabled={disabled}
             onClick={onRemove}
-            aria-label="Remove condition"
+            aria-label="Bỏ điều kiện"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -314,13 +314,13 @@ function LeafEditor({
     <div className="flex flex-col gap-2 rounded-md border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Select value={leaf.field} disabled={disabled} onValueChange={changeField}>
-          <SelectTrigger className="w-[190px]">
-            <SelectValue placeholder="Field" />
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Trường dữ liệu" />
           </SelectTrigger>
           <SelectContent>
             {metadata.fields.map((candidate) => (
               <SelectItem key={candidate.path} value={candidate.path}>
-                {candidate.path}
+                {fieldLabel(candidate.path)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -328,12 +328,12 @@ function LeafEditor({
 
         <Select value={leaf.op} disabled={disabled || !field} onValueChange={changeOperator}>
           <SelectTrigger className="w-[170px]">
-            <SelectValue placeholder="Operator" />
+            <SelectValue placeholder="Phép so sánh" />
           </SelectTrigger>
           <SelectContent>
             {(field?.operators ?? []).map((op) => (
               <SelectItem key={op} value={op}>
-                {operatorLabel(op)}
+                {operatorLabelVi(op)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -359,7 +359,7 @@ function LeafEditor({
           disabled={disabled}
           onClick={() => onChange({ not: leaf })}
         >
-          Negate
+          Đảo điều kiện
         </Button>
         {onRemove && (
           <Button
@@ -368,7 +368,7 @@ function LeafEditor({
             size="icon-sm"
             disabled={disabled}
             onClick={onRemove}
-            aria-label="Remove condition"
+            aria-label="Bỏ điều kiện"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -379,9 +379,9 @@ function LeafEditor({
         <Alert variant="destructive">
           <TriangleAlert className="h-4 w-4" />
           <AlertDescription>
-            <span className="font-mono">{leaf.field}</span> only has a value once
-            the row has been saved, so a write policy using it would refuse every
-            new record. The API will not accept this.
+            “{fieldLabel(leaf.field)}” chỉ có giá trị sau khi dòng đã được lưu,
+            nên phạm vi “Thêm, sửa” dùng trường này sẽ chặn mọi dòng mới. Hệ
+            thống sẽ không nhận điều kiện này.
           </AlertDescription>
         </Alert>
       )}
@@ -420,9 +420,9 @@ function NullWarning({
       <TriangleAlert className="h-4 w-4" />
       <AlertDescription className="flex flex-col items-start gap-2">
         <span>
-          <span className="font-mono">{field.path}</span> can be empty. A negated
-          condition does <b>not</b> match a row where it is — an empty value makes
-          the comparison unknown, and unknown refuses the row.
+          “{fieldLabel(field.path)}” có thể để trống. Điều kiện đã đảo sẽ{" "}
+          <b>không</b> khớp dòng có trường này trống — giá trị trống làm phép so
+          sánh không có kết quả, và dòng đó bị loại.
         </span>
         <Button
           type="button"
@@ -435,7 +435,7 @@ function NullWarning({
             })
           }
         >
-          Also match rows where it is empty
+          Khớp cả các dòng để trống trường này
         </Button>
       </AlertDescription>
     </Alert>
@@ -470,48 +470,47 @@ function ValueEditor({
 
   const literal = value !== undefined && "lit" in value ? value.lit : undefined;
 
+  // Một ô chọn cho cả hai nguồn giá trị như Figma: "Nhập giá trị cụ thể" hoặc
+  // một giá trị theo tài khoản đang đăng nhập. Dữ liệu lưu vẫn là `{ lit }` /
+  // `{ ctx }` như trước.
+  const LITERAL = "__lit__";
+  const contextKey = isContext ? (value as { ctx: string }).ctx : "";
+  const contextKnown = usableKeys.some((candidate) => candidate.key === contextKey);
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select
-        value={isContext ? "ctx" : "lit"}
+        value={isContext ? `ctx:${contextKey}` : LITERAL}
         disabled={disabled}
         onValueChange={(next) =>
           onChange(
-            next === "ctx"
-              ? { ctx: usableKeys[0]?.key ?? "" }
-              : { lit: emptyLiteral(op) }
+            next === LITERAL
+              ? { lit: emptyLiteral(op) }
+              : { ctx: next.slice("ctx:".length) }
           )
         }
       >
-        <SelectTrigger className="w-[130px]">
-          <SelectValue />
+        <SelectTrigger className="w-[300px]">
+          <SelectValue placeholder="Chọn giá trị" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="lit">a value</SelectItem>
-          <SelectItem value="ctx" disabled={usableKeys.length === 0}>
-            the caller&apos;s
-          </SelectItem>
+          <SelectItem value={LITERAL}>Nhập giá trị cụ thể</SelectItem>
+          {/* Khoá đang lưu nhưng không còn hợp với phép so sánh vẫn phải có một
+              mục, nếu không ô chọn hiện trống như mất dữ liệu. */}
+          {isContext && !contextKnown && contextKey && (
+            <SelectItem value={`ctx:${contextKey}`}>
+              {contextLabel(contextKey)}
+            </SelectItem>
+          )}
+          {usableKeys.map((candidate) => (
+            <SelectItem key={candidate.key} value={`ctx:${candidate.key}`}>
+              {contextLabel(candidate.key).replace(/^./, (c) => c.toUpperCase())}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
-      {isContext ? (
-        <Select
-          value={(value as { ctx: string }).ctx}
-          disabled={disabled}
-          onValueChange={(next) => onChange({ ctx: next })}
-        >
-          <SelectTrigger className="w-[210px]">
-            <SelectValue placeholder="Context key" />
-          </SelectTrigger>
-          <SelectContent>
-            {usableKeys.map((candidate) => (
-              <SelectItem key={candidate.key} value={candidate.key}>
-                {candidate.key}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
+      {isContext ? null : (
         <LiteralEditor
           field={field}
           op={op}
@@ -548,7 +547,7 @@ function LiteralEditor({
           value={String(bounds[0] ?? "")}
           onChange={(e) => onChange([e.target.value, bounds[1] ?? ""])}
         />
-        <span className="text-muted-foreground text-xs">and</span>
+        <span className="text-muted-foreground text-xs">đến</span>
         <Input
           className="w-[150px]"
           type={inputType(field.type)}
@@ -594,7 +593,7 @@ function LiteralEditor({
     return (
       <Input
         className="w-[240px]"
-        placeholder="Comma separated"
+        placeholder="Cách nhau bằng dấu phẩy"
         disabled={disabled}
         value={values.join(", ")}
         onChange={(e) =>
@@ -617,7 +616,7 @@ function LiteralEditor({
         onValueChange={onChange}
       >
         <SelectTrigger className="w-[190px]">
-          <SelectValue placeholder="Value" />
+          <SelectValue placeholder="Giá trị" />
         </SelectTrigger>
         <SelectContent>
           {field.values.map((option) => (
@@ -641,8 +640,8 @@ function LiteralEditor({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="true">true</SelectItem>
-          <SelectItem value="false">false</SelectItem>
+          <SelectItem value="true">Có</SelectItem>
+          <SelectItem value="false">Không</SelectItem>
         </SelectContent>
       </Select>
     );

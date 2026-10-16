@@ -1,7 +1,7 @@
 import React, { type ComponentProps } from "react";
 import { useTable } from "@refinedev/react-table";
 import { createColumnHelper } from "@tanstack/react-table";
-import { CheckCheckIcon } from "lucide-react";
+import { CheckCheck } from "lucide-react";
 
 import {
   DataTable,
@@ -18,55 +18,56 @@ import {
   ListView,
   ListViewHeader,
 } from "@/shared/components/views/list-view";
-import { DeleteButton } from "@/shared/components/buttons/delete";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { useNotifications, type Notification } from "@/shared/hooks/use-notifications";
 import { cn } from "@/shared/lib/utils";
-import { formatDateTime } from "@/shared/lib/format";
+import { NotificationRowActions } from "./row-actions";
+import { formatDateTimeVi, relativeDayVi } from "./format";
 
 /**
- * Everything this account has been told, as a table.
+ * Mọi thông báo gửi tới tài khoản này, dạng bảng (Figma 311:84353).
  *
- * A resource with only a list and a delete, deliberately. There is no create
- * screen because a person does not write a notification — the application
- * raises one, in the same transaction as whatever warranted it — and no edit
- * screen because the only mutation a recipient may make is marking one read,
- * which is a button rather than a form.
- *
- * Every row belongs to the signed-in account. That is not a filter this page
- * applies; the API has no way to return anybody else's.
+ * Chỉ có danh sách và xoá, có chủ ý: không ai tự viết thông báo — hệ thống tạo
+ * ra cùng lúc với việc đáng báo — và việc duy nhất người nhận được làm là đánh
+ * dấu đã đọc. Mọi dòng đều của tài khoản đang đăng nhập; API không trả thông
+ * báo của người khác.
  */
 
+const LEVEL_LABELS: Record<Notification["level"], string> = {
+  INFO: "Thông tin",
+  SUCCESS: "Hoàn thành",
+  WARNING: "Cảnh báo",
+  ERROR: "Cần xử lý",
+};
+
 const ADVANCED_FILTER_FIELDS: AdvancedFilterField[] = [
-  { field: "title", label: "Title", type: "text", placeholder: "Any" },
+  { field: "title", label: "Nội dung", type: "text", placeholder: "Tất cả" },
   {
     field: "level",
-    label: "Level",
+    label: "Mức độ",
     type: "select",
     options: [
-      { label: "Info", value: "INFO" },
-      { label: "Success", value: "SUCCESS" },
-      { label: "Warning", value: "WARNING" },
-      { label: "Error", value: "ERROR" },
+      { label: LEVEL_LABELS.INFO, value: "INFO" },
+      { label: LEVEL_LABELS.SUCCESS, value: "SUCCESS" },
+      { label: LEVEL_LABELS.WARNING, value: "WARNING" },
+      { label: LEVEL_LABELS.ERROR, value: "ERROR" },
     ],
   },
   {
     field: "read",
-    label: "Status",
+    label: "Trạng thái",
     type: "select",
     options: [
-      { label: "Unread", value: "false" },
-      { label: "Read", value: "true" },
+      { label: "Chưa đọc", value: "false" },
+      { label: "Đã đọc", value: "true" },
     ],
   },
 ];
 
 /**
- * The level maps onto the badge's own status family rather than a hand-mixed
- * wash. `bg-info/10` and friends are an alpha over whatever is behind them, so
- * the same chip came out one colour on a card and another on a hovered row;
- * the subtle tokens are opaque and tuned against the surface they land on.
+ * Mức độ dùng họ màu nhạt của badge chứ không pha tay, để cùng một chip ra
+ * cùng một màu trên thẻ lẫn trên dòng đang rê chuột.
  */
 const LEVEL_VARIANT: Record<
   Notification["level"],
@@ -79,32 +80,30 @@ const LEVEL_VARIANT: Record<
 };
 
 export const NotificationList = () => {
-  // Shares the bell's hook, so marking one read here updates the badge without
-  // either component knowing the other exists.
+  // Dùng chung hook với chuông thông báo, nên đánh dấu đã đọc ở đây cũng cập
+  // nhật số trên chuông.
   const { markRead, markAllRead, unreadCount, refresh } = useNotifications();
+
+  // Bảng là của Refine, còn `markRead` chỉ làm mới số đếm của chuông — nên sau
+  // khi đánh dấu, bảng cũng được tải lại để cột "Trạng thái" đổi theo.
+  const refetchRowsRef = React.useRef<() => void>(() => {});
+
+  const handleMarkRead = React.useCallback(
+    async (id: number) => {
+      await markRead(id);
+      refetchRowsRef.current();
+    },
+    [markRead]
+  );
 
   const columns = React.useMemo(() => {
     const columnHelper = createColumnHelper<Notification>();
 
     return [
-      columnHelper.accessor("level", {
-        id: "level",
-        header: "Level",
-        enableSorting: true,
-        cell: ({ getValue }) => {
-          const level = getValue();
-          return (
-            <Badge variant={LEVEL_VARIANT[level]} dot>
-              {level.charAt(0) + level.slice(1).toLowerCase()}
-            </Badge>
-          );
-        },
-        size: 120,
-      }),
       columnHelper.accessor("title", {
         id: "title",
         enableResizing: true,
-        header: "Title",
+        header: "Nội dung",
         enableSorting: true,
         cell: ({ row }) => (
           <div className="flex flex-col gap-0.5">
@@ -118,68 +117,74 @@ export const NotificationList = () => {
             )}
           </div>
         ),
+        size: 380,
       }),
       columnHelper.accessor("createdAt", {
         id: "createdAt",
-        header: "Received",
+        header: "Nhận lúc",
         enableSorting: true,
         cell: ({ getValue }) => (
-          <span className="text-sm text-muted-foreground">
-            {formatDateTime(getValue())}
-          </span>
+          <div className="flex flex-col">
+            <span className="text-sm tabular-nums">
+              {formatDateTimeVi(getValue())}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {relativeDayVi(getValue())}
+            </span>
+          </div>
         ),
-        size: 200,
+        size: 170,
+      }),
+      columnHelper.accessor("read", {
+        id: "read",
+        header: "Trạng thái",
+        enableSorting: false,
+        cell: ({ getValue }) => (
+          <Badge variant="outline">{getValue() ? "Đã đọc" : "Chưa đọc"}</Badge>
+        ),
+        size: 130,
+      }),
+      columnHelper.accessor("level", {
+        id: "level",
+        header: "Mức độ",
+        enableSorting: true,
+        cell: ({ getValue }) => {
+          const level = getValue();
+          return (
+            <Badge variant={LEVEL_VARIANT[level]} dot>
+              {LEVEL_LABELS[level] ?? level}
+            </Badge>
+          );
+        },
+        size: 140,
       }),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
+        header: () => <span className="ms-auto">Thao tác</span>,
         enableSorting: false,
-        // Not `actionsColumnWidth(2)`: that formula is for icon-only buttons,
-        // and "Mark read" keeps its label. It is not a CRUD icon whose meaning
-        // a tooltip can carry — it is the only thing a recipient may change
-        // about a notification — so the label stays and the column is sized to
-        // it: the outline button (~110px with its icon, gap and border at the
-        // widest density) plus a gap, the delete button and the cell padding.
-        size: 176,
-        minSize: 176,
+        // Nút chính nền nhạt rộng cố định ("Đánh dấu đã đọc" hoặc "Xem") và
+        // nút ⋯ chứa các việc còn lại, kể cả Xoá.
+        size: 228,
+        minSize: 228,
         cell: ({ row }) => (
-          <div className="flex items-center gap-1">
-            {!row.original.read && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                onClick={() => void markRead(row.original.id)}
-              >
-                <CheckCheckIcon className="size-3.5" />
-                Mark read
-              </Button>
-            )}
-            <DeleteButton recordItemId={row.original.id} iconOnly size="icon-sm" />
+          <div className="flex items-center justify-end gap-2">
+            <NotificationRowActions
+              notification={row.original}
+              onMarkRead={handleMarkRead}
+            />
           </div>
         ),
       }),
     ];
-  }, [markRead]);
+  }, [handleMarkRead]);
 
   const table = useTable<Notification>({
     columns,
-    // Drag the divider in the header to resize; double-click it to go back to
-    // the column's default width.
-    // Resizing is opt-in per column: `RESIZABLE_COLUMN_DEFAULTS` turns it off
-    // by default and a column asks for a handle with `enableResizing: true`.
+    // Kéo vạch ở tiêu đề cột để đổi độ rộng; nhấp đúp để về mặc định.
     enableColumnResizing: true,
     columnResizeMode: "onChange",
     defaultColumn: RESIZABLE_COLUMN_DEFAULTS,
-    // The row's actions are the cell somebody scrolls sideways *in order to*
-    // reach, so they are the one cell that must not be what scrolls away.
-    // `getCommonStyles` in `data-table.tsx` renders a pinned column sticky, but
-    // only ever reads pinning state and never sets it, so a column stays where
-    // it was declared until a table asks for this.
-    //
-    // Sticky positioning costs nothing while the table fits its card — the cell
-    // never leaves its static position — so this is unconditional rather than
-    // switched on once the table is measured to overflow.
+    // Cột thao tác ghim bên phải, để không bị cuộn ngang mất.
     initialState: {
       columnPinning: { right: ["actions"] },
     },
@@ -188,13 +193,15 @@ export const NotificationList = () => {
     },
   });
 
-  // The table is Refine's and the bell's counts are react-query state it knows
-  // nothing about, so deleting a row here would otherwise leave the badge
-  // counting something that is gone. Rather than widen the shared
-  // `DeleteButton` with a success callback, this keys off the table's own
-  // query: whenever its rows change — a delete, a filter, a page — the counts
-  // are re-read. They are one cheap `count`, and the "Mark all read (N)" button
-  // on this very page is a reason to want them accurate anyway.
+  const { refetch } = table.refineCore.tableQuery;
+  React.useEffect(() => {
+    refetchRowsRef.current = () => {
+      void refetch();
+    };
+  }, [refetch]);
+
+  // Số đếm của chuông là trạng thái react-query mà bảng không biết, nên mỗi
+  // khi dòng của bảng đổi — xoá, lọc, sang trang — số đếm được đọc lại.
   const rowsUpdatedAt = table.refineCore.tableQuery.dataUpdatedAt;
   React.useEffect(() => {
     refresh();
@@ -202,31 +209,41 @@ export const NotificationList = () => {
 
   return (
     <ListView>
-      <ListViewHeader description="Everything this account has been told. Nothing here was written by hand — the application raises it." />
+      <ListViewHeader
+        title="Thông báo"
+        description="Những việc hệ thống nhắc bạn: phiếu đến hạn, phiếu bị trả lại, phiếu đã nộp."
+        canCreate={false}
+        actions={
+          unreadCount > 0 ? (
+            <Button
+              onClick={async () => {
+                await markAllRead();
+                refetchRowsRef.current();
+              }}
+            >
+              <CheckCheck className="size-4" />
+              Đánh dấu đã đọc tất cả ({unreadCount})
+            </Button>
+          ) : undefined
+        }
+      />
       <DataTable
         table={table}
         toolbar={
           <>
             <ListToolbar
               table={table}
-              search={<DataTableQuickFilter table={table} />}
+              search={
+                <DataTableQuickFilter
+                  table={table}
+                  placeholder="Tìm trong thông báo..."
+                />
+              }
               filters={
                 <DataTableAdvancedFilter
                   table={table}
                   fields={ADVANCED_FILTER_FIELDS}
                 />
-              }
-              actions={
-                unreadCount > 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => void markAllRead()}
-                    className="gap-1.5"
-                  >
-                    <CheckCheckIcon className="size-4" />
-                    Mark all read ({unreadCount})
-                  </Button>
-                )
               }
             />
             <DataTableFilterChips

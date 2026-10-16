@@ -1,4 +1,5 @@
-import { useCustom } from "@refinedev/core";
+import { useMemo } from "react";
+import { useCan, useCustom, useList } from "@refinedev/core";
 
 import { customResult } from "@/shared/hooks/use-custom-result";
 import { API_URL } from "@/shared/api/constants";
@@ -18,8 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table";
-import { cn } from "@/shared/lib/utils";
 import { ACTIONS, type CoverageResponse } from "@/domains/row-level-policy/types";
+import type { Role } from "@/domains/role/types";
+import { actionLabel, resourceLabel } from "../labels";
 
 /**
  * The coverage grid: which roles have a scope on which resource, per action.
@@ -44,6 +46,19 @@ export function CoverageMatrix() {
   // empty object, which is truthy and has no `resources` to read a length off.
   const coverage = customResult(result?.data, "resources");
 
+  // Bảng trả về mã vai trò; đổi sang tên khi được xem danh sách vai trò, không
+  // thì hiện nguyên mã.
+  const { data: canReadRoles } = useCan({ resource: "roles", action: "list" });
+  const { result: roleResult } = useList<Role>({
+    resource: "roles",
+    pagination: { pageSize: 200 },
+    queryOptions: { enabled: canReadRoles?.can ?? false },
+  });
+  const roleNames = useMemo(
+    () => new Map((roleResult?.data ?? []).map((role) => [role.code, role.name])),
+    [roleResult?.data]
+  );
+
   if (query.isLoading) {
     return null;
   }
@@ -52,10 +67,9 @@ export function CoverageMatrix() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Coverage</CardTitle>
+          <CardTitle>Tổng quan phạm vi</CardTitle>
           <CardDescription>
-            No resource is under row-level management yet. A resource joins by
-            declaring a policy set in code, not by adding a row here.
+            Chưa có loại dữ liệu nào được giới hạn theo phạm vi.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -68,24 +82,27 @@ export function CoverageMatrix() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Coverage</CardTitle>
+        <CardTitle>Tổng quan phạm vi</CardTitle>
         <CardDescription>
-          Where a role has no scope, the resource&apos;s declared default
-          decides. A red cell is a role that is not narrowed at all — usually
-          because nobody has written its policy yet.
+          Mỗi ô cho biết vai trò đó được thấy phần dữ liệu nào. Vai trò chưa có
+          phạm vi riêng thì theo mặc định của loại dữ liệu; ô màu đỏ là vai trò
+          chưa bị giới hạn gì — thường vì chưa ai đặt phạm vi cho nó.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {coverage.resources.map((resource) => (
           <div key={resource.resource} className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{resource.resource}</span>
+              <span className="font-medium">
+                {resourceLabel(resource.resource)}
+              </span>
               <Badge
                 variant={resource.defaultScope === "FULL" ? "secondary" : "outline"}
               >
-                default: {resource.defaultScope === "FULL"
-                  ? "sees everything"
-                  : "sees nothing"}
+                Mặc định:{" "}
+                {resource.defaultScope === "FULL"
+                  ? "thấy toàn bộ"
+                  : "không thấy gì"}
               </Badge>
             </div>
 
@@ -93,16 +110,18 @@ export function CoverageMatrix() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[180px]">Role</TableHead>
+                    <TableHead className="w-[220px]">Vai trò</TableHead>
                     {ACTIONS.map((action) => (
-                      <TableHead key={action}>{action}</TableHead>
+                      <TableHead key={action}>{actionLabel(action)}</TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {roles.map((role) => (
                     <TableRow key={role}>
-                      <TableCell className="font-mono text-xs">{role}</TableCell>
+                      <TableCell className="text-sm">
+                        {roleNames.get(role) ?? role}
+                      </TableCell>
                       {ACTIONS.map((action) => {
                         const cell = resource.cells.find(
                           (candidate) =>
@@ -128,26 +147,24 @@ export function CoverageMatrix() {
 
 function RiskBadge({ risk }: { risk: string | undefined }) {
   if (risk === "OK") {
-    return <Badge variant="outline">scoped</Badge>;
+    return (
+      <Badge variant="info" dot>
+        Đã có phạm vi
+      </Badge>
+    );
   }
   if (risk === "CLOSED") {
-    // Fail-closed, which is the destination for every resource. Worth naming so
-    // nobody "fixes" it by writing a scope that grants everything.
+    // Đóng an toàn — đích đến của mọi loại dữ liệu. Ghi rõ để không ai "sửa"
+    // bằng cách đặt một phạm vi cho thấy tất cả.
     return (
-      <Badge variant="outline" className="text-muted-foreground">
-        no rows
+      <Badge variant="neutral" dot>
+        Không thấy gì
       </Badge>
     );
   }
   return (
-    <Badge
-      className={cn(
-        "bg-destructive/10 text-destructive border-destructive/30",
-        "border"
-      )}
-      variant="outline"
-    >
-      unrestricted
+    <Badge variant="destructive" dot>
+      Chưa giới hạn
     </Badge>
   );
 }

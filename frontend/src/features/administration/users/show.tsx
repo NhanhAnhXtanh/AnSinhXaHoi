@@ -3,12 +3,8 @@ import { Link } from "react-router";
 import { ShieldIcon, ShieldOffIcon } from "lucide-react";
 
 import { LoadingOverlay } from "@/shared/components/layout/loading-overlay";
-import {
-  ShowView,
-  ShowViewHeader,
-} from "@/shared/components/views/show-view";
+import { ShowView } from "@/shared/components/views/show-view";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
-import { Badge } from "@/shared/ui/badge";
 import { Card } from "@/shared/ui/card";
 import {
   DetailList,
@@ -18,14 +14,15 @@ import {
   MetaItem,
   MetaStrip,
 } from "@/shared/components/views/record-detail";
-import { formatDateTime } from "@/shared/lib/format";
 import type { User } from "@/domains/user/types";
-import { STATUS_LABELS } from "@/domains/user/types";
-import { USER_STATUS_VARIANTS } from "@/shared/lib/status-variants";
+import { formatDateTimeVi } from "../labels";
+import { AdminPageHeader } from "../record-actions";
+import { UserHeaderActions } from "./user-actions";
+import { UserStatusBadge } from "./user-status-badge";
 
-/** A never-signed-in account is a fact, not a missing value. */
+/** Chưa đăng nhập lần nào là một sự thật, không phải ô thiếu dữ liệu. */
 function formatLastSignIn(value?: string | null) {
-  return value ? formatDateTime(value) : "Never";
+  return value ? formatDateTimeVi(value) : "Chưa đăng nhập";
 }
 
 /**
@@ -68,7 +65,12 @@ export const UserShow = () => {
 
   return (
     <ShowView>
-      <ShowViewHeader />
+      <AdminPageHeader
+        title={record ? record.fullName || record.username : "Người dùng"}
+        badge={status ? <UserStatusBadge status={status} /> : undefined}
+        description="Thông tin tài khoản, đơn vị công tác và vai trò của cán bộ."
+        actions={record ? <UserHeaderActions user={record} /> : undefined}
+      />
 
       <Card className="py-4">
         <LoadingOverlay loading={isLoading}>
@@ -84,26 +86,19 @@ export const UserShow = () => {
                 <h2 className="text-lg leading-6 font-semibold tracking-tight">
                   {record?.fullName ?? "—"}
                 </h2>
-                {status && (
-                  <Badge variant={USER_STATUS_VARIANTS[status] ?? "secondary"}>
-                    {STATUS_LABELS[status] ?? status}
-                  </Badge>
-                )}
+                <UserStatusBadge status={status} />
               </div>
               <p className="text-muted-foreground text-sm">
-                <span className="font-mono">{record?.username ?? "—"}</span>
+                <span>{record?.username ?? "—"}</span>
                 {record?.email ? ` · ${record.email}` : ""}
               </p>
             </div>
 
             <MetaStrip className="shrink-0">
-              <MetaItem label="User ID">
-                <span className="tabular-nums">{record?.id ?? "—"}</span>
+              <MetaItem label="Ngày tạo">
+                {formatDateTimeVi(record?.createdAt)}
               </MetaItem>
-              <MetaItem label="Created">
-                {formatDateTime(record?.createdAt)}
-              </MetaItem>
-              <MetaItem label="Last sign-in">
+              <MetaItem label="Đăng nhập gần nhất">
                 {formatLastSignIn(record?.lastLoginAt)}
               </MetaItem>
             </MetaStrip>
@@ -112,12 +107,12 @@ export const UserShow = () => {
       </Card>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-3">
-        <DetailPanel title="Identity">
+        <DetailPanel title="Thông tin tài khoản">
           <DetailList>
-            <DetailRow label="Username">
-              <span className="font-mono">{record?.username ?? "—"}</span>
+            <DetailRow label="Tên đăng nhập">
+              <span>{record?.username ?? "—"}</span>
             </DetailRow>
-            <DetailRow label="Email">
+            <DetailRow label="Thư điện tử">
               {record?.email ? (
                 // `mailto:` rather than plain text: the next thing anybody does
                 // with an address on a screen like this is write to it.
@@ -131,69 +126,57 @@ export const UserShow = () => {
                 <EmptyValue />
               )}
             </DetailRow>
-            <DetailRow label="Full name">
+            <DetailRow label="Họ và tên">
               {record?.fullName ?? <EmptyValue />}
             </DetailRow>
-            <DetailRow label="Status">
-              {status ? (
-                <Badge variant={USER_STATUS_VARIANTS[status] ?? "secondary"}>
-                  {STATUS_LABELS[status] ?? status}
-                </Badge>
-              ) : (
-                <EmptyValue />
-              )}
+            <DetailRow label="Trạng thái">
+              {status ? <UserStatusBadge status={status} /> : <EmptyValue />}
             </DetailRow>
           </DetailList>
         </DetailPanel>
 
-        <DetailPanel title="Placement">
+        <DetailPanel title="Đơn vị công tác">
           <DetailList>
-            <DetailRow label="Organization">
+            <DetailRow label="Đơn vị">
               {record?.organization ? (
                 <Link
                   to={`/organizations/show/${record.organization.id}`}
                   className="hover:underline"
                 >
                   {record.organization.name}
-                  <span className="text-muted-foreground ml-2 font-mono text-xs">
-                    {record.organization.code}
-                  </span>
                 </Link>
               ) : (
-                <EmptyValue>Not placed</EmptyValue>
+                <EmptyValue>Chưa gắn đơn vị</EmptyValue>
               )}
             </DetailRow>
-            <DetailRow label="Department">
+            <DetailRow label="Phòng ban">
               {record?.department ? (
                 <Link
                   to={`/departments/show/${record.department.id}`}
                   className="hover:underline"
                 >
                   {record.department.name}
-                  <span className="text-muted-foreground ml-2 font-mono text-xs">
-                    {record.department.code}
-                  </span>
                 </Link>
               ) : (
-                <EmptyValue>None</EmptyValue>
+                <EmptyValue>Không thuộc phòng ban nào</EmptyValue>
               )}
             </DetailRow>
           </DetailList>
         </DetailPanel>
 
-        <DetailPanel title="Activity">
+        <DetailPanel title="Hoạt động">
           <DetailList>
-            <DetailRow label="Created">
-              {formatDateTime(record?.createdAt)}
+            <DetailRow label="Ngày tạo">
+              {formatDateTimeVi(record?.createdAt)}
             </DetailRow>
-            <DetailRow label="Last updated">
+            <DetailRow label="Sửa gần nhất">
               {record?.updatedAt ? (
-                formatDateTime(record.updatedAt)
+                formatDateTimeVi(record.updatedAt)
               ) : (
                 <EmptyValue />
               )}
             </DetailRow>
-            <DetailRow label="Last sign-in">
+            <DetailRow label="Đăng nhập gần nhất">
               {formatLastSignIn(record?.lastLoginAt)}
             </DetailRow>
           </DetailList>
@@ -207,10 +190,10 @@ export const UserShow = () => {
         code and a screen of its own behind it.
       */}
       <DetailPanel
-        title="Roles"
+        title="Vai trò"
         action={
           <span className="text-muted-foreground text-xs tabular-nums">
-            {record?.roles?.length ?? 0} held
+            {record?.roles?.length ?? 0} vai trò
           </span>
         }
         bodyClassName="p-4"
@@ -225,13 +208,8 @@ export const UserShow = () => {
                   className="border-border hover:bg-accent/40 flex items-start gap-3 rounded-lg border p-3 transition-colors"
                 >
                   <ShieldIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-medium">
-                      {role.name}
-                    </span>
-                    <span className="text-muted-foreground truncate font-mono text-xs">
-                      {role.code}
-                    </span>
+                  <span className="truncate text-sm font-medium">
+                    {role.name}
                   </span>
                 </Link>
               ))}
@@ -239,7 +217,7 @@ export const UserShow = () => {
           ) : (
             <p className="text-muted-foreground flex items-center gap-2 text-sm">
               <ShieldOffIcon className="size-4" />
-              This account holds no role, so every screen refuses it.
+              Tài khoản chưa có vai trò nào nên chưa mở được màn hình làm việc nào.
             </p>
           )}
         </LoadingOverlay>

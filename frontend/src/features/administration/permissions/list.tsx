@@ -3,7 +3,6 @@ import { createColumnHelper } from "@tanstack/react-table";
 import React from "react";
 
 import {
-  actionsColumnWidth,
   DataTable,
   RESIZABLE_COLUMN_DEFAULTS,
 } from "@/shared/components/data-table/data-table";
@@ -18,14 +17,16 @@ import {
   ListView,
   ListViewHeader,
 } from "@/shared/components/views/list-view";
-import { ShowButton } from "@/shared/components/buttons/show";
 import { Badge } from "@/shared/ui/badge";
-import {
-  humanizeResource,
-  splitPermissionCode,
-  type Permission,
-} from "@/domains/permission/types";
+import { splitPermissionCode, type Permission } from "@/domains/permission/types";
 import { PERMISSION_ACTION_VARIANTS } from "@/shared/lib/status-variants";
+import { actionLabel, resourceLabel, YES_NO_OPTIONS } from "../labels";
+import {
+  ActionsCell,
+  ActionsHeader,
+  MENU_ONLY_COLUMN,
+  RecordActionsMenu,
+} from "../record-actions";
 
 /**
  * The permission catalogue, read-only.
@@ -44,16 +45,13 @@ import { PERMISSION_ACTION_VARIANTS } from "@/shared/lib/status-variants";
  * to the user as a filter that does nothing.
  */
 const ADVANCED_FILTER_FIELDS: AdvancedFilterField[] = [
-  { field: "code", label: "Code", type: "text", placeholder: "Any" },
-  { field: "name", label: "Name", type: "text", placeholder: "Any" },
+  { field: "name", label: "Tên quyền", type: "text", placeholder: "Tất cả" },
+  { field: "code", label: "Mã quyền", type: "text", placeholder: "Tất cả" },
   {
     field: "systemPermission",
-    label: "System permission",
+    label: "Quyền hệ thống",
     type: "select",
-    options: [
-      { label: "Yes", value: "true" },
-      { label: "No", value: "false" },
-    ],
+    options: YES_NO_OPTIONS,
   },
 ];
 
@@ -62,21 +60,9 @@ export const PermissionList = () => {
     const columnHelper = createColumnHelper<Permission>();
 
     return [
-      columnHelper.accessor("code", {
-        id: "code",
-        enableResizing: true,
-        header: "Code",
-        enableSorting: true,
-        // The whole point of the row: this exact string is what @PreAuthorize
-        // matches and what the access control provider asks for, so it is
-        // shown verbatim and in mono rather than prettified.
-        cell: ({ getValue }) => (
-          <span className="font-mono text-xs">{getValue()}</span>
-        ),
-      }),
       columnHelper.display({
         id: "resource",
-        header: "Resource",
+        header: "Chức năng",
         // Derived from the code rather than sent by the API, which is why it
         // does not sort: there is no column behind it to sort on. Sorting by
         // `code` groups by resource anyway, since the resource is its prefix.
@@ -85,12 +71,12 @@ export const PermissionList = () => {
           const { resource, action } = splitPermissionCode(row.original.code);
           return (
             <div className="flex items-center gap-2">
-              <span className="text-sm">{humanizeResource(resource)}</span>
+              <span className="text-sm">{resourceLabel(resource)}</span>
               <Badge
                 variant={PERMISSION_ACTION_VARIANTS[action] ?? "outline"}
                 className="text-[10px]"
               >
-                {action}
+                {actionLabel(action)}
               </Badge>
             </div>
           );
@@ -100,23 +86,35 @@ export const PermissionList = () => {
       columnHelper.accessor("name", {
         id: "name",
         enableResizing: true,
-        header: "Name",
+        header: "Tên quyền",
         enableSorting: true,
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
             <span className="font-medium">{row.original.name}</span>
             {row.original.systemPermission && (
-              <Badge variant="secondary" className="text-[10px]">
-                System
+              <Badge variant="neutral" dot>
+                Hệ thống
               </Badge>
             )}
           </div>
         ),
       }),
+      columnHelper.accessor("code", {
+        id: "code",
+        enableResizing: true,
+        header: "Mã quyền",
+        enableSorting: true,
+        // Đúng chuỗi máy chủ kiểm, nên hiện nguyên văn.
+        cell: ({ getValue }) => (
+          <span className="text-muted-foreground font-mono text-xs">
+            {getValue()}
+          </span>
+        ),
+      }),
       columnHelper.accessor("description", {
         id: "description",
         enableResizing: true,
-        header: "Description",
+        header: "Mô tả",
         enableSorting: false,
         cell: ({ getValue }) => (
           <span className="text-muted-foreground text-sm">
@@ -126,18 +124,20 @@ export const PermissionList = () => {
       }),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
-        // Show only. Edit and delete would be hidden by access control anyway
-        // — no `permissions:write` or `permissions:delete` code exists to
-        // grant — but the endpoints do not exist either, so they are not
-        // offered at all rather than offered and then refused.
+        header: () => <ActionsHeader />,
+        // Chỉ Xem chi tiết: không có điểm cuối sửa / xoá quyền, nên không đưa
+        // ra rồi mới từ chối.
         cell: ({ row }) => (
-          <div className="flex gap-1">
-            <ShowButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-          </div>
+          <ActionsCell>
+            <RecordActionsMenu
+              resource="permissions"
+              id={row.original.id}
+              editLabel={false}
+            />
+          </ActionsCell>
         ),
         enableSorting: false,
-        ...actionsColumnWidth(1),
+        ...MENU_ONLY_COLUMN,
       }),
     ];
   }, []);
@@ -170,14 +170,20 @@ export const PermissionList = () => {
 
   return (
     <ListView>
-      <ListViewHeader description="The codes an endpoint checks before it answers. Written by migrations, read here." />
+      <ListViewHeader
+        title="Quyền"
+        description="Danh sách các quyền có thể cấp cho vai trò. Quyền do hệ thống tạo sẵn, ở đây chỉ để xem."
+        canCreate={false}
+      />
       <DataTable
         table={table}
         toolbar={
           <>
             <ListToolbar
               table={table}
-              search={<DataTableQuickFilter table={table} />}
+              search={
+                <DataTableQuickFilter table={table} placeholder="Tìm theo tên quyền..." />
+              }
               filters={<DataTableAdvancedFilter table={table} fields={ADVANCED_FILTER_FIELDS} />}
             />
             <DataTableFilterChips table={table} fields={ADVANCED_FILTER_FIELDS} />
