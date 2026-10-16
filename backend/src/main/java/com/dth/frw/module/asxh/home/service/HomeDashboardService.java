@@ -26,12 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link HomeDashboardCalculator} (hàm thuần, có test riêng).
  *
  * <p><b>Phạm vi dữ liệu theo người dùng.</b> Phiếu đi qua {@code rowLevel.scope(InputReport,
- * READ)} giống {@code InputReportService.list}, nên khi phiếu được đưa vào quản lý theo dòng thì
- * trang chủ tự thu hẹp theo. Hiện bản mới CHƯA có liên kết người dùng ↔ đơn vị báo cáo
- * ({@code users} chỉ gắn {@code organization}/{@code department} của base, chưa gắn
- * {@code ReportUnit}) và {@code InputReport} chưa khai {@code @RowLevelResource}, nên phạm vi
- * đang là toàn bộ: mọi tài khoản có {@code input_reports:read} thấy số của mọi đơn vị.
- * TODO: khi có liên kết đó (BR-72), tài khoản đơn vị chỉ thấy đơn vị mình — không cần sửa ở đây.
+ * READ)} giống {@code InputReportService.list}: tài khoản cấp Đơn vị ({@code users.report_unit_id})
+ * chỉ thấy số của đơn vị mình (UC-72, {@code InputReportRowLevelPolicies}); tài khoản Sở / UBND
+ * thấy mọi đơn vị. Tờ biểu ở chế độ "Theo đơn vị" chỉ giữ những tờ của phiếu đã qua phạm vi đó.
  *
  * <p>Chế độ "Theo đơn vị" chỉ tính khi được yêu cầu VÀ người gọi có quyền màn Thiết lập &amp;
  * điều hành (BR-76.1: chỉ chế độ đang hiện được nạp).

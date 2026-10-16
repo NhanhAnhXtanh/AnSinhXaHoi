@@ -2,6 +2,7 @@ package com.dth.frw.domain.asxh.report;
 
 import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
+import com.dth.frw.shared.security.rowlevel.RowLevelResource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -36,6 +37,8 @@ import java.util.Objects;
  * chuỗi JSON frontend gửi lên, máy chủ không đọc nội dung.
  */
 @Entity
+// Phạm vi dữ liệu theo đơn vị (UC-72): xem module/asxh/inputreport/security.
+@RowLevelResource("input_report_sheets")
 @Table(
         name = "asxh_input_report_sheets",
         uniqueConstraints = @UniqueConstraint(

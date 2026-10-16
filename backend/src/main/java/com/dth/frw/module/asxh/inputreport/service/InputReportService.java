@@ -91,8 +91,8 @@ public class InputReportService {
 
     // ------------------------------------------------------------------ đọc
 
-    // TODO: tài khoản đơn vị chỉ thấy phiếu của đơn vị mình (BR-33.1). Cần liên kết người dùng
-    // ↔ ReportUnit rồi khai InputReport là @RowLevelResource; khi đó rowLevel.scope tự gập vào.
+    // Tài khoản đơn vị chỉ thấy phiếu của đơn vị mình (BR-33.1, UC-72): rowLevel.scope gập FILTER
+    // của InputReportRowLevelPolicies (inputreport/security) vào mọi lần đọc / ghi theo phạm vi.
     public Page<InputReport> list(ListParams params) {
         return repository.findAll(
                 rowLevel.scope(InputReport.class, Action.READ).and(InputReportSpecifications.from(params)),

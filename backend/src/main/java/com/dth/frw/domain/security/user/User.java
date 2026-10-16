@@ -1,5 +1,6 @@
 package com.dth.frw.domain.security.user;
 
+import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.domain.catalog.department.Department;
 import com.dth.frw.domain.catalog.organization.Organization;
 import com.dth.frw.domain.security.permission.Permission;
@@ -106,6 +107,23 @@ public class User {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "department_id")
     private Department department;
+
+    /**
+     * Đơn vị báo cáo ASXH mà tài khoản này nhập liệu thay mặt. Không bắt buộc.
+     *
+     * <p>Có đơn vị ⇒ tài khoản <b>cấp Đơn vị</b> (BR-69.1): chỉ thấy và chỉ ghi được phiếu
+     * của chính đơn vị đó — bộ lọc nằm ở {@code InputReportRowLevelPolicies}, đọc giá trị
+     * này qua bộ nhớ đệm quyền (không truy vấn mỗi request). Để trống ⇒ tài khoản Sở / UBND,
+     * không bị lọc theo đơn vị (BR-72.1).
+     *
+     * <p>EAGER như {@code organization}: danh sách người dùng hiện tên đơn vị trên mỗi dòng
+     * và bộ nhớ đệm quyền cần id của nó; quan hệ một-một nên chỉ nới dòng, không nhân dòng.
+     * Khoá ngoại {@code RESTRICT}: xoá đơn vị còn tài khoản bị từ chối, vì để trống cột này
+     * sẽ biến tài khoản đơn vị thành tài khoản Sở (không bị lọc) mà không ai hay.
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "report_unit_id")
+    private ReportUnit reportUnit;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -238,6 +256,14 @@ public class User {
 
     public void setDepartment(Department department) {
         this.department = department;
+    }
+
+    public ReportUnit getReportUnit() {
+        return reportUnit;
+    }
+
+    public void setReportUnit(ReportUnit reportUnit) {
+        this.reportUnit = reportUnit;
     }
 
     public Instant getCreatedAt() {

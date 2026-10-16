@@ -67,3 +67,9 @@ databaseChangeLog:
       file: db/changelog/changes/131-create-asxh-attachments.yaml
   - include:
       file: db/changelog/changes/132-seed-asxh-ledger-permissions.sql
+  - include:
+      file: db/changelog/changes/165-seed-asxh-roles.sql
+  - include:
+      file: db/changelog/changes/166-add-user-report-unit.yaml
+  - include:
+      file: db/changelog/changes/167-seed-asxh-dev-accounts.sql

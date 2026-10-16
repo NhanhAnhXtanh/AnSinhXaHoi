@@ -31,6 +31,15 @@ import type { User } from "@/domains/user/types";
 import { workLabels } from "./labels";
 
 /**
+ * Identity kèm đơn vị báo cáo: `/auth/me` và cặp khoá lúc đăng nhập trả thêm `reportUnit`
+ * (tài khoản cấp Đơn vị), phiên đăng nhập lưu nguyên đối tượng đó. Khai cục bộ thay vì sửa
+ * `Identity` dùng chung — trường này chỉ màn này đọc.
+ */
+type IdentityWithUnit = Identity & {
+  reportUnit?: { id: number; name: string } | null;
+};
+
+/**
  * Tài khoản của người đang đăng nhập (Figma 311:87428 — hai thẻ 1:1).
  *
  * Không phải một resource của Refine: không có danh sách "tài khoản của tôi"
@@ -96,7 +105,7 @@ function StrengthMeter({ value }: { value: string }) {
 }
 
 export const Profile = () => {
-  const { data: identity } = useGetIdentity<Identity>();
+  const { data: identity } = useGetIdentity<IdentityWithUnit>();
   // Vai trò và quyền không nằm trong identity: chúng đến từ `/auth/permissions`,
   // đã được `authProvider.check` tải và lưu trước khi vào giao diện.
   const authorities = getAuthorities();
@@ -175,6 +184,8 @@ export const Profile = () => {
   const roleNames =
     me?.roles?.map((role) => role.name) ?? authorities?.roles ?? [];
 
+  const unitName = me?.reportUnit?.name ?? identity?.reportUnit?.name ?? null;
+
   return (
     <div className={cn("flex flex-col gap-4", "screen-enter screen-enter-stagger")}>
       <div className="flex flex-col gap-3">
@@ -202,13 +213,29 @@ export const Profile = () => {
             <InfoItem label="Tên đăng nhập">{identity?.username ?? "—"}</InfoItem>
             <InfoItem label="Thư điện tử">{identity?.email ?? "—"}</InfoItem>
             <InfoItem label="Đơn vị công tác">
-              {me
-                ? me.organization
-                  ? me.department
-                    ? `${me.organization.name} · ${me.department.name}`
-                    : me.organization.name
-                  : "Không thuộc đơn vị nào"
-                : "—"}
+              {/*
+                Tài khoản cấp Đơn vị: tên đơn vị báo cáo — có sẵn trong phiên đăng nhập nên
+                cán bộ đơn vị (không có quyền xem người dùng) vẫn thấy. Tài khoản Sở / UBND
+                không gắn đơn vị báo cáo thì hiện nơi công tác của bản ghi người dùng nếu có.
+              */}
+              {unitName ? (
+                <span className="flex flex-col">
+                  <span>{unitName}</span>
+                  <span className="text-muted-foreground text-xs">
+                    Tài khoản cấp Đơn vị — chỉ thấy phiếu của đơn vị này
+                  </span>
+                </span>
+              ) : me?.organization ? (
+                me.department ? (
+                  `${me.organization.name} · ${me.department.name}`
+                ) : (
+                  me.organization.name
+                )
+              ) : (
+                <span className="text-muted-foreground">
+                  Tài khoản cấp Sở / UBND, không gắn đơn vị báo cáo
+                </span>
+              )}
             </InfoItem>
             <InfoItem label="Vai trò" className="sm:col-span-2">
               {roleNames.length ? (

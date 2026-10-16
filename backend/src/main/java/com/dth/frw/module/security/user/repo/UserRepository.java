@@ -1,6 +1,7 @@
 package com.dth.frw.module.security.user.repo;
 
 import com.dth.frw.domain.security.user.User;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -34,4 +35,26 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("select count(u) from User u join u.roles r "
             + "where r.code = :roleCode and u.status = com.dth.frw.domain.security.user.UserStatus.ACTIVE")
     long countActiveWithRole(@Param("roleCode") String roleCode);
+
+    /** Tài khoản gắn với một đơn vị báo cáo ASXH — kiểm "một đơn vị — một tài khoản" (BR-69.2). */
+    List<User> findByReportUnitId(Long reportUnitId);
+
+    /**
+     * Id các tài khoản ĐANG HOẠT ĐỘNG gắn với đơn vị và toàn bộ cây đơn vị con của nó — để
+     * ngừng hoạt động theo khi đơn vị ngừng hoạt động (BR-02.1).
+     *
+     * <p>CTE đệ quy trên bảng đơn vị, cùng cách {@code ReportUnitRepository.deactivateDescendants};
+     * {@code UNION} (không {@code ALL}) để dữ liệu lỡ có vòng vẫn dừng. Đọc bảng đơn vị ở đây là
+     * chủ ý: đi qua service đơn vị thì phải nạp cả cây vào bộ nhớ chỉ để lấy id.
+     */
+    @Query(nativeQuery = true, value = """
+            WITH RECURSIVE tree(id) AS (
+                SELECT u.id FROM asxh_report_units u WHERE u.id = :unitId
+                UNION
+                SELECT c.id FROM asxh_report_units c JOIN tree t ON c.parent_id = t.id
+            )
+            SELECT us.id FROM users us
+             WHERE us.report_unit_id IN (SELECT id FROM tree) AND us.status = 'ACTIVE'
+            """)
+    List<Long> findActiveIdsInReportUnitTree(@Param("unitId") Long unitId);
 }

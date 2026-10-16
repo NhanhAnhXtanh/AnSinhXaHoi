@@ -108,7 +108,7 @@ public class RoleService {
                 // Renaming ADMIN would not remove anyone's access, but it would
                 // break every reference to it that is not a foreign key --
                 // seed data, deployment scripts, documentation.
-                throw new ConflictException("The code of a system role cannot be changed");
+                throw new ConflictException("Không đổi được mã của vai trò hệ thống.");
             }
             requireCodeAvailable(code, role.getId());
             role.setCode(code);
@@ -140,7 +140,7 @@ public class RoleService {
         Role role = get(id);
         if (role.isSystemRole()) {
             throw new ConflictException(
-                    "%s is a system role and cannot be deleted".formatted(role.getCode()));
+                    "%s là vai trò hệ thống nên không xoá được.".formatted(role.getName()));
         }
         repository.delete(role);
         // The RESTRICT foreign key means nobody still held it, so strictly
@@ -163,7 +163,7 @@ public class RoleService {
     private void requireCodeAvailable(String code, Long selfId) {
         repository.findByCodeIgnoreCase(code).ifPresent(existing -> {
             if (!existing.getId().equals(selfId)) {
-                throw new ConflictException("A role with the code %s already exists".formatted(code));
+                throw new ConflictException("Mã vai trò %s đã tồn tại. Bạn nhập mã khác.".formatted(code));
             }
         });
     }

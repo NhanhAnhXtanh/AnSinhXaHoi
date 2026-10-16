@@ -151,7 +151,7 @@ public class OrganizationService {
         repository.findByCodeIgnoreCase(code).ifPresent(existing -> {
             if (!existing.getId().equals(selfId)) {
                 throw new ConflictException(
-                        "An organization with the code %s already exists".formatted(code));
+                        "Mã đơn vị %s đã tồn tại. Bạn nhập mã khác.".formatted(code));
             }
         });
     }

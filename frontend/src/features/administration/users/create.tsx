@@ -1,5 +1,7 @@
+import { useEffect, useMemo } from "react";
+import { useList } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { CreateView } from "@/shared/components/views/create-view";
 import { Button } from "@/shared/ui/button";
@@ -20,12 +22,17 @@ import {
   SectionedFormPanel,
 } from "@/shared/components/form/form-section";
 import { RolePicker, type RoleRef } from "./role-picker";
-import { PlacementPicker, type PlacementRef } from "./placement-picker";
+import { ReportUnitPicker, type ReportUnitRef } from "./report-unit-picker";
+import { AccountLevelField } from "./account-level-field";
 import { StatusSwitchField } from "./status-switch-field";
 import { RequiredMark, joinFullName, USER_FIELD_RULES } from "./user-form-fields";
 import { AdminPageHeader } from "../record-actions";
 import { errorDescription } from "../labels";
-import type { UserStatus } from "@/domains/user/types";
+import {
+  UNIT_REPORTER_ROLE_CODE,
+  type RoleSummary,
+  type UserStatus,
+} from "@/domains/user/types";
 
 /**
  * Giá trị của form tạo. `familyName` / `givenName` / `confirmPassword` chỉ sống
@@ -42,24 +49,40 @@ type UserFormValues = {
   confirmPassword: string;
   status: UserStatus;
   roles: RoleRef[];
-  organization: PlacementRef;
-  department: PlacementRef;
+  reportUnit: ReportUnitRef;
 };
 
-const DEFAULT_VALUES: UserFormValues = {
-  familyName: "",
-  givenName: "",
-  username: "",
-  email: "",
-  password: "",
-  confirmPassword: "",
-  status: "active",
-  roles: [],
-  // `{ id: null }` thay vì bỏ trống: API đọc đó là "chưa gắn đơn vị", và giữ
-  // giá trị của ô chọn luôn là một đối tượng ổn định.
-  organization: { id: null },
-  department: { id: null },
-};
+function defaultValues(reportUnitId: number | null): UserFormValues {
+  return {
+    familyName: "",
+    givenName: "",
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    status: "active",
+    roles: [],
+    // `{ id: null }` thay vì bỏ trống: API đọc đó là "không gắn đơn vị" (tài khoản Sở /
+    // UBND), và giữ giá trị của ô chọn luôn là một đối tượng ổn định.
+    reportUnit: { id: reportUnitId },
+  };
+}
+
+/**
+ * Cấp tài khoản từ màn Đơn vị (UC-70): `/users/create?reportUnit={id}&reportUnitName={tên}`.
+ * Đơn vị điền sẵn và khoá, vai trò "Cán bộ đơn vị nhập liệu" chọn sẵn, lưu xong quay lại màn
+ * Sửa đơn vị.
+ */
+function usePresetUnit() {
+  const [params] = useSearchParams();
+  const raw = Number(params.get("reportUnit"));
+  const id = Number.isInteger(raw) && raw > 0 ? raw : null;
+  const name = params.get("reportUnitName");
+  return useMemo(
+    () => (id == null ? null : { id, name: name && name.trim() ? name : "Đơn vị đã chọn" }),
+    [id, name]
+  );
+}
 
 /**
  * Thêm người dùng.
@@ -71,12 +94,18 @@ const DEFAULT_VALUES: UserFormValues = {
  */
 export const UserCreate = () => {
   const navigate = useNavigate();
+  const presetUnit = usePresetUnit();
 
   const {
     refineCore: { onFinish },
     ...form
   } = useForm({
     refineCoreProps: {
+      // Cấp từ màn Đơn vị thì quay lại đúng đơn vị đó thay vì sang danh sách người dùng.
+      redirect: presetUnit ? false : "list",
+      onMutationSuccess: () => {
+        if (presetUnit) navigate(`/report-units/edit/${presetUnit.id}`);
+      },
       successNotification: (_data, values) => ({
         type: "success",
         message: `Đã tạo người dùng ${
@@ -89,8 +118,26 @@ export const UserCreate = () => {
         description: errorDescription(error),
       }),
     },
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: defaultValues(presetUnit?.id ?? null),
   });
+
+  // Vai trò cán bộ đơn vị chọn sẵn khi cấp tài khoản cho đơn vị (UC-70). Cùng truy vấn với ô
+  // chọn vai trò bên dưới (cùng khoá), nên không tốn thêm yêu cầu.
+  const { result: rolesResult } = useList<RoleSummary>({
+    resource: "roles",
+    pagination: { pageSize: 100 },
+    sorters: [{ field: "code", order: "asc" }],
+    queryOptions: { enabled: Boolean(presetUnit) },
+  });
+  const reporterRoleId = presetUnit
+    ? rolesResult?.data?.find((role) => role.code === UNIT_REPORTER_ROLE_CODE)?.id
+    : undefined;
+  const { getValues, setValue } = form;
+  useEffect(() => {
+    if (reporterRoleId == null) return;
+    if ((getValues("roles") ?? []).length > 0) return;
+    setValue("roles", [{ id: reporterRoleId }]);
+  }, [reporterRoleId, getValues, setValue]);
 
   function onSubmit(values: UserFormValues) {
     // Đúng `UserRequest` của API: họ tên ghép lại thành một ô, không gửi ô
@@ -102,8 +149,7 @@ export const UserCreate = () => {
       password: values.password,
       status: values.status,
       roles: values.roles,
-      organization: values.organization,
-      department: values.department,
+      reportUnit: values.reportUnit,
     };
     onFinish(payload as unknown as UserFormValues);
   }
@@ -111,8 +157,12 @@ export const UserCreate = () => {
   return (
     <CreateView>
       <AdminPageHeader
-        title="Thêm người dùng"
-        description="Nhập thông tin tài khoản, chọn đơn vị công tác và vai trò cho cán bộ."
+        title={presetUnit ? `Cấp tài khoản cho ${presetUnit.name}` : "Thêm người dùng"}
+        description={
+          presetUnit
+            ? "Tài khoản đăng nhập để cán bộ đơn vị nhập số liệu và nộp phiếu của đơn vị."
+            : "Nhập thông tin tài khoản, chọn đơn vị công tác và vai trò cho cán bộ."
+        }
       />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="min-w-0">
@@ -279,21 +329,26 @@ export const UserCreate = () => {
               description="Nơi cán bộ làm việc và việc cho phép hay không cho phép đăng nhập."
             >
               {/*
-                Hai ô, một điều khiển: danh sách phòng ban lọc theo đơn vị chọn
-                bên cạnh, đổi đơn vị thì phòng ban bị xoá. `contents` để hai ô
-                nằm thẳng trên lưới của mục này.
+                Ba ô một hàng như Figma 310:26715: Đơn vị công tác (đơn vị báo
+                cáo, ô tìm) | Cấp tài khoản (suy ra, chỉ đọc) | Trạng thái.
               */}
-              <PlacementPicker
-                className="contents"
-                itemClassName="md:col-span-4"
-                organization={form.watch("organization")}
-                department={form.watch("department")}
-                onOrganizationChange={(value) =>
-                  form.setValue("organization", value)
-                }
-                onDepartmentChange={(value) =>
-                  form.setValue("department", value)
-                }
+              <FormField
+                control={form.control}
+                name="reportUnit"
+                render={({ field }) => (
+                  <ReportUnitPicker
+                    className="md:col-span-4"
+                    value={field.value}
+                    onChange={field.onChange}
+                    current={presetUnit}
+                    locked={Boolean(presetUnit)}
+                  />
+                )}
+              />
+
+              <AccountLevelField
+                className="md:col-span-4"
+                hasUnit={form.watch("reportUnit")?.id != null}
               />
 
               <FormField

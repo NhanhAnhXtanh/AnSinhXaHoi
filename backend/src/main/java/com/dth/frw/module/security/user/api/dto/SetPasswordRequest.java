@@ -15,7 +15,7 @@ import jakarta.validation.constraints.Size;
  * current one.
  */
 public record SetPasswordRequest(
-        @NotBlank(message = "Password is required")
-        @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
+        @NotBlank(message = "Vui lòng nhập mật khẩu mới.")
+        @Size(min = 8, max = 100, message = "Mật khẩu cần từ 8 đến 100 ký tự.")
         String password) {
 }

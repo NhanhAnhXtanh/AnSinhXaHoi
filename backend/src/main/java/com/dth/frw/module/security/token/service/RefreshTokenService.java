@@ -79,7 +79,8 @@ public class RefreshTokenService {
     public User consume(String rawToken, Instant now) {
         RefreshToken token = repository.findByTokenHash(hash(rawToken))
                 .filter(candidate -> candidate.isUsable(now))
-                .orElseThrow(() -> new BadCredentialsException("Refresh token is invalid or has expired"));
+                .orElseThrow(() -> new BadCredentialsException(
+                        "Phiên đăng nhập đã hết hạn. Bạn đăng nhập lại để tiếp tục."));
 
         token.revoke(now);
         repository.save(token);

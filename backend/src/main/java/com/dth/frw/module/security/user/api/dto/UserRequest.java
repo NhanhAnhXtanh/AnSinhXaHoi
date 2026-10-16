@@ -18,26 +18,26 @@ import java.util.List;
  * the database — it is never stored, echoed or logged.
  */
 public record UserRequest(
-        @NotBlank(message = "Username is required")
-        @Size(min = 3, max = 100, message = "Username must be between 3 and 100 characters")
+        @NotBlank(message = "Vui lòng nhập tên đăng nhập.")
+        @Size(min = 3, max = 100, message = "Tên đăng nhập cần từ 3 đến 100 ký tự.")
         @Pattern(regexp = "^[a-zA-Z0-9._-]+$",
-                message = "Username may only contain letters, digits, dots, underscores and hyphens")
+                message = "Tên đăng nhập chỉ gồm chữ không dấu, chữ số, dấu chấm, gạch dưới và gạch ngang.")
         String username,
 
-        @NotBlank(message = "Email is required")
-        @Email(message = "Email must be a valid address")
-        @Size(max = 255, message = "Email must be at most 255 characters")
+        @NotBlank(message = "Vui lòng nhập thư điện tử.")
+        @Email(message = "Địa chỉ thư điện tử chưa đúng.")
+        @Size(max = 255, message = "Thư điện tử tối đa 255 ký tự.")
         String email,
 
-        @NotBlank(message = "Full name is required")
-        @Size(max = 255, message = "Full name must be at most 255 characters")
+        @NotBlank(message = "Vui lòng nhập họ tên.")
+        @Size(max = 255, message = "Họ tên tối đa 255 ký tự.")
         String fullName,
 
-        @NotBlank(message = "Password is required")
+        @NotBlank(message = "Vui lòng đặt mật khẩu.")
         // Length is the only rule worth enforcing here. Composition rules push
         // people towards predictable substitutions without adding real entropy,
         // and a longer minimum buys more than a required symbol does.
-        @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
+        @Size(min = 8, max = 100, message = "Mật khẩu cần từ 8 đến 100 ký tự.")
         String password,
 
         /** Optional; a user created without one starts active. */
@@ -54,7 +54,14 @@ public record UserRequest(
         @Valid
         DepartmentRef department,
 
-        @NotEmpty(message = "At least one role is required")
+        /**
+         * Đơn vị báo cáo ASXH, không bắt buộc. Có đơn vị ⇒ tài khoản cấp Đơn vị, chỉ thấy
+         * phiếu của đơn vị mình; để trống ⇒ tài khoản Sở / UBND.
+         */
+        @Valid
+        ReportUnitRef reportUnit,
+
+        @NotEmpty(message = "Vui lòng chọn ít nhất một vai trò.")
         @Valid
         List<RoleRef> roles) {
 }

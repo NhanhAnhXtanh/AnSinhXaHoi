@@ -15,6 +15,11 @@ export type User = {
   organization: OrganizationSummary | null;
   /** Null for an account in no department, placed or otherwise. */
   department: DepartmentSummary | null;
+  /**
+   * Đơn vị báo cáo ASXH. Có đơn vị ⇒ tài khoản cấp Đơn vị (chỉ thấy phiếu của đơn vị mình);
+   * null ⇒ tài khoản Sở / UBND.
+   */
+  reportUnit: ReportUnitSummary | null;
   createdAt: string;
   updatedAt: string | null;
   lastLoginAt: string | null;
@@ -46,6 +51,41 @@ export type DepartmentSummary = {
   code: string;
   name: string;
 };
+
+/** Đơn vị báo cáo ASXH như dòng người dùng báo — `UserResponse.ReportUnitSummary`. */
+export type ReportUnitSummary = {
+  id: number;
+  budgetCode: string;
+  name: string;
+  active: boolean;
+};
+
+/**
+ * Cấp tài khoản (BR-69.1), suy ra chứ không lưu: có đơn vị ⇒ Đơn vị; không có đơn vị ⇒ UBND
+ * nếu giữ vai trò `UBND_APPROVER`, còn lại Sở. Giá trị `don_vi` / `so_ubnd` cũng là ô lọc
+ * `accountLevel` của API (API không tách Sở với UBND vì đó là chuyện vai trò).
+ */
+export type AccountLevel = "don_vi" | "ubnd" | "so";
+
+export const ACCOUNT_LEVEL_LABELS: Record<AccountLevel, string> = {
+  don_vi: "Đơn vị",
+  ubnd: "UBND",
+  so: "Sở",
+};
+
+/** Mã vai trò lãnh đạo UBND (seed 165) — tài khoản không gắn đơn vị giữ vai trò này là cấp UBND. */
+export const UBND_ROLE_CODE = "UBND_APPROVER";
+
+/** Mã vai trò cán bộ đơn vị nhập liệu (seed 165) — chọn sẵn khi cấp tài khoản cho đơn vị. */
+export const UNIT_REPORTER_ROLE_CODE = "ORGANIZATION_REPORTER";
+
+export function accountLevelOf(user: {
+  reportUnit: { id: number } | null | undefined;
+  roles?: { code: string }[] | null;
+}): AccountLevel {
+  if (user.reportUnit) return "don_vi";
+  return (user.roles ?? []).some((role) => role.code === UBND_ROLE_CODE) ? "ubnd" : "so";
+}
 
 /** Mirrors `UserStatus`; these are the lower-case wire values, not the constants. */
 export type UserStatus = "active" | "inactive" | "locked";

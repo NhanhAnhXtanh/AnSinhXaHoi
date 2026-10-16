@@ -66,16 +66,14 @@ public class ApiExceptionHandler {
     static final String MSG_FIELD_INVALID = "Giá trị chưa hợp lệ.";
 
     /**
-     * What {@code AuthService} / {@code RefreshTokenService} raise, in English,
-     * mapped to what a cán bộ should read. Matched here rather than changed at
-     * the source so the auth slice keeps its own wording for its logs.
+     * Câu tiếng Anh còn sót ở nơi phát {@code BadCredentialsException}, đổi sang câu cho cán bộ.
+     *
+     * <p>{@code AuthService} và {@code RefreshTokenService} đã viết câu tiếng Việt ngay tại
+     * nguồn nên không còn ở đây. Còn lại "Not signed in" của {@code NotificationController}
+     * (ngoài phạm vi sửa đợt này) — giữ để câu đó không rơi xuống câu mặc định "sai mật khẩu".
      */
     private static final Map<String, String> CREDENTIAL_MESSAGES = Map.of(
-            "Incorrect username or password", MSG_WRONG_CREDENTIALS,
-            "This account is no longer active", MSG_ACCOUNT_INACTIVE,
-            "Not signed in", MSG_SESSION_EXPIRED,
-            "This account no longer exists", MSG_SESSION_EXPIRED,
-            "Refresh token is invalid or has expired", MSG_SESSION_EXPIRED);
+            "Not signed in", MSG_SESSION_EXPIRED);
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException e) {
@@ -128,7 +126,9 @@ public class ApiExceptionHandler {
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException e) {
-        return body(HttpStatus.FORBIDDEN, MSG_FORBIDDEN, Map.of());
+        // Câu riêng tiếng Việt của service (ví dụ "chỉ được thao tác trên phiếu của đơn vị
+        // mình") được giữ; "Access Denied" của Spring rơi về câu chung.
+        return body(HttpStatus.FORBIDDEN, vietnameseOr(e.getMessage(), MSG_FORBIDDEN), Map.of());
     }
 
     /**

@@ -218,6 +218,10 @@ public class AuthorityCache {
      *                    scope, which is why moving somebody between departments
      *                    now has to evict this entry
      * @param departmentId which unit, or null
+     * @param reportUnitId đơn vị báo cáo ASXH của tài khoản, hoặc null (tài khoản Sở / UBND).
+     *                    Đầu vào của phạm vi phiếu nhập ({@code InputReportRowLevelPolicies}),
+     *                    nên đổi đơn vị của tài khoản cũng phải xoá mục này — UserService
+     *                    phát {@code AuthoritiesChanged.ForUser} khi trường đó đổi
      * @param version     the stamp described on {@link #versionFor(long)}
      * @param loadedAt    when this was read, for the expiry
      */
@@ -229,6 +233,7 @@ public class AuthorityCache {
             Set<Long> roleIds,
             Long organizationId,
             Long departmentId,
+            Long reportUnitId,
             String version,
             long loadedAt) {
 
@@ -269,6 +274,7 @@ public class AuthorityCache {
                     Set.copyOf(roleIds),
                     user.getOrganization() == null ? null : user.getOrganization().getId(),
                     user.getDepartment() == null ? null : user.getDepartment().getId(),
+                    user.getReportUnit() == null ? null : user.getReportUnit().getId(),
                     stamp,
                     System.nanoTime());
         }

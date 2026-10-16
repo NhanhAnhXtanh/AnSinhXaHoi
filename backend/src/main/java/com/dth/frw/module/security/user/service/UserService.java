@@ -1,16 +1,19 @@
 package com.dth.frw.module.security.user.service;
 
+import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.domain.catalog.department.Department;
 import com.dth.frw.domain.catalog.organization.Organization;
 import com.dth.frw.domain.security.role.Role;
 import com.dth.frw.domain.security.user.User;
 import com.dth.frw.domain.security.user.UserStatus;
+import com.dth.frw.module.asxh.unit.service.ReportUnitService;
 import com.dth.frw.module.catalog.department.service.DepartmentService;
 import com.dth.frw.module.catalog.organization.service.OrganizationService;
 import com.dth.frw.module.security.role.service.RoleService;
 import com.dth.frw.module.security.token.service.RefreshTokenService;
 import com.dth.frw.module.security.user.api.dto.DepartmentRef;
 import com.dth.frw.module.security.user.api.dto.OrganizationRef;
+import com.dth.frw.module.security.user.api.dto.ReportUnitRef;
 import com.dth.frw.module.security.user.api.dto.RoleRef;
 import com.dth.frw.module.security.user.api.dto.UserPatchRequest;
 import com.dth.frw.module.security.user.api.dto.UserRequest;
@@ -68,6 +71,12 @@ public class UserService {
 
     private final DepartmentService departmentService;
 
+    // Đơn vị báo cáo ASXH của tài khoản (cấp Đơn vị), giải qua service của slice đơn vị như
+    // tổ chức / phòng ban ở trên: id lạ ra đúng 404 của endpoint đơn vị. ReportUnitService
+    // không phụ thuộc ngược lại service này (đồng bộ trạng thái đơn vị → tài khoản đi qua
+    // sự kiện, xem ReportUnitAccountSync), nên không có vòng phụ thuộc.
+    private final ReportUnitService reportUnitService;
+
     // Disabling an account or resetting its password has to end the sessions
     // already open under it, or the change would not take effect until the
     // refresh token expired days later.
@@ -85,6 +94,7 @@ public class UserService {
                        RoleService roleService,
                        OrganizationService organizationService,
                        DepartmentService departmentService,
+                       ReportUnitService reportUnitService,
                        RefreshTokenService refreshTokenService,
                        PasswordEncoder passwordEncoder,
                        ApplicationEventPublisher events) {
@@ -92,6 +102,7 @@ public class UserService {
         this.roleService = roleService;
         this.organizationService = organizationService;
         this.departmentService = departmentService;
+        this.reportUnitService = reportUnitService;
         this.refreshTokenService = refreshTokenService;
         this.passwordEncoder = passwordEncoder;
         this.events = events;
@@ -140,6 +151,10 @@ public class UserService {
         user.setOrganization(placement.organization());
         user.setDepartment(placement.department());
 
+        ReportUnit reportUnit = resolveReportUnit(request.reportUnit(), null);
+        requireReportUnitAssignable(reportUnit, null, user.getStatus());
+        user.setReportUnit(reportUnit);
+
         return repository.save(user);
     }
 
@@ -168,6 +183,16 @@ public class UserService {
                 request.organization(), request.department(), user.getOrganization(), user.getDepartment());
         user.setOrganization(placement.organization());
         user.setDepartment(placement.department());
+
+        // Đơn vị báo cáo và trạng thái được kiểm theo trạng thái SAU khi lưu: gắn vào đơn vị đã
+        // có tài khoản khác (BR-69.2), hoặc để tài khoản hoạt động trong đơn vị đã ngừng hoạt
+        // động (UC-02 3b), đều bị từ chối trước khi ghi đơn vị vào entity.
+        ReportUnit reportUnit = resolveReportUnit(request.reportUnit(), user.getReportUnit());
+        UserStatus targetStatus = request.status() == null ? user.getStatus() : request.status();
+        if (request.reportUnit() != null || request.status() != null) {
+            requireReportUnitAssignable(reportUnit, user.getId(), targetStatus);
+        }
+        user.setReportUnit(reportUnit);
 
         // Both of these can take the last administrator away, so they are
         // checked against the state the request is asking for, not the state
@@ -200,8 +225,11 @@ public class UserService {
         // Without publishing here, moving somebody between departments would
         // take effect only when the cache expired -- degraded rather than
         // wrong, but a minute in which they still see their old team's rows.
+        //
+        // Đơn vị báo cáo cũng vậy: phạm vi phiếu của tài khoản đọc nó từ bộ nhớ đệm quyền.
         if (request.roles() != null || request.status() != null
-                || request.organization() != null || request.department() != null) {
+                || request.organization() != null || request.department() != null
+                || request.reportUnit() != null) {
             events.publishEvent(new AuthoritiesChanged.ForUser(saved.getId()));
         }
         return saved;
@@ -233,7 +261,7 @@ public class UserService {
     public User changeOwnPassword(Long id, String currentPassword, String newPassword) {
         User user = get(id);
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw new ConflictException("The current password is not correct");
+            throw new ConflictException("Mật khẩu hiện tại chưa đúng.");
         }
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         User saved = repository.save(user);
@@ -259,7 +287,8 @@ public class UserService {
         // and it is unrecoverable. Disabling it is the reversible version of
         // whatever was intended.
         if (CurrentUser.id().filter(user.getId()::equals).isPresent()) {
-            throw new ConflictException("You cannot delete the account you are signed in as");
+            throw new ConflictException(
+                    "Không thể xoá tài khoản bạn đang đăng nhập. Nếu muốn dừng tài khoản này, hãy chuyển sang ngừng hoạt động.");
         }
         requireAdminSurvives(user, Set.of(), UserStatus.INACTIVE);
 
@@ -278,6 +307,94 @@ public class UserService {
     private Set<Role> resolveRoles(List<RoleRef> refs) {
         List<Long> ids = refs.stream().map(RoleRef::id).toList();
         return new LinkedHashSet<>(roleService.resolveAll(ids));
+    }
+
+    /**
+     * Đơn vị báo cáo mà request muốn gắn — cùng quy ước ba trạng thái với tổ chức: bỏ trường
+     * giữ nguyên {@code current}, {@code {"id": null}} bỏ gắn, {@code {"id": n}} gắn đơn vị n.
+     */
+    private ReportUnit resolveReportUnit(ReportUnitRef ref, ReportUnit current) {
+        if (ref == null) {
+            return current;
+        }
+        return ref.id() == null ? null : reportUnitService.get(ref.id());
+    }
+
+    /**
+     * BR-69.2: một đơn vị — một tài khoản. UC-02 3b: không để tài khoản hoạt động trong đơn vị
+     * đã ngừng hoạt động.
+     *
+     * @param selfId id tài khoản đang sửa, {@code null} khi tạo mới
+     */
+    private void requireReportUnitAssignable(ReportUnit unit, Long selfId, UserStatus status) {
+        if (unit == null) {
+            return;
+        }
+        boolean takenByAnother = repository.findByReportUnitId(unit.getId()).stream()
+                .anyMatch(other -> !other.getId().equals(selfId));
+        if (takenByAnother) {
+            throw new ConflictException(
+                    "Đơn vị %s đã được gắn với một tài khoản khác. Mỗi đơn vị chỉ có một tài khoản."
+                            .formatted(unit.getName()));
+        }
+        if (!unit.isActive() && status == UserStatus.ACTIVE) {
+            throw new ConflictException(
+                    "Không thể để tài khoản hoạt động vì đơn vị %s đã ngừng hoạt động."
+                            .formatted(unit.getName()));
+        }
+    }
+
+    // ------------------------------------------- đồng bộ theo trạng thái đơn vị
+
+    /**
+     * Ngừng hoạt động đơn vị (BR-02.1, BR-70.2): mọi tài khoản đang hoạt động gắn với đơn vị
+     * và toàn bộ cây đơn vị con chuyển sang ngừng hoạt động, phiên đăng nhập bị kết thúc.
+     * Gọi từ {@code ReportUnitAccountSync}, trong giao dịch của lần sửa đơn vị.
+     *
+     * @return số tài khoản vừa bị ngừng hoạt động
+     */
+    @Transactional
+    public int deactivateAccountsOfUnitTree(Long unitId) {
+        List<Long> ids = repository.findActiveIdsInReportUnitTree(unitId);
+        if (ids.isEmpty()) {
+            return 0;
+        }
+        Instant now = Instant.now();
+        int changed = 0;
+        for (User user : repository.findAllById(ids)) {
+            if (!user.canSignIn()) {
+                continue;
+            }
+            // Tài khoản đơn vị không bao giờ là quản trị viên cuối cùng, nhưng vẫn giữ cùng hàng
+            // rào với đường sửa tay để không lối tắt nào khoá hết người quản trị.
+            requireAdminSurvives(user, user.getRoles(), UserStatus.INACTIVE);
+            user.setStatus(UserStatus.INACTIVE);
+            repository.save(user);
+            refreshTokenService.revokeAllFor(user, now);
+            events.publishEvent(new AuthoritiesChanged.ForUser(user.getId()));
+            changed++;
+        }
+        return changed;
+    }
+
+    /**
+     * Kích hoạt lại đơn vị (BR-02.2, UC-02 3a): chỉ bật lại tài khoản của CHÍNH đơn vị đó đang
+     * ngừng hoạt động; tài khoản bị khoá giữ nguyên, đơn vị con không lan.
+     *
+     * @return số tài khoản vừa được bật lại
+     */
+    @Transactional
+    public int reactivateAccountsOfUnit(Long unitId) {
+        int changed = 0;
+        for (User user : repository.findByReportUnitId(unitId)) {
+            if (user.getStatus() == UserStatus.INACTIVE) {
+                user.setStatus(UserStatus.ACTIVE);
+                repository.save(user);
+                events.publishEvent(new AuthoritiesChanged.ForUser(user.getId()));
+                changed++;
+            }
+        }
+        return changed;
     }
 
     /** Where a request wants the account placed, resolved and agreed with itself. */
@@ -340,10 +457,11 @@ public class UserService {
 
         if (!organization.getId().equals(department.getOrganization().getId())) {
             throw new ConflictException(
-                    "%s belongs to %s, not to %s".formatted(
-                            department.getName(),
-                            department.getOrganization().getName(),
-                            organization.getName()));
+                    "Phòng ban %s thuộc %s, không thuộc %s. Bạn chọn lại phòng ban cho đúng đơn vị công tác."
+                            .formatted(
+                                    department.getName(),
+                                    department.getOrganization().getName(),
+                                    organization.getName()));
         }
         return new Placement(organization, department);
     }
@@ -362,14 +480,15 @@ public class UserService {
 
         if (wasAdmin && !staysAdmin && repository.countActiveWithRole(ADMIN_ROLE_CODE) <= 1) {
             throw new ConflictException(
-                    "This is the last active administrator; promote another account first");
+                    "Đây là quản trị viên cuối cùng còn hoạt động. Hãy cấp vai trò quản trị cho một tài khoản khác trước.");
         }
     }
 
     private void requireUsernameAvailable(String username, Long selfId) {
         repository.findByUsernameIgnoreCase(username).ifPresent(existing -> {
             if (!existing.getId().equals(selfId)) {
-                throw new ConflictException("The username %s is already taken".formatted(username));
+                throw new ConflictException(
+                        "Tên đăng nhập %s đã có người dùng. Bạn chọn tên đăng nhập khác.".formatted(username));
             }
         });
     }
@@ -377,7 +496,8 @@ public class UserService {
     private void requireEmailAvailable(String email, Long selfId) {
         repository.findByEmailIgnoreCase(email).ifPresent(existing -> {
             if (!existing.getId().equals(selfId)) {
-                throw new ConflictException("The email %s is already in use".formatted(email));
+                throw new ConflictException(
+                        "Thư điện tử %s đã được dùng cho tài khoản khác.".formatted(email));
             }
         });
     }

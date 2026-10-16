@@ -20,9 +20,12 @@ import {
 } from "@/shared/components/views/list-view";
 import { CreateButton } from "@/shared/components/buttons/create";
 import { Badge } from "@/shared/ui/badge";
-import type { Organization as OrganizationRow } from "@/domains/organization/types";
-import type { Department as DepartmentRow } from "@/domains/department/types";
-import type { User } from "@/domains/user/types";
+import {
+  ACCOUNT_LEVEL_LABELS,
+  accountLevelOf,
+  type RoleSummary,
+  type User,
+} from "@/domains/user/types";
 import { Plus } from "lucide-react";
 import { formatDateTimeVi, USER_STATUS_FILTER_OPTIONS } from "../labels";
 import {
@@ -54,34 +57,30 @@ const STATIC_FILTER_FIELDS: AdvancedFilterField[] = [
   },
 ];
 
+/** Dòng `/api/report_units` mà ô lọc "Đơn vị" cần — khai cục bộ, không nhập feature khác. */
+type ReportUnitRow = { id: number; name: string };
+
 export const UserList = () => {
-  // Reading organizations and departments are separate grants from reading
-  // users. Asking anyway would spend a request on a guaranteed 403 and raise an
-  // error toast on every visit, for a filter that could not be populated either
-  // way — so the lookups are gated and the fields drop out below.
-  const { data: canReadOrganizations } = useCan({
-    resource: "organizations",
-    action: "list",
-  });
-  const { data: canReadDepartments } = useCan({
-    resource: "departments",
-    action: "list",
-  });
-  const mayReadOrganizations = canReadOrganizations?.can ?? false;
-  const mayReadDepartments = canReadDepartments?.can ?? false;
+  // Đọc đơn vị báo cáo và vai trò là quyền riêng, khác quyền đọc người dùng. Hỏi khi
+  // không có quyền chỉ tốn một yêu cầu chắc chắn 403 và một thông báo lỗi mỗi lần vào
+  // màn — nên chỉ tải khi có quyền, không có thì ô lọc đó không hiện.
+  const { data: canReadUnits } = useCan({ resource: "report_units", action: "list" });
+  const { data: canReadRoles } = useCan({ resource: "roles", action: "list" });
+  const mayReadUnits = canReadUnits?.can ?? false;
+  const mayReadRoles = canReadRoles?.can ?? false;
 
-  const { result: organizationResult } = useList<OrganizationRow>({
-    resource: "organizations",
-    pagination: { pageSize: 200 },
+  const { result: unitResult } = useList<ReportUnitRow>({
+    resource: "report_units",
+    pagination: { pageSize: 1000 },
     sorters: [{ field: "name", order: "asc" }],
-    queryOptions: { enabled: mayReadOrganizations },
+    queryOptions: { enabled: mayReadUnits },
   });
 
-  const { result: departmentResult } = useList<DepartmentRow>({
-    resource: "departments",
-    pagination: { pageSize: 200 },
-    sorters: [{ field: "name", order: "asc" }],
-    queryOptions: { enabled: mayReadDepartments },
+  const { result: roleResult } = useList<RoleSummary>({
+    resource: "roles",
+    pagination: { pageSize: 100 },
+    sorters: [{ field: "code", order: "asc" }],
+    queryOptions: { enabled: mayReadRoles },
   });
 
   const columns = React.useMemo(() => {
@@ -108,20 +107,23 @@ export const UserList = () => {
         id: "placement",
         enableResizing: true,
         header: "Đơn vị công tác",
-        // Not sortable: `_sort=organization` is not a property the API accepts,
-        // and offering the header would produce a sort that quietly does
-        // nothing. Filter by organization or department instead.
+        // Không sắp xếp được: API không nhận `_sort=reportUnit`, cho bấm tiêu đề thì
+        // thành một lần sắp xếp không làm gì. Dùng ô lọc Đơn vị thay vào.
         enableSorting: false,
+        // Figma 309:16321: tên đơn vị báo cáo (hoặc "—"), dòng dưới là cấp tài khoản.
         cell: ({ row }) => {
-          const { organization, department } = row.original;
-          if (!organization) {
-            return <span className="text-muted-foreground text-sm">—</span>;
-          }
+          const { reportUnit } = row.original;
           return (
             <div className="flex flex-col">
-              <span className="text-sm">{organization.name}</span>
+              <span className="text-sm">
+                {reportUnit ? (
+                  reportUnit.name
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </span>
               <span className="text-muted-foreground text-xs">
-                {department?.name ?? "Không thuộc phòng ban nào"}
+                Tài khoản cấp {ACCOUNT_LEVEL_LABELS[accountLevelOf(row.original)]}
               </span>
             </div>
           );
@@ -185,49 +187,50 @@ export const UserList = () => {
   const advancedFilterFields = React.useMemo<AdvancedFilterField[]>(
     () => [
       ...STATIC_FILTER_FIELDS,
-      // Offered only to somebody who may read the resource each filters on. A
-      // select with no options is a control that looks broken rather than one
-      // that explains itself.
-      ...(mayReadOrganizations
+      {
+        field: "accountLevel",
+        label: "Cấp tài khoản",
+        type: "select" as const,
+        placeholder: "Tất cả",
+        operators: ["eq" as const],
+        options: [
+          { label: "Cấp Đơn vị", value: "don_vi" },
+          { label: "Cấp Sở hoặc UBND", value: "so_ubnd" },
+        ],
+      },
+      // Chỉ hiện với người được đọc danh mục tương ứng: một ô chọn không có lựa chọn
+      // nào trông như hỏng chứ không tự giải thích được.
+      ...(mayReadUnits
         ? [
             {
-              field: "organization.id",
+              field: "reportUnit.id",
               label: "Đơn vị",
               type: "select" as const,
               placeholder: "Tất cả đơn vị",
-              options: (organizationResult?.data ?? []).map((item) => ({
+              options: (unitResult?.data ?? []).map((item) => ({
                 label: item.name,
                 value: String(item.id),
               })),
             },
           ]
         : []),
-      // Not filtered by the organization filter above it, unlike the picker on
-      // the form. This is a search, not a write: narrowing to one department is
-      // already narrower than any organization it could belong to, and making
-      // the two fields depend on each other would mean a filter that empties
-      // itself when an unrelated one is cleared.
-      ...(mayReadDepartments
+      ...(mayReadRoles
         ? [
             {
-              field: "department.id",
-              label: "Phòng ban",
+              field: "roles.id",
+              label: "Vai trò",
               type: "select" as const,
-              placeholder: "Tất cả phòng ban",
-              options: (departmentResult?.data ?? []).map((item) => ({
-                label: `${item.organization.name} · ${item.name}`,
+              placeholder: "Tất cả vai trò",
+              operators: ["eq" as const],
+              options: (roleResult?.data ?? []).map((item) => ({
+                label: item.name,
                 value: String(item.id),
               })),
             },
           ]
         : []),
     ],
-    [
-      mayReadOrganizations,
-      mayReadDepartments,
-      organizationResult?.data,
-      departmentResult?.data,
-    ]
+    [mayReadUnits, mayReadRoles, unitResult?.data, roleResult?.data]
   );
 
   const table = useTable({

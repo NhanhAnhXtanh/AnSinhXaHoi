@@ -177,7 +177,7 @@ public class DepartmentService {
                 .ifPresent(existing -> {
                     if (!existing.getId().equals(selfId)) {
                         throw new ConflictException(
-                                "%s already has a department with the code %s"
+                                "%s đã có phòng ban mang mã %s. Bạn nhập mã khác."
                                         .formatted(organization.getName(), code));
                     }
                 });

@@ -21,13 +21,26 @@ public record CurrentUserResponse(
         Long id,
         String username,
         String email,
-        String fullName) {
+        String fullName,
+        /**
+         * Đơn vị báo cáo ASXH của tài khoản (cấp Đơn vị), {@code null} với tài khoản Sở / UBND.
+         * Thuộc "tôi là ai" chứ không phải "tôi được làm gì": màn Hồ sơ và đầu trang nhập liệu
+         * hiện tên đơn vị của người đăng nhập mà không cần quyền đọc danh mục đơn vị.
+         */
+        ReportUnitSummary reportUnit) {
+
+    /** Đơn vị báo cáo theo cách endpoint này báo — khai riêng, không dùng DTO slice khác. */
+    public record ReportUnitSummary(Long id, String name) {
+    }
 
     public static CurrentUserResponse from(User user) {
         return new CurrentUserResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
-                user.getFullName());
+                user.getFullName(),
+                user.getReportUnit() == null
+                        ? null
+                        : new ReportUnitSummary(user.getReportUnit().getId(), user.getReportUnit().getName()));
     }
 }

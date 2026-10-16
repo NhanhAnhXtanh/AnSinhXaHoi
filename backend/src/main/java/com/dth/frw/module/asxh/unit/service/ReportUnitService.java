@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.hibernate.Hibernate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
@@ -52,9 +53,15 @@ public class ReportUnitService {
     private final ReportUnitRepository repository;
     private final RowLevelSecurity rowLevel;
 
-    public ReportUnitService(ReportUnitRepository repository, RowLevelSecurity rowLevel) {
+    // Báo cho slice người dùng khi đơn vị đổi trạng thái hoạt động, để tài khoản đổi theo
+    // (BR-02.1, BR-02.2). Sự kiện thay cho lời gọi: UserService đã phụ thuộc service này.
+    private final ApplicationEventPublisher events;
+
+    public ReportUnitService(ReportUnitRepository repository, RowLevelSecurity rowLevel,
+                             ApplicationEventPublisher events) {
         this.repository = repository;
         this.rowLevel = rowLevel;
+        this.events = events;
     }
 
     public Page<ReportUnit> list(ListParams params) {
@@ -124,6 +131,7 @@ public class ReportUnitService {
         }
 
         boolean deactivating = unit.isActive() && Boolean.FALSE.equals(request.active());
+        boolean reactivating = !unit.isActive() && Boolean.TRUE.equals(request.active());
 
         if (parentChanged) {
             unit.setParent(targetParent);
@@ -155,8 +163,11 @@ public class ReportUnitService {
         if (deactivating) {
             // BR-02.1: ngừng hoạt động lan xuống toàn bộ cây con; kích hoạt lại không lan.
             repository.deactivateDescendants(saved.getId());
-            // TODO: vô hiệu tài khoản gắn các đơn vị này (BR-02.2, UC-70) — bảng users
-            // chưa có liên kết tới đơn vị báo cáo; làm khi nối tài khoản đơn vị.
+            // BR-02.1, BR-70.2: tài khoản gắn đơn vị này và cây con ngừng hoạt động theo.
+            events.publishEvent(new ReportUnitActivationChanged(saved.getId(), false));
+        } else if (reactivating) {
+            // BR-02.2: bật lại tài khoản của CHÍNH đơn vị; đơn vị con không lan.
+            events.publishEvent(new ReportUnitActivationChanged(saved.getId(), true));
         }
         return initializeParent(saved);
     }
@@ -181,7 +192,8 @@ public class ReportUnitService {
             // BR-03.1: đơn vị đã được thiết lập biểu cho kỳ, đã có phiếu hoặc số liệu đã
             // lưu thì giữ lại để tra cứu — chỉ cho ngừng hoạt động.
             throw new ConflictException("Không xoá được đơn vị " + unit.getName()
-                    + " vì đơn vị đã được thiết lập biểu cho kỳ báo cáo hoặc đã có phiếu báo cáo. "
+                    + " vì đơn vị đã được thiết lập biểu cho kỳ báo cáo, đã có phiếu báo cáo "
+                    + "hoặc còn tài khoản đăng nhập gắn với đơn vị. "
                     + "Bạn có thể chọn Ngừng hoạt động thay cho xoá.");
         }
         return unit;

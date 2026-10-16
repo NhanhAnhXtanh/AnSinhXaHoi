@@ -72,6 +72,7 @@ import {
   type UnitBlock,
   type UnitType,
 } from "./model";
+import { useUnitAccountCounts } from "./use-unit-account-counts";
 
 type StatusFilter = "all" | "active" | "inactive";
 type BlockFilter = "all" | UnitBlock;
@@ -135,6 +136,8 @@ export function ReportUnitList() {
     errorNotification: false,
   });
   const units = useMemo(() => treeResult.data ?? [], [treeResult.data]);
+  // Số tài khoản gắn với từng đơn vị (null = chưa biết / không có quyền xem người dùng).
+  const accountCounts = useUnitAccountCounts();
 
   const filters = useMemo<CrudFilter[]>(() => {
     const out: CrudFilter[] = [];
@@ -629,9 +632,10 @@ export function ReportUnitList() {
                   </TableCell>
                   <TableCell>{UNIT_TYPE_LABELS[row.unit.unitType] ?? "—"}</TableCell>
                   <TableCell>{BLOCK_LABELS[row.unit.block] ?? "—"}</TableCell>
-                  <TableCell align="right" title="Chưa gắn tài khoản với đơn vị">
-                    {/* Tài khoản chưa gắn được với đơn vị báo cáo (xem accounts-panel.tsx). */}
-                    {formatNumber(null)}
+                  <TableCell align="right">
+                    {accountCounts
+                      ? formatNumber(accountCounts.get(row.unit.id) ?? 0)
+                      : formatNumber(null)}
                   </TableCell>
                   <TableCell>
                     <StatusBadge tone={row.unit.active ? "success" : "neutral"}>

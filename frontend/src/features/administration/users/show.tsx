@@ -14,7 +14,11 @@ import {
   MetaItem,
   MetaStrip,
 } from "@/shared/components/views/record-detail";
-import type { User } from "@/domains/user/types";
+import {
+  ACCOUNT_LEVEL_LABELS,
+  accountLevelOf,
+  type User,
+} from "@/domains/user/types";
 import { formatDateTimeVi } from "../labels";
 import { AdminPageHeader } from "../record-actions";
 import { UserHeaderActions } from "./user-actions";
@@ -137,7 +141,24 @@ export const UserShow = () => {
 
         <DetailPanel title="Đơn vị công tác">
           <DetailList>
-            <DetailRow label="Đơn vị">
+            <DetailRow label="Đơn vị báo cáo">
+              {record?.reportUnit ? (
+                <Link
+                  to={`/report-units/edit/${record.reportUnit.id}`}
+                  className="hover:underline"
+                >
+                  {record.reportUnit.name}
+                </Link>
+              ) : (
+                <EmptyValue>Không gắn đơn vị</EmptyValue>
+              )}
+            </DetailRow>
+            <DetailRow label="Cấp tài khoản">
+              {record ? ACCOUNT_LEVEL_LABELS[accountLevelOf(record)] : null}
+            </DetailRow>
+            {/* Nơi công tác của khung quản trị gốc — chỉ hiện khi tài khoản có gắn. */}
+            {record?.organization && (
+            <DetailRow label="Tổ chức">
               {record?.organization ? (
                 <Link
                   to={`/organizations/show/${record.organization.id}`}
@@ -149,6 +170,8 @@ export const UserShow = () => {
                 <EmptyValue>Chưa gắn đơn vị</EmptyValue>
               )}
             </DetailRow>
+            )}
+            {record?.department && (
             <DetailRow label="Phòng ban">
               {record?.department ? (
                 <Link
@@ -161,6 +184,7 @@ export const UserShow = () => {
                 <EmptyValue>Không thuộc phòng ban nào</EmptyValue>
               )}
             </DetailRow>
+            )}
           </DetailList>
         </DetailPanel>
 

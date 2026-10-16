@@ -2,6 +2,7 @@ package com.dth.frw.domain.asxh.report;
 
 import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.unit.ReportUnit;
+import com.dth.frw.shared.security.rowlevel.RowLevelResource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -32,6 +33,8 @@ import java.util.Objects;
  * LAZY vì chỉ lịch sử phiên bản mới cần.
  */
 @Entity
+// Phạm vi dữ liệu theo đơn vị (UC-72): xem module/asxh/inputreport/security.
+@RowLevelResource("input_reports")
 @Table(
         name = "asxh_input_reports",
         indexes = {

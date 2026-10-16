@@ -17,16 +17,16 @@ import java.util.List;
  * ({@code POST /users/{id}/password}) rather than hiding inside a form save.
  */
 public record UserPatchRequest(
-        @Size(min = 3, max = 100, message = "Username must be between 3 and 100 characters")
+        @Size(min = 3, max = 100, message = "Tên đăng nhập cần từ 3 đến 100 ký tự.")
         @Pattern(regexp = "^[a-zA-Z0-9._-]+$",
-                message = "Username may only contain letters, digits, dots, underscores and hyphens")
+                message = "Tên đăng nhập chỉ gồm chữ không dấu, chữ số, dấu chấm, gạch dưới và gạch ngang.")
         String username,
 
-        @Email(message = "Email must be a valid address")
-        @Size(max = 255, message = "Email must be at most 255 characters")
+        @Email(message = "Địa chỉ thư điện tử chưa đúng.")
+        @Size(max = 255, message = "Thư điện tử tối đa 255 ký tự.")
         String email,
 
-        @Size(min = 1, max = 255, message = "Full name must be between 1 and 255 characters")
+        @Size(min = 1, max = 255, message = "Họ tên cần từ 1 đến 255 ký tự.")
         String fullName,
 
         UserStatus status,
@@ -43,13 +43,17 @@ public record UserPatchRequest(
         @Valid
         DepartmentRef department,
 
+        /** Đơn vị báo cáo ASXH: bỏ trường = giữ nguyên, {@code {"id": null}} = bỏ gắn. */
+        @Valid
+        ReportUnitRef reportUnit,
+
         // Size rather than NotEmpty, because null and empty have to mean
         // different things here: omitting the field leaves the assignments
         // alone, while an empty list is rejected. NotEmpty would reject both.
         // An account with no role can sign in and do nothing, which reads as a
         // broken system rather than a deliberate one -- disabling the account
         // is what that is for.
-        @Size(min = 1, message = "At least one role is required")
+        @Size(min = 1, message = "Vui lòng chọn ít nhất một vai trò.")
         @Valid
         List<RoleRef> roles) {
 }

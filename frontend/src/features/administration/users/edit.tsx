@@ -20,7 +20,8 @@ import {
   SectionedFormPanel,
 } from "@/shared/components/form/form-section";
 import { RolePicker } from "./role-picker";
-import { PlacementPicker, type PlacementRef } from "./placement-picker";
+import { ReportUnitPicker } from "./report-unit-picker";
+import { AccountLevelField } from "./account-level-field";
 import { ResetPasswordCard } from "./reset-password-card";
 import { StatusSwitchField } from "./status-switch-field";
 import { UserHeaderActions } from "./user-actions";
@@ -36,14 +37,13 @@ import { errorDescription, formatDateTimeVi } from "../labels";
 import type { User } from "@/domains/user/types";
 
 /**
- * Rút một đơn vị / phòng ban về dạng `{ id }` API đọc, giữ nguyên ba trạng thái
- * API phân biệt.
+ * Rút đơn vị báo cáo về dạng `{ id }` API đọc, giữ nguyên ba trạng thái API phân biệt.
  *
  * `null` nghĩa là không gửi — giữ nguyên, đúng cho tài khoản chưa gắn đơn vị
  * và không ai chạm vào. `{ id: null }` là cách ô chọn nói "bỏ gắn", phải giữ
  * nguyên. Còn lại là bản tóm tắt API trả về, gửi lại chỉ mã số của nó.
  */
-function toPlacementRef(value: unknown): PlacementRef | null {
+function toRef(value: unknown): { id: number | null } | null {
   if (value == null) return null;
   const id = (value as { id?: number | string | null }).id;
   return { id: id == null ? null : Number(id) };
@@ -83,8 +83,8 @@ export const UserEdit = () => {
   /**
    * Đổ bản ghi vào form một lần.
    *
-   * `organization` và `department` do `PlacementPicker` điều khiển chứ không
-   * qua `FormField`, nên cách đổ từng ô của thư viện sẽ bỏ sót chúng. `reset`
+   * `reportUnit` do `ReportUnitPicker` điều khiển chứ không qua `FormField`,
+   * nên cách đổ từng ô của thư viện sẽ bỏ sót nó. `reset`
    * ghi cả bản ghi vào giá trị form; `keepDirtyValues` để lần tải lại sau
    * không xoá mất chỗ đang sửa. Họ tên được tách thành hai ô ở đây.
    */
@@ -100,7 +100,11 @@ export const UserEdit = () => {
       ? (values.roles as { id: number }[]).map((role) => ({ id: role.id }))
       : values.roles;
 
+    // Tổ chức / phòng ban của khung quản trị gốc không còn trên form (Figma chỉ có đơn vị
+    // báo cáo): bỏ khỏi payload để API giữ nguyên, thay vì gửi lại bản tóm tắt cũ.
     const { familyName, givenName, ...rest } = values;
+    delete rest.organization;
+    delete rest.department;
 
     onFinish({
       ...rest,
@@ -109,8 +113,7 @@ export const UserEdit = () => {
         givenName as string | undefined
       ),
       roles,
-      organization: toPlacementRef(values.organization),
-      department: toPlacementRef(values.department),
+      reportUnit: toRef(values.reportUnit),
     });
   }
 
@@ -226,24 +229,22 @@ export const UserEdit = () => {
               description="Nơi cán bộ làm việc và việc cho phép hay không cho phép đăng nhập."
             >
               {/*
-                `contents` để hai ô đơn vị / phòng ban nằm thẳng trên lưới của
-                mục này, cùng hàng với Trạng thái. Đơn vị đang lưu được truyền
-                vào để ô chọn hiện đúng tên ngay cả trước khi danh sách về —
-                và cả khi tài khoản này không có quyền xem danh sách đơn vị.
+                Ba ô một hàng như Figma 310:36846. Đơn vị đang lưu được truyền
+                vào để ô chọn hiện đúng tên ngay cả trước khi danh sách về — và
+                cả khi tài khoản này không có quyền xem danh sách đơn vị.
               */}
-              <PlacementPicker
-                className="contents"
-                itemClassName="md:col-span-4"
-                organization={form.watch("organization")}
-                department={form.watch("department")}
-                onOrganizationChange={(value) =>
-                  form.setValue("organization", value, { shouldDirty: true })
+              <ReportUnitPicker
+                className="md:col-span-4"
+                value={form.watch("reportUnit")}
+                onChange={(value) =>
+                  form.setValue("reportUnit", value, { shouldDirty: true })
                 }
-                onDepartmentChange={(value) =>
-                  form.setValue("department", value, { shouldDirty: true })
-                }
-                currentOrganization={user?.organization}
-                currentDepartment={user?.department}
+                current={user?.reportUnit}
+              />
+
+              <AccountLevelField
+                className="md:col-span-4"
+                hasUnit={form.watch("reportUnit")?.id != null}
               />
 
               <FormField
