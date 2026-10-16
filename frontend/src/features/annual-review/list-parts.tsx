@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -16,7 +15,7 @@ import {
 } from "@/shared/ui/select";
 import { cn } from "@/shared/lib/utils";
 
-import { STATUS, type SubmissionStatus } from "./fixtures";
+import { STATUS, type AnnualStatus } from "./api";
 
 /** Một tấm panel: thanh lọc · bảng · phân trang. */
 export function ListPanel({
@@ -39,9 +38,9 @@ export function ListPanel({
   );
 }
 
-export type StatusFilter = SubmissionStatus | "all";
+export type StatusFilter = AnnualStatus | "all";
 
-/** Ô tìm + "Trạng thái" + "Bộ lọc khác" (năm báo cáo) + làm mới. */
+/** Ô tìm + "Trạng thái" + "Bộ lọc khác" (năm báo cáo) + làm mới (tải lại từ máy chủ). */
 export function ListToolbar({
   search,
   onSearch,
@@ -50,6 +49,8 @@ export function ListToolbar({
   year,
   onYear,
   years,
+  onRefresh,
+  refreshing = false,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -58,6 +59,8 @@ export function ListToolbar({
   year: number | null;
   onYear: (y: number | null) => void;
   years: number[];
+  onRefresh: () => void;
+  refreshing?: boolean;
 }) {
   return (
     <>
@@ -83,7 +86,7 @@ export function ListToolbar({
         </SelectTrigger>
         <SelectContent align="end">
           <SelectItem value="all">Tất cả</SelectItem>
-          {(Object.keys(STATUS) as SubmissionStatus[]).map((k) => (
+          {(Object.keys(STATUS) as AnnualStatus[]).map((k) => (
             <SelectItem key={k} value={k}>
               {STATUS[k].label}
             </SelectItem>
@@ -128,9 +131,10 @@ export function ListToolbar({
         size="icon"
         aria-label="Làm mới"
         title="Làm mới"
-        onClick={() => toast.info("Đã tải lại danh sách.")}
+        disabled={refreshing}
+        onClick={onRefresh}
       >
-        <RefreshCw aria-hidden />
+        <RefreshCw aria-hidden className={cn(refreshing && "animate-spin")} />
       </Button>
     </>
   );
@@ -228,7 +232,7 @@ export function Pager({
 
 /** Lọc chung cho danh sách và lịch sử. */
 export function matchSubmission(
-  s: { year: number; docNo: string; status: SubmissionStatus },
+  s: { year: number; docNo: string; status: AnnualStatus },
   search: string,
   status: StatusFilter,
   year: number | null
@@ -238,11 +242,4 @@ export function matchSubmission(
   const q = search.trim().toLocaleLowerCase("vi");
   if (!q) return true;
   return String(s.year).includes(q) || s.docNo.toLocaleLowerCase("vi").includes(q);
-}
-
-const ORDINAL = ["", "đầu", "thứ hai", "thứ ba", "thứ tư", "thứ năm", "thứ sáu", "thứ bảy"];
-
-/** 1 → "nộp lần đầu"; 2 → "nộp lần thứ hai". */
-export function submitOrdinal(n: number): string {
-  return `nộp lần ${ORDINAL[n] ?? `thứ ${n}`}`;
 }

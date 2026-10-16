@@ -143,9 +143,7 @@ public class DeptPeriodService {
 
     /**
      * Kỳ có đang là nguồn số liệu Sở không — số liệu của chính nó, hoặc của kỳ tổng chứa nó. Thu hồi kỳ
-     * (xoá hẳn số liệu đơn vị) phải bị chặn khi còn như vậy.
-     *
-     * <p>TODO điều phối: {@code PeriodLifecycleService.withdraw} cần gọi hàm này (slice thiết lập).
+     * (xoá hẳn số liệu đơn vị) phải bị chặn khi còn như vậy — {@code PeriodLifecycleService.withdraw} gọi.
      */
     @Transactional(readOnly = true)
     public boolean isUsedBy(ReportPeriod period) {
@@ -208,10 +206,7 @@ public class DeptPeriodService {
     /**
      * Gọi trong giao dịch CHỐT ĐỢT (kỳ vừa sang Đã đóng, BR-27.1): lưu số liệu tổng hợp của kỳ. Không lưu
      * (trả {@code null}) khi kỳ đã có số liệu Sở, chồng thời gian với kỳ đã lưu, năm đang khoá, hoặc kỳ
-     * không có biểu. Quyền đã kiểm ở bước chốt đợt.
-     *
-     * <p>TODO điều phối: {@code PeriodLifecycleService.close} (slice thiết lập) cần gọi hàm này sau khi đổi
-     * trạng thái kỳ. Hiện màn Tổng hợp gọi "Lưu số liệu" riêng sau khi chốt đợt.
+     * không có biểu. Quyền đã kiểm ở bước chốt đợt — {@code PeriodLifecycleService.close} gọi.
      */
     @Transactional
     public DeptReport snapshotClosedPeriod(ReportPeriod period) {

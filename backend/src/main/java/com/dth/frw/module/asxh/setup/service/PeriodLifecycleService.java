@@ -2,6 +2,8 @@ package com.dth.frw.module.asxh.setup.service;
 
 import com.dth.frw.domain.asxh.period.PeriodStatus;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
+import com.dth.frw.module.asxh.dept.service.DeptPeriodService;
+import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.module.asxh.inputreport.service.InputReportService;
 import com.dth.frw.module.asxh.period.service.ReportPeriodService;
 import com.dth.frw.shared.exception.ConflictException;
@@ -73,17 +75,25 @@ public class PeriodLifecycleService {
     private final PublicationService publicationService;
     private final PeriodAssignmentService assignmentService;
     private final InputReportService inputReportService;
+    // Số liệu tổng hợp Sở (slice dept): lưu số liệu khi chốt đợt, chặn thu hồi kỳ đang là nguồn,
+    // khoá năm đã nộp báo cáo năm lên UBND.
+    private final DeptPeriodService deptPeriodService;
+    private final DeptYearLockService yearLockService;
 
     public PeriodLifecycleService(ReportPeriodService periodService,
                                   PeriodSetupLockService lockService,
                                   PublicationService publicationService,
                                   PeriodAssignmentService assignmentService,
-                                  InputReportService inputReportService) {
+                                  InputReportService inputReportService,
+                                  DeptPeriodService deptPeriodService,
+                                  DeptYearLockService yearLockService) {
         this.periodService = periodService;
         this.lockService = lockService;
         this.publicationService = publicationService;
         this.assignmentService = assignmentService;
         this.inputReportService = inputReportService;
+        this.deptPeriodService = deptPeriodService;
+        this.yearLockService = yearLockService;
     }
 
     public SetupState setupState(Long periodId) {
@@ -117,7 +127,9 @@ public class PeriodLifecycleService {
                 !locked && !initial && status == PeriodStatus.READY && assignments > 0,
                 !locked && initial && open,
                 CLOSABLE.contains(status),
-                status == PeriodStatus.OVERDUE,
+                // Năm đã nộp UBND thì không mở lại kỳ nào (UC-28 3b); máy chủ kiểm lại khi bấm.
+                status == PeriodStatus.OVERDUE
+                        && lock.map(found -> found.kind() != PeriodSetupLockService.LockKind.YEAR).orElse(true),
                 WITHDRAWABLE.contains(status),
                 readOnlyReason);
     }
@@ -157,9 +169,10 @@ public class PeriodLifecycleService {
      * Phiếu đã duyệt giữ nguyên; còn phiếu chờ duyệt thì không chốt (3a). Kỳ đã chốt không mở lại
      * được (BR-27.4).
      *
-     * <p>TODO: chốt đợt = lưu sổ Sở (BR-27.1) — lập phiếu Sở kỳ và chụp số tổng hợp mọi biểu
-     * theo từng đơn vị; bỏ qua khi kỳ giao thời gian với kỳ khác đã có sổ Sở (3b). Chưa port
-     * phần tổng hợp / sổ cái.
+     * <p>Chốt đợt = lưu số liệu tổng hợp của kỳ (BR-27.1) trong CÙNG giao dịch: chụp số tổng hợp
+     * mọi biểu theo từng đơn vị ({@code DeptPeriodService.snapshotClosedPeriod}). Bỏ qua (không lỗi)
+     * khi kỳ đã có số liệu, trùng thời gian với kỳ khác đã lưu (3b), năm đang khoá, hoặc không có
+     * biểu — khi đó màn Tổng hợp còn nút "Lưu số liệu" kèm lý do.
      */
     @Transactional
     public ReportPeriod close(Long periodId) {
@@ -179,7 +192,9 @@ public class PeriodLifecycleService {
                     + ". Duyệt hoặc trả lại hết trước khi chốt đợt.");
         }
         inputReportService.lockOpenReports(periodId);
-        return periodService.transition(periodId, PeriodStatus.CLOSED);
+        ReportPeriod closed = periodService.transition(periodId, PeriodStatus.CLOSED);
+        deptPeriodService.snapshotClosedPeriod(closed);
+        return closed;
     }
 
     /**
@@ -187,7 +202,7 @@ public class PeriodLifecycleService {
      * — chỉ đổi trạng thái mà giữ hạn cũ (đã qua) thì việc tự chuyển trạng thái hằng đêm lại đóng
      * kỳ ngay hôm sau (BR-28.1).
      *
-     * <p>TODO: khoá năm — năm đã nộp báo cáo lên UBND thì không mở lại (3b).
+     * <p>Khoá năm (3b, UC-60): năm đã nộp báo cáo lên UBND thì không mở lại kỳ nào của năm.
      */
     @Transactional
     public ReportPeriod extend(Long periodId, LocalDate newDeadline) {
@@ -195,6 +210,9 @@ public class PeriodLifecycleService {
         if (period.getStatus() != PeriodStatus.OVERDUE) {
             throw new ConflictException("Chỉ gia hạn được kỳ đã quá hạn; kỳ " + period.getName()
                     + " đang ở trạng thái " + PublicationService.statusLabel(period.getStatus()) + ".");
+        }
+        if (period.getYear() != null) {
+            yearLockService.assertOpen(period.getYear());
         }
         if (newDeadline == null || newDeadline.isBefore(LocalDate.now())) {
             throw new ConflictException("Hạn nộp mới phải từ hôm nay trở đi.");
@@ -210,7 +228,8 @@ public class PeriodLifecycleService {
      * tờ biểu của kỳ, đưa kỳ về Đã thiết lập. Thiết lập (đơn vị × biểu) giữ nguyên; lần mở sau
      * tính là lần đầu (BR-29.2).
      *
-     * <p>TODO: chặn khi kỳ đang là nguồn của phiếu Sở (3a) và xoá sổ cái của kỳ — chưa port.
+     * <p>Chặn khi kỳ đang là nguồn số liệu tổng hợp đã lưu (3a) — của chính nó hoặc của kỳ dài hơn
+     * chứa nó: xoá phiếu lúc đó là rút mất nguồn của số đã lưu / đã nộp UBND.
      */
     @Transactional
     public ReportPeriod withdraw(Long periodId, String confirmName) {
@@ -220,6 +239,10 @@ public class PeriodLifecycleService {
                     ? "Chỉ thu hồi được sau khi đã mở đợt."
                     : "Không thể thu hồi kỳ đang ở trạng thái "
                             + PublicationService.statusLabel(period.getStatus()) + ".");
+        }
+        if (deptPeriodService.isUsedBy(period)) {
+            throw new ConflictException("Kỳ " + period.getName() + " đã được lưu vào số liệu tổng hợp "
+                    + "(của chính kỳ này hoặc của kỳ dài hơn chứa nó) nên không thu hồi được.");
         }
         String typed = confirmName == null ? "" : confirmName.trim();
         if (!typed.equals(period.getName() == null ? "" : period.getName().trim())) {

@@ -1,5 +1,6 @@
 package com.dth.frw.module.asxh.inputreport.service;
 
+import com.dth.frw.domain.asxh.dept.DeptYearLockState;
 import com.dth.frw.domain.asxh.period.PeriodStatus;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.report.InputReport;
@@ -9,6 +10,7 @@ import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.domain.asxh.unit.ReportUnit;
+import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSpecifications;
@@ -78,15 +80,19 @@ public class InputReportService {
     private final RowLevelSecurity rowLevel;
     // Slice số liệu đã lưu (LEDGER): kiểm tra phía máy chủ khi nộp + lưu số liệu khi duyệt.
     private final com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks;
+    // Khoá năm theo báo cáo năm (slice dept, UC-60): năm đã nộp UBND thì không nhập / nộp / duyệt.
+    private final DeptYearLockService yearLockService;
 
     public InputReportService(InputReportRepository repository,
                               InputReportSheetRepository sheetRepository,
                               RowLevelSecurity rowLevel,
-                              com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks) {
+                              com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks,
+                              DeptYearLockService yearLockService) {
         this.repository = repository;
         this.sheetRepository = sheetRepository;
         this.rowLevel = rowLevel;
         this.workflowHooks = workflowHooks;
+        this.yearLockService = yearLockService;
     }
 
     // ------------------------------------------------------------------ đọc
@@ -139,6 +145,7 @@ public class InputReportService {
             throw new ConflictException("Phiếu đã nộp hoặc đã chốt nên không nộp lại được.");
         }
         requirePeriodOpen(report, "Đợt báo cáo không còn mở để nộp số liệu.");
+        requireYearOpen(yearLockService, report, "nộp");
 
         List<InputReportSheet> sheets = sheetRepository.findByReportId(report.getId());
         long pending = sheets.stream().filter(sheet -> !sheet.getCompletion().isDone()).count();
@@ -168,7 +175,8 @@ public class InputReportService {
         if (report.getStatus() != ReportStatus.SUBMITTED) {
             throw new ConflictException("Phiếu phải đang chờ duyệt mới phê duyệt được.");
         }
-        // TODO: khoá năm — năm đã nộp báo cáo lên UBND thì không duyệt (UC-41 3e).
+        // Khoá năm — năm đã nộp báo cáo lên UBND thì không duyệt (UC-41 3e).
+        requireYearOpen(yearLockService, report, "phê duyệt");
         // Chống cộng đôi + chạy getInputData từng tờ biểu (bỏ qua NO_DATA) + lưu số liệu, cùng
         // giao dịch: lỗi bất kỳ → 409, phiếu vẫn chờ duyệt.
         workflowHooks.onApprove(report, sheetRepository.findByReportId(report.getId()));
@@ -199,7 +207,8 @@ public class InputReportService {
         if (current.getStatus() != ReportStatus.SUBMITTED) {
             throw new ConflictException("Phiếu phải đang chờ duyệt mới trả lại được.");
         }
-        // TODO: khoá năm — năm đã nộp báo cáo lên UBND thì không trả lại (UC-42 3b).
+        // Khoá năm — năm đã nộp báo cáo lên UBND thì không trả lại (UC-42 3b).
+        requireYearOpen(yearLockService, current, "trả lại");
 
         Instant now = Instant.now();
         String user = currentUsername();
@@ -327,7 +336,31 @@ public class InputReportService {
         if (report.getPeriod().getStatus() != PeriodStatus.OPEN) {
             throw new ConflictException(message);
         }
-        // TODO: khoá năm — năm của kỳ đã nộp báo cáo lên UBND thì khoá mọi kỳ của năm (UC-31).
+        // Khoá năm: xem requireYearOpen — gọi riêng vì cần bean của slice dept.
+    }
+
+    /**
+     * Năm của kỳ đã nộp báo cáo năm lên UBND (đang chờ hoặc đã duyệt) thì khoá mọi phiếu của năm
+     * (UC-60, BR-59.3) — kiểm cả với tài khoản đơn vị (BR-60.2: đọc trạng thái năm không qua quyền).
+     *
+     * @param action động từ ghép vào câu báo, ví dụ "nộp", "lưu số liệu"
+     * @throws ConflictException năm đang khoá (→ 409)
+     */
+    static void requireYearOpen(DeptYearLockService yearLockService,
+                                InputReport report, String action) {
+        ReportPeriod period = report.getPeriod();
+        if (yearLockService == null || period == null || period.getYear() == null) {
+            return;
+        }
+        int year = period.getYear();
+        DeptYearLockState state = yearLockService.state(year);
+        if (state == null || state == DeptYearLockState.OPEN) {
+            return;
+        }
+        throw new ConflictException((state == DeptYearLockState.APPROVED
+                ? "Năm " + year + " đã được UBND duyệt báo cáo năm"
+                : "Năm " + year + " đã nộp báo cáo năm lên UBND")
+                + " nên không " + action + " được nữa: số liệu các kỳ trong năm đã khoá.");
     }
 
     static String currentUsername() {

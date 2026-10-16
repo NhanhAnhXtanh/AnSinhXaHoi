@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CircleX } from "lucide-react";
+import { CircleX, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
 import {
@@ -18,6 +18,9 @@ const MAX_REASON = 500;
 /**
  * Hộp ghi lý do (Trả lại / Mở lại báo cáo năm): một ô lý do bắt buộc, tối đa
  * 500 ký tự. Bấm nút khi chưa ghi thì báo lỗi dưới ô.
+ *
+ * `onConfirm` gửi lên máy chủ: trả `null` khi xong (hộp tự đóng), hoặc câu lỗi
+ * để hiện ngay dưới ô (hộp giữ nguyên chữ đã gõ để người dùng sửa).
  */
 export function ReasonDialog({
   open,
@@ -38,18 +41,20 @@ export function ReasonDialog({
   placeholder: string;
   confirmLabel: string;
   emptyError: string;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => Promise<string | null>;
 }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setReason("");
     setError(null);
+    setBusy(false);
   }, [open]);
 
-  const submit = () => {
+  const submit = async () => {
     const text = reason.trim();
     if (!text) {
       setError(emptyError);
@@ -59,12 +64,21 @@ export function ReasonDialog({
       setError(`Lý do dài quá ${MAX_REASON} ký tự, hãy viết ngắn lại.`);
       return;
     }
-    onConfirm(text);
-    onOpenChange(false);
+    setBusy(true);
+    try {
+      const failure = await onConfirm(text);
+      if (failure) {
+        setError(failure);
+        return;
+      }
+      onOpenChange(false);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -83,6 +97,7 @@ export function ReasonDialog({
             }}
             placeholder={placeholder}
             rows={3}
+            disabled={busy}
             aria-invalid={Boolean(error)}
           />
           {error ? (
@@ -98,10 +113,11 @@ export function ReasonDialog({
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
             Quay lại
           </Button>
-          <Button type="button" onClick={submit}>
+          <Button type="button" disabled={busy} onClick={() => void submit()}>
+            {busy && <LoaderCircle aria-hidden className="animate-spin" />}
             {confirmLabel}
           </Button>
         </DialogFooter>

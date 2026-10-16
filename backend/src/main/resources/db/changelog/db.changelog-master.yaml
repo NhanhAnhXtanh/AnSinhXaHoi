@@ -72,6 +72,8 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/141-create-asxh-summary-snapshots.yaml
   - include:
+      file: db/changelog/changes/150-create-asxh-annual-reports.yaml
+  - include:
       file: db/changelog/changes/165-seed-asxh-roles.sql
   - include:
       file: db/changelog/changes/166-add-user-report-unit.yaml

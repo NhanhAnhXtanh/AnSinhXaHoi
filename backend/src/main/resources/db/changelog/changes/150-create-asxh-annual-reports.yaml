@@ -1,0 +1,241 @@
+# Báo cáo năm Sở nộp lên UBND (UC-58..67): phiếu năm ("Phiếu n"), các biểu năm với phiên bản mẫu
+# đã ghim, và file phiếu nộp.
+#
+# Phụ thuộc 110 (asxh_templates, asxh_template_versions). Không khoá ngoại tới số liệu Sở
+# (asxh_dept_*): phiếu năm chỉ GHIM con số phiên bản năm, số liệu đọc lại qua DeptYearDataQuery.
+#
+# Mã quyền annual_reports:read|write|approve và vai trò dùng chúng đã seed ở 165 (ON CONFLICT DO
+# NOTHING) — file này không seed thêm quyền nào.
+databaseChangeLog:
+  - changeSet:
+      id: 150-create-asxh-annual-reports
+      author: dth
+      comment: Phiếu năm — mỗi lần Sở nộp báo cáo năm lên UBND là một dòng; một năm chỉ một phiếu còn hiệu lực.
+      changes:
+        - createTable:
+            tableName: asxh_annual_reports
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_annual_reports
+              - column:
+                  name: report_year
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: revision_no
+                  type: int
+                  constraints:
+                    nullable: false
+              # SUBMITTED | APPROVED | RETURNED
+              - column:
+                  name: status
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              # Phiên bản số liệu tổng hợp của năm đã ghim lúc nộp (BR-59.2).
+              - column:
+                  name: ledger_version
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: doc_no
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: doc_date
+                  type: date
+                  constraints:
+                    nullable: false
+              - column:
+                  name: submitted_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: submitted_by
+                  type: varchar(255)
+              - column:
+                  name: decided_at
+                  type: timestamp with time zone
+              - column:
+                  name: decided_by
+                  type: varchar(255)
+              - column:
+                  name: return_reason
+                  type: varchar(1000)
+              # true = UBND mở lại phiếu đã duyệt (UC-65), khác trả lại thường (UC-64).
+              - column:
+                  name: reopened
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        - addUniqueConstraint:
+            tableName: asxh_annual_reports
+            columnNames: report_year, revision_no
+            constraintName: uq_asxh_annual_reports_year_revision
+        - createIndex:
+            tableName: asxh_annual_reports
+            indexName: idx_asxh_annual_reports_year
+            columns:
+              - column:
+                  name: report_year
+
+  - changeSet:
+      id: 150-create-asxh-annual-reports-active-index
+      author: dth
+      comment: Một năm chỉ một phiếu còn hiệu lực (đang chờ hoặc đã duyệt) — BR-59.1, giữ ở CSDL chứ không chỉ ở code.
+      changes:
+        - sql:
+            sql: >-
+              create unique index uq_asxh_annual_reports_active_year
+              on asxh_annual_reports (report_year)
+              where status in ('SUBMITTED', 'APPROVED')
+      rollback:
+        - sql:
+            sql: drop index if exists uq_asxh_annual_reports_active_year
+
+  - changeSet:
+      id: 150-create-asxh-annual-report-sheets
+      author: dth
+      comment: Biểu tổng hợp năm của từng phiếu năm, với phiên bản mẫu đã ghim lúc nộp.
+      changes:
+        - createTable:
+            tableName: asxh_annual_report_sheets
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_annual_report_sheets
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_version_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_order
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: asxh_annual_report_sheets
+            columnNames: report_id, template_id
+            constraintName: uq_asxh_annual_report_sheets_report_template
+        - addForeignKeyConstraint:
+            baseTableName: asxh_annual_report_sheets
+            baseColumnNames: report_id
+            constraintName: fk_asxh_annual_report_sheets_report
+            referencedTableName: asxh_annual_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        # RESTRICT: biểu / phiên bản mẫu đã ghim vào phiếu năm không xoá được (UC-16).
+        - addForeignKeyConstraint:
+            baseTableName: asxh_annual_report_sheets
+            baseColumnNames: template_id
+            constraintName: fk_asxh_annual_report_sheets_template
+            referencedTableName: asxh_templates
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_annual_report_sheets
+            baseColumnNames: template_version_id
+            constraintName: fk_asxh_annual_report_sheets_version
+            referencedTableName: asxh_template_versions
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: asxh_annual_report_sheets
+            indexName: idx_asxh_annual_report_sheets_version
+            columns:
+              - column:
+                  name: template_version_id
+
+  - changeSet:
+      id: 150-create-asxh-annual-report-attachments
+      author: dth
+      comment: File phiếu nộp (bản ký, đóng dấu) gửi kèm lần nộp báo cáo năm — nội dung nằm trong thư mục asxh.attachments.storage-dir.
+      changes:
+        - createTable:
+            tableName: asxh_annual_report_attachments
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_annual_report_attachments
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: file_name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_type
+                  type: varchar(255)
+              - column:
+                  name: file_size
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: storage_path
+                  type: varchar(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(255)
+        - addForeignKeyConstraint:
+            baseTableName: asxh_annual_report_attachments
+            baseColumnNames: report_id
+            constraintName: fk_asxh_annual_report_attachments_report
+            referencedTableName: asxh_annual_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: asxh_annual_report_attachments
+            indexName: idx_asxh_annual_report_attachments_report
+            columns:
+              - column:
+                  name: report_id

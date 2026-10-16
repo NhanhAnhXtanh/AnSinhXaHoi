@@ -4,6 +4,7 @@ import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.domain.asxh.report.InputReportSheet;
 import com.dth.frw.domain.asxh.report.SheetCompletion;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
+import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetSpecifications;
 import com.dth.frw.module.asxh.ledger.service.ReportSubmitValidationService;
@@ -43,12 +44,16 @@ public class InputReportSheetService {
     private final InputReportSheetRepository repository;
     private final RowLevelSecurity rowLevel;
     private final ReportSubmitValidationService validation;
+    // Khoá năm theo báo cáo năm (slice dept, UC-60).
+    private final DeptYearLockService yearLockService;
 
     public InputReportSheetService(InputReportSheetRepository repository, RowLevelSecurity rowLevel,
-                                   ReportSubmitValidationService validation) {
+                                   ReportSubmitValidationService validation,
+                                   DeptYearLockService yearLockService) {
         this.repository = repository;
         this.rowLevel = rowLevel;
         this.validation = validation;
+        this.yearLockService = yearLockService;
     }
 
     public Page<InputReportSheet> list(ListParams params) {
@@ -183,6 +188,7 @@ public class InputReportSheetService {
             throw new ConflictException("Phiếu đã nộp hoặc đã chốt nên không " + action + " được nữa.");
         }
         InputReportService.requirePeriodOpen(report, "Đợt báo cáo không còn mở nên không " + action + " được.");
+        InputReportService.requireYearOpen(yearLockService, report, action);
         return sheet;
     }
 }

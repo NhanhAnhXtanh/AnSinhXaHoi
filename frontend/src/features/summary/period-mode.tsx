@@ -179,7 +179,7 @@ function PeriodPanel({ periodId, year, onChanged }: { periodId: number; year: nu
   const period = overview.period;
 
   // ------------------------------------------------------------ chốt đợt / lưu số liệu (UC-27, UC-54)
-  const saveSummary = async (afterClose: boolean) => {
+  const saveSummary = async () => {
     try {
       await post({
         url: DEPT_REPORTS_URL,
@@ -189,18 +189,9 @@ function PeriodPanel({ periodId, year, onChanged }: { periodId: number; year: nu
         successNotification: false,
         errorNotification: false,
       });
-      toast.success(
-        afterClose
-          ? `Đã chốt đợt báo cáo ${period.name} và lưu số liệu tổng hợp.`
-          : `Đã lưu số liệu tổng hợp ${period.name}.`
-      );
+      toast.success(`Đã lưu số liệu tổng hợp ${period.name}.`);
     } catch (error) {
-      const message = errorMessage(error, "Chưa lưu được số liệu tổng hợp. Bạn thử lại sau ít phút.");
-      if (afterClose) {
-        toast.warning(`Đã chốt đợt báo cáo ${period.name} nhưng chưa lưu được số liệu tổng hợp: ${message}`);
-      } else {
-        toast.error(message);
-      }
+      toast.error(errorMessage(error, "Chưa lưu được số liệu tổng hợp. Bạn thử lại sau ít phút."));
     }
   };
 
@@ -216,11 +207,8 @@ function PeriodPanel({ periodId, year, onChanged }: { periodId: number; year: nu
         errorNotification: false,
       });
       setDialog(null);
-      if (overview.canWrite) {
-        await saveSummary(true);
-      } else {
-        toast.success(`Đã chốt đợt báo cáo ${period.name}.`);
-      }
+      // Máy chủ lưu số liệu tổng hợp ngay trong lần chốt đợt (BR-27.1).
+      toast.success(`Đã chốt đợt báo cáo ${period.name} và lưu số liệu tổng hợp.`);
       await refresh();
     } catch (error) {
       toast.error(errorMessage(error, "Chưa chốt được đợt báo cáo. Bạn thử lại sau ít phút."));
@@ -233,7 +221,7 @@ function PeriodPanel({ periodId, year, onChanged }: { periodId: number; year: nu
     setBusy(true);
     try {
       setDialog(null);
-      await saveSummary(false);
+      await saveSummary();
       await refresh();
     } finally {
       setBusy(false);

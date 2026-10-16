@@ -7,6 +7,7 @@ import com.dth.frw.domain.asxh.period.PeriodStatus;
 import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.module.asxh.attachment.repo.InputReportAttachmentRepository;
 import com.dth.frw.module.asxh.attachment.repo.TreasuryConfirmationRepository;
+import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.CurrentUser;
@@ -47,15 +48,18 @@ public class InputReportAttachmentService {
     private final TreasuryConfirmationRepository confirmationRepository;
     private final AttachmentStorage storage;
     private final boolean treasuryRequired;
+    private final DeptYearLockService yearLockService;
 
     public InputReportAttachmentService(InputReportAttachmentRepository repository,
                                         TreasuryConfirmationRepository confirmationRepository,
                                         AttachmentStorage storage,
-                                        @Value("${asxh.attachments.treasury-required:true}") boolean treasuryRequired) {
+                                        @Value("${asxh.attachments.treasury-required:true}") boolean treasuryRequired,
+                                        DeptYearLockService yearLockService) {
         this.repository = repository;
         this.confirmationRepository = confirmationRepository;
         this.storage = storage;
         this.treasuryRequired = treasuryRequired;
+        this.yearLockService = yearLockService;
     }
 
     /**
@@ -165,12 +169,16 @@ public class InputReportAttachmentService {
         throw new ConflictException(message);
     }
 
-    private static void assertEditable(InputReport report) {
+    private void assertEditable(InputReport report) {
         if (report.getStatus() == null || !report.getStatus().isEditable()) {
             throw new ConflictException("Phiếu không còn cho phép sửa nên không đổi được giấy tờ đính kèm.");
         }
         if (report.getPeriod() == null || report.getPeriod().getStatus() != PeriodStatus.OPEN) {
             throw new ConflictException("Đợt báo cáo không còn mở nên không đổi được giấy tờ đính kèm.");
+        }
+        // Năm đã nộp UBND (UC-60): mọi số liệu và giấy tờ của các kỳ trong năm đều khoá.
+        if (report.getPeriod().getYear() != null) {
+            yearLockService.assertOpen(report.getPeriod().getYear());
         }
     }
 }

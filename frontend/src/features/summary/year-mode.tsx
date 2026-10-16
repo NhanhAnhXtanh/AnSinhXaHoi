@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Download, FileSpreadsheet, History, RotateCw, Send, TriangleAlert } from "lucide-react";
+import { useCan } from "@refinedev/core";
+import {
+  Download,
+  Eye,
+  FileClock,
+  FileSpreadsheet,
+  History,
+  RotateCw,
+  Send,
+  TriangleAlert,
+} from "lucide-react";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import {
@@ -10,6 +21,7 @@ import {
   MasterDetailLayout,
   StatusBadge,
   WorkCard,
+  formatDate,
 } from "@/shared/components/asxh";
 import type { ActionItem, PrimaryAction, StatusTone } from "@/shared/components/asxh";
 import {
@@ -31,8 +43,28 @@ import {
   type YearSheet,
 } from "./api";
 import { SheetBody, SheetEmpty, SheetError, SheetFrame } from "./sheet-frame";
+import {
+  ANNUAL_YEAR_STATUS_URL,
+  SubmitYearDialog,
+  submitAnnualReport,
+  type AnnualLatest,
+  type AnnualYearStatus,
+  type SubmitYearInput,
+} from "./submit-year-dialog";
 import { joinVi, summaryExportName } from "./utils";
 import { SubmitBlockedDialog, YearHistoryDialog } from "./year-dialogs";
+
+/** Nhãn của phiếu năm mới nhất — thay nhãn "Đã khoá" khi năm đã nộp UBND. */
+function annualStatus(latest: AnnualLatest): { label: string; tone: StatusTone } {
+  switch (latest.status) {
+    case "submitted":
+      return { label: "Chờ UBND duyệt", tone: "warning" };
+    case "approved":
+      return { label: "UBND đã duyệt", tone: "success" };
+    default:
+      return { label: "UBND trả lại", tone: "destructive" };
+  }
+}
 
 function yearStatus(item: { ledgerVersion: number; lockReason: string | null }): { label: string; tone: StatusTone } {
   if (item.lockReason) return { label: "Đã khoá", tone: "locked" };
@@ -100,16 +132,29 @@ export function YearMode({ year, onYearChange }: { year: number; onYearChange: (
 
   return (
     <MasterDetailLayout aside={list}>
-      <YearPanel key={year} year={year} />
+      <YearPanel key={year} year={year} onYearsChanged={() => void yearsState.refetch()} />
     </MasterDetailLayout>
   );
 }
 
-function YearPanel({ year }: { year: number }) {
+function YearPanel({ year, onYearsChanged }: { year: number; onYearsChanged: () => void }) {
+  const navigate = useNavigate();
   const overviewState = useApiObject<YearOverview>(`${SUMMARY_URL}/year`, { year }, "sheets");
   const overview = overviewState.data;
   const [sheetKey, setSheetKey] = useState("");
-  const [dialog, setDialog] = useState<"blocked" | "history" | null>(null);
+  const [dialog, setDialog] = useState<"blocked" | "history" | "submit" | null>(null);
+
+  // Báo cáo năm (UC-58..66): tình trạng nộp của năm — chỉ hỏi khi tài khoản xem được báo cáo năm.
+  const { data: canReadAnnualData } = useCan({ resource: "annual_review", action: "list" });
+  const { data: canSubmitAnnualData } = useCan({ resource: "annual_review", action: "create" });
+  const canReadAnnual = canReadAnnualData?.can === true;
+  const canSubmitAnnual = canSubmitAnnualData?.can === true;
+  const annualState = useApiObject<AnnualYearStatus>(
+    canReadAnnual ? ANNUAL_YEAR_STATUS_URL : null,
+    canReadAnnual ? { year } : undefined,
+    "year"
+  );
+  const annual = annualState.data;
   const [exporting, setExporting] = useState(false);
   const apiRef = useRef<SpreadWorkbookApi | null>(null);
 
@@ -185,28 +230,64 @@ function YearPanel({ year }: { year: number }) {
     }
   };
 
-  // ------------------------------------------------------------ nút nộp (báo cáo năm nối tiếp)
+  // ------------------------------------------------------------ một nút đổi vai (UC-59, UC-62, UC-66)
+  // Chưa nộp → "Nộp báo cáo năm"; đang chờ / đã duyệt → "Xem phiếu"; bị trả lại → "Gửi lại báo cáo năm".
   const unfinished = overview.unfinishedSheets;
+  const latest = annual?.latest ?? null;
+  const active = latest !== null && latest.status !== "returned";
+  const resubmit = latest !== null && latest.status === "returned";
+  const verb = resubmit ? "Gửi lại báo cáo năm" : "Nộp báo cáo năm";
+  const openLatest = () => {
+    if (latest) navigate(`/annual-review/${latest.id}?from=summary`);
+  };
+
+  const doSubmit = async (input: SubmitYearInput): Promise<string | null> => {
+    try {
+      const report = await submitAnnualReport(year, input);
+      toast.success(`Đã ${resubmit ? "gửi lại" : "nộp"} Phiếu ${report.revisionNo} báo cáo năm ${year} lên UBND.`);
+      await Promise.all([overviewState.refetch(), annualState.refetch()]);
+      onYearsChanged();
+      return null;
+    } catch (error) {
+      return errorMessage(error, "Chưa nộp được báo cáo năm. Bạn thử lại sau ít phút.");
+    }
+  };
+
   let primary: PrimaryAction;
-  if (unfinished.length > 0) {
-    primary = { label: "Nộp báo cáo năm", icon: Send, onClick: () => setDialog("blocked") };
+  if (active) {
+    primary = { label: "Xem phiếu", icon: Eye, onClick: openLatest };
+  } else if (unfinished.length > 0) {
+    primary = { label: verb, icon: Send, onClick: () => setDialog("blocked") };
   } else if (overview.lockReason) {
-    primary = { label: "Nộp báo cáo năm", icon: Send, disabled: true, reason: overview.lockReason };
+    primary = { label: verb, icon: Send, disabled: true, reason: overview.lockReason };
   } else if (overview.savedPeriods === 0) {
     primary = {
-      label: "Nộp báo cáo năm",
+      label: verb,
       icon: Send,
       disabled: true,
       reason: "Năm này chưa có kỳ nào lưu số liệu — chốt đợt báo cáo ở Theo kỳ trước khi nộp.",
     };
-  } else {
-    // TODO điều phối: agent BÁO CÁO NĂM nối nút này (UC-58) — SubmitYearDialog đã có sẵn ở submit-year-dialog.tsx.
+  } else if (!canSubmitAnnual) {
     primary = {
-      label: "Nộp báo cáo năm",
+      label: verb,
       icon: Send,
       disabled: true,
-      reason: "Chức năng nộp báo cáo năm đang được hoàn thiện.",
+      reason: "Tài khoản của bạn chưa được cấp quyền nộp báo cáo năm.",
     };
+  } else if (!annual) {
+    primary = {
+      label: verb,
+      icon: Send,
+      disabled: true,
+      loading: annualState.isLoading,
+      reason: annualState.error
+        ? errorMessage(annualState.error, "Chưa kiểm tra được số liệu năm. Bạn tải lại trang sau ít phút.")
+        : "Đang kiểm tra số liệu năm…",
+    };
+  } else if (annual.blocker) {
+    primary = { label: verb, icon: Send, disabled: true, reason: annual.blocker };
+  } else {
+    primary = { label: verb, icon: Send, onClick: () => setDialog("submit") };
   }
 
   const items: ActionItem[] = [
@@ -224,14 +305,37 @@ function YearPanel({ year }: { year: number }) {
       icon: History,
       onSelect: () => setDialog("history"),
     },
+    ...(resubmit && latest
+      ? [
+          {
+            key: "latest",
+            label: `Xem Phiếu ${latest.revisionNo} đã bị trả lại`,
+            icon: Eye,
+            onSelect: openLatest,
+          } satisfies ActionItem,
+        ]
+      : []),
+    ...(canReadAnnual
+      ? [
+          {
+            key: "submissions",
+            label: "Lịch sử nộp báo cáo năm",
+            icon: FileClock,
+            onSelect: () => navigate(`/annual-review/history?nam=${year}`),
+          } satisfies ActionItem,
+        ]
+      : []),
   ];
 
-  const st = yearStatus(overview);
+  const st = latest ? annualStatus(latest) : yearStatus(overview);
   let meta: ReactNode =
     overview.source === "DEPT"
       ? `Số liệu tổng hợp · Phiên bản ${overview.ledgerVersion} · ${overview.savedPeriods}/${overview.totalPeriods} kỳ đã lưu số liệu`
       : `Tổng hợp trực tiếp từ phiếu đã duyệt · Năm dương lịch ${year} (tháng 1–6 và tháng 7–12)`;
   if (overview.lockReason) meta = `${meta} · ${overview.lockReason}`;
+  if (resubmit && latest) {
+    meta = `${meta} · UBND ${latest.reopened ? "mở lại" : "trả lại"} ${formatDate(latest.decidedAt ?? "")} · Lý do: ${latest.returnReason ?? "—"}`;
+  }
   if (data?.borrowedEarliest) {
     meta = (
       <span className="flex min-w-0 flex-col">
@@ -315,6 +419,14 @@ function YearPanel({ year }: { year: number }) {
         message={`Còn ${joinVi(unfinished)} đang sửa dở. Hoàn tất các biểu này ở Theo kỳ rồi bấm Nộp báo cáo năm.`}
       />
       <YearHistoryDialog open={dialog === "history"} onOpenChange={(o) => !o && setDialog(null)} year={year} />
+      <SubmitYearDialog
+        open={dialog === "submit"}
+        onOpenChange={(o) => !o && setDialog(null)}
+        year={year}
+        resubmit={resubmit}
+        warnings={annual?.warnings ?? []}
+        onSubmit={doSubmit}
+      />
     </>
   );
 }
