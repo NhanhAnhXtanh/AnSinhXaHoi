@@ -1,5 +1,6 @@
 package com.dth.frw.module.asxh.summary.service;
 
+import com.dth.frw.module.asxh.script.ServerScriptRunner;
 import java.util.regex.Pattern;
 
 /**
@@ -21,7 +22,14 @@ public final class ScriptHooks {
         if (scriptText == null || scriptText.isBlank()) {
             return false;
         }
-        String code = LINE_COMMENT.matcher(BLOCK_COMMENT.matcher(scriptText).replaceAll(" ")).replaceAll(" ");
-        return SUMMARY_HOOK.matcher(code).find();
+        // Dạng mảng JSON nhiều bản ghi: xét mã từng bản ghi (bỏ chú thích trên chuỗi JSON thô
+        // sẽ cắt mất phần sau "//" của cả dòng).
+        for (ServerScriptRunner.ScriptRecord record : ServerScriptRunner.parseScriptText(scriptText)) {
+            String code = LINE_COMMENT.matcher(BLOCK_COMMENT.matcher(record.code()).replaceAll(" ")).replaceAll(" ");
+            if (SUMMARY_HOOK.matcher(code).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

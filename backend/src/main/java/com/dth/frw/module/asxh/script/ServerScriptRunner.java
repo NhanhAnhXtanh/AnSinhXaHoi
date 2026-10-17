@@ -24,15 +24,24 @@ import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Chạy script của phiên bản mẫu ({@code TemplateVersion.scriptText}) bằng GraalJS ở phía máy
  * chủ — port {@code ServerScriptRunner} của bản Jmix, giữ NGUYÊN mô hình biên dịch và facade
  * {@code ctx} để script bê từ bản Jmix chạy được không sửa.
  *
- * <p><b>Mô hình biên dịch</b> (giống {@code core/script/compile.ts} phía trình duyệt): mã script
- * được bọc trong {@code (function (defineScript) { 'use strict'; ... })} và phải kết thúc bằng
- * {@code return defineScript({ getInputData(ctx) {...}, validate(ctx, rows) {...}, ... })}.
+ * <p><b>Mô hình biên dịch</b> (giống {@code shared/components/spreadsheet/script/compile.ts} phía
+ * trình duyệt): mã script được bọc trong {@code (function (defineScript) { 'use strict'; ... })}.
+ * {@code scriptText} của phiên bản mẫu nhận đủ ba dạng như {@code parseScriptText} của frontend
+ * (xem {@link #parseScriptText}):
+ * <ol>
+ *   <li>mã JS kết thúc bằng {@code return defineScript({ getInputData(ctx) {...}, ... })};</li>
+ *   <li>mã JS gọi {@code defineScript({...})} NHIỀU lần — mỗi lần là một khối hook, chạy theo thứ
+ *       tự gọi (dạng script chuyển từ nhiều bản ghi {@code qt_template_script} của bản Jmix);</li>
+ *   <li>mảng JSON {@code [{ name, code, sheetCode?, displayOrder?, enabled? }]}.</li>
+ * </ol>
  *
  * <p><b>Facade {@code ctx} trên máy chủ</b> chỉ mở phần đọc:
  * <ul>
@@ -114,6 +123,106 @@ public class ServerScriptRunner {
     public record ScriptSource(String name, String code) {
     }
 
+    /** Một bản ghi script đọc từ {@code scriptText} (dạng 3 mới có {@code sheetCode}). */
+    public record ScriptRecord(String name, String code, String sheetCode) {
+    }
+
+    /** Một khối hook đã biên dịch (một lần gọi {@code defineScript}). */
+    private record CompiledBlock(String name, Value hooks) {
+    }
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    /**
+     * Gom MỌI lần gọi {@code defineScript} của một script, cộng giá trị script trả về (nếu chưa
+     * nằm trong số đã gom) — y như {@code compileRecord} của frontend.
+     */
+    private static final String COLLECTOR_JS = """
+            (function (factory) {
+              var registered = [];
+              var define = function (hooks) {
+                if (hooks == null || typeof hooks !== 'object') {
+                  throw new TypeError('defineScript(...) cần một object các hook.');
+                }
+                registered.push(hooks);
+                return hooks;
+              };
+              var returned = factory(define);
+              if (returned != null && registered.indexOf(returned) < 0) {
+                registered.push(returned);
+              }
+              return registered;
+            })""";
+
+    /**
+     * Đọc {@code scriptText} của phiên bản mẫu thành danh sách bản ghi — cùng luật với
+     * {@code parseScriptText} của frontend: chuỗi rỗng ⇒ không bản ghi; mảng JSON các object có
+     * {@code code} (dạng 3) ⇒ mỗi phần tử một bản ghi, bỏ phần tử {@code enabled: false}, xếp theo
+     * {@code displayOrder} (thiếu thì theo vị trí); còn lại ⇒ một bản ghi là chính đoạn mã (dạng
+     * 1 / 2 — nhiều lần gọi {@code defineScript} được tách lúc biên dịch).
+     */
+    public static List<ScriptRecord> parseScriptText(String scriptText) {
+        String text = scriptText == null ? "" : scriptText.trim();
+        if (text.isEmpty()) {
+            return List.of();
+        }
+        if (text.startsWith("[")) {
+            JsonNode parsed = null;
+            try {
+                parsed = JSON.readTree(text);
+            } catch (RuntimeException notJson) {
+                // Không phải JSON → coi như mã JS.
+            }
+            if (parsed != null && parsed.isArray()) {
+                record Ordered(int order, int index, ScriptRecord record) {
+                }
+                List<Ordered> records = new ArrayList<>();
+                for (int i = 0; i < parsed.size(); i++) {
+                    JsonNode entry = parsed.get(i);
+                    if (entry == null || !entry.isObject() || !entry.path("code").isString()) {
+                        continue;
+                    }
+                    if (entry.path("enabled").isBoolean() && !entry.path("enabled").asBoolean()) {
+                        continue;
+                    }
+                    String name = entry.path("name").isString() && !entry.path("name").asString().isBlank()
+                            ? entry.path("name").asString() : "Script " + (i + 1);
+                    String sheetCode = entry.path("sheetCode").isString() && !entry.path("sheetCode").asString().isEmpty()
+                            ? entry.path("sheetCode").asString() : null;
+                    int order = entry.path("displayOrder").isNumber() ? entry.path("displayOrder").asInt() : i;
+                    records.add(new Ordered(order, i, new ScriptRecord(name, entry.path("code").asString(), sheetCode)));
+                }
+                records.sort(java.util.Comparator.comparingInt(Ordered::order).thenComparingInt(Ordered::index));
+                return records.stream().map(Ordered::record).toList();
+            }
+        }
+        return List.of(new ScriptRecord("Script của mẫu", scriptText, null));
+    }
+
+    /**
+     * Tách từng {@link ScriptSource} theo {@link #parseScriptText}; bản ghi dạng 3 có
+     * {@code sheetCode} khác biểu đang chạy thì bỏ (như frontend lọc theo biểu).
+     */
+    private static List<ScriptSource> expand(List<ScriptSource> scripts, ReportInfo report) {
+        String sheetCode = report == null ? null : report.sheetCode();
+        List<ScriptSource> expanded = new ArrayList<>();
+        for (ScriptSource script : scripts) {
+            List<ScriptRecord> records = parseScriptText(script.code());
+            if (records.size() == 1 && records.get(0).sheetCode() == null) {
+                expanded.add(script);
+                continue;
+            }
+            for (ScriptRecord record : records) {
+                if (record.sheetCode() != null && sheetCode != null && !sheetCode.isEmpty()
+                        && !record.sheetCode().equals(sheetCode)) {
+                    continue;
+                }
+                expanded.add(new ScriptSource(script.name() + " / " + record.name(), record.code()));
+            }
+        }
+        return expanded;
+    }
+
     /**
      * Ngữ cảnh phiếu chỉ-đọc đặt vào {@code ctx.report}. Bốn trường đầu giữ tên của bản Jmix
      * ({@code reportId, sheetCode, status, organizationCode}); các trường sau là phần thêm.
@@ -167,10 +276,10 @@ public class ServerScriptRunner {
         try (Context context = newSandboxedContext()) {
             ScheduledFuture<?> killer = scheduleKill(context);
             try {
-                Value defineScript = context.eval("js", "(function (hooks) { return hooks; })");
+                Value collector = context.eval("js", COLLECTOR_JS);
                 Value ctx = buildContext(context, reader, report, errorIssues, MODE_INPUT, Map.of());
-                for (ScriptSource script : scripts) {
-                    Value hooks = compile(context, script, defineScript);
+                for (CompiledBlock block : compileAll(context, expand(scripts, report), collector)) {
+                    Value hooks = block.hooks();
                     Value hook = hooks.hasMember("getInputData") ? hooks.getMember("getInputData") : null;
                     if (hook == null || !hook.canExecute()) {
                         continue;
@@ -179,10 +288,10 @@ public class ServerScriptRunner {
                     try {
                         result = hook.execute(ctx);
                     } catch (PolyglotException e) {
-                        throw translate("Script \"" + script.name() + "\" lỗi khi chạy getInputData", e);
+                        throw translate("Script \"" + block.name() + "\" lỗi khi chạy getInputData", e);
                     }
                     executed++;
-                    collectRows(script.name(), result, rows);
+                    collectRows(block.name(), result, rows);
                 }
             } finally {
                 killer.cancel(false);
@@ -250,10 +359,10 @@ public class ServerScriptRunner {
         try (Context context = newSandboxedContext()) {
             ScheduledFuture<?> killer = scheduleKill(context);
             try {
-                Value defineScript = context.eval("js", "(function (hooks) { return hooks; })");
+                Value collector = context.eval("js", COLLECTOR_JS);
                 Value ctx = buildContext(context, reader, report, errorIssues, MODE_SUMMARY_EDIT, shared);
-                for (ScriptSource script : scripts) {
-                    Value hooks = compile(context, script, defineScript);
+                for (CompiledBlock block : compileAll(context, expand(scripts, report), collector)) {
+                    Value hooks = block.hooks();
                     Value hook = hooks.hasMember("getSummaryData") ? hooks.getMember("getSummaryData") : null;
                     if (hook == null || !hook.canExecute()) {
                         continue;
@@ -262,7 +371,7 @@ public class ServerScriptRunner {
                     try {
                         result = hook.execute(ctx);
                     } catch (PolyglotException e) {
-                        throw translate("Script \"" + script.name() + "\" lỗi khi chạy getSummaryData", e);
+                        throw translate("Script \"" + block.name() + "\" lỗi khi chạy getSummaryData", e);
                     }
                     executed++;
                     if (result == null || result.isNull()) {
@@ -270,7 +379,7 @@ public class ServerScriptRunner {
                     }
                     if (!result.hasArrayElements()) {
                         throw new ServerScriptException(ServerScriptException.Kind.SCRIPT,
-                                "Script \"" + script.name() + "\": getSummaryData phải trả về một mảng dòng"
+                                "Script \"" + block.name() + "\": getSummaryData phải trả về một mảng dòng"
                                         + " (trên máy chủ không dùng hàm async).");
                     }
                     for (long i = 0; i < result.getArraySize(); i++) {
@@ -331,26 +440,29 @@ public class ServerScriptRunner {
         try (Context context = newSandboxedContext()) {
             ScheduledFuture<?> killer = scheduleKill(context);
             try {
-                Value defineScript = context.eval("js", "(function (hooks) { return hooks; })");
+                Value collector = context.eval("js", COLLECTOR_JS);
                 Value ctx = buildContext(context, reader, report, errorIssues, MODE_INPUT, Map.of());
                 Value emptyRows = context.eval("js", "[]");
-                for (ScriptSource script : scripts) {
-                    Value hooks;
+                for (ScriptSource script : expand(scripts, report)) {
+                    List<CompiledBlock> blocks;
                     try {
-                        hooks = compile(context, script, defineScript);
+                        blocks = compile(context, script, collector);
                     } catch (ServerScriptException e) {
                         failures.add(script.name() + ": " + e.getMessage());
                         continue;
                     }
-                    Value validate = hooks.hasMember("validate") ? hooks.getMember("validate") : null;
-                    if (validate == null || !validate.canExecute()) {
-                        continue;
-                    }
-                    try {
-                        collectIssues(validate.execute(ctx, emptyRows), errorIssues);
-                        executed++;
-                    } catch (PolyglotException e) {
-                        failures.add(script.name() + ": " + e.getMessage());
+                    for (CompiledBlock block : blocks) {
+                        Value hooks = block.hooks();
+                        Value validate = hooks.hasMember("validate") ? hooks.getMember("validate") : null;
+                        if (validate == null || !validate.canExecute()) {
+                            continue;
+                        }
+                        try {
+                            collectIssues(validate.execute(ctx, emptyRows), errorIssues);
+                            executed++;
+                        } catch (PolyglotException e) {
+                            failures.add(block.name() + ": " + e.getMessage());
+                        }
                     }
                 }
             } finally {
@@ -403,7 +515,19 @@ public class ServerScriptRunner {
         }
     }
 
-    private Value compile(Context context, ScriptSource script, Value defineScript) {
+    private List<CompiledBlock> compileAll(Context context, List<ScriptSource> scripts, Value collector) {
+        List<CompiledBlock> blocks = new ArrayList<>();
+        for (ScriptSource script : scripts) {
+            blocks.addAll(compile(context, script, collector));
+        }
+        return blocks;
+    }
+
+    /**
+     * Biên dịch một script thành các khối hook: mỗi lần gọi {@code defineScript} là một khối (dạng
+     * 2), cộng giá trị {@code return} nếu chưa được gom (dạng 1).
+     */
+    private List<CompiledBlock> compile(Context context, ScriptSource script, Value collector) {
         String code = script.code() == null ? "" : script.code();
         Value factory;
         try {
@@ -414,17 +538,28 @@ public class ServerScriptRunner {
         } catch (PolyglotException e) {
             throw translate("Script \"" + script.name() + "\" biên dịch lỗi", e);
         }
-        Value hooks;
+        Value registered;
         try {
-            hooks = factory.execute(defineScript);
+            registered = collector.execute(factory);
         } catch (PolyglotException e) {
             throw translate("Script \"" + script.name() + "\" lỗi khi khởi tạo", e);
         }
-        if (hooks == null || hooks.isNull() || !hooks.hasMembers()) {
+        long count = registered == null || !registered.hasArrayElements() ? 0 : registered.getArraySize();
+        if (count == 0) {
             throw new ServerScriptException(ServerScriptException.Kind.SCRIPT,
                     "Script \"" + script.name() + "\" phải kết thúc bằng return defineScript({...}).");
         }
-        return hooks;
+        List<CompiledBlock> blocks = new ArrayList<>();
+        for (long i = 0; i < count; i++) {
+            Value hooks = registered.getArrayElement(i);
+            String name = count > 1 ? script.name() + " (khối " + (i + 1) + ")" : script.name();
+            if (hooks == null || hooks.isNull() || !hooks.hasMembers()) {
+                throw new ServerScriptException(ServerScriptException.Kind.SCRIPT,
+                        "Script \"" + name + "\" phải kết thúc bằng return defineScript({...}).");
+            }
+            blocks.add(new CompiledBlock(name, hooks));
+        }
+        return blocks;
     }
 
     /**
