@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -169,12 +170,18 @@ public class DeptPeriodService {
         return pending != null ? pending : overlapReason(period);
     }
 
-    /** Tập phiếu đơn vị còn hiệu lực HIỆN TẠI đã khác tập đóng băng lúc lưu chưa (BR-55.4). */
+    /**
+     * Tập phiếu đơn vị còn hiệu lực HIỆN TẠI đã khác tập đóng băng lúc lưu chưa (BR-55.4). So với chính các
+     * dòng phiếu nguồn đã đóng băng chứ không với dấu băm lưu kèm: số liệu Sở chuyển từ bản Jmix mang dấu
+     * băm tính trên mã phiếu cũ (UUID) nên luôn "khác" dù tập phiếu y nguyên.
+     */
     @Transactional(readOnly = true)
     public boolean isSourceStale(DeptReport report) {
         List<Long> leaves = aggregation.resolveLeafPeriodIds(report.getPeriod().getId());
         String now = fingerprint(effectiveReports(leaves));
-        return !now.equals(report.getSourceFingerprint());
+        String frozen = digest(sourceRepository.findByReport(report.getId()).stream()
+                .map(source -> source.getInputReportId() + ":" + source.getRevisionNo()));
+        return !now.equals(frozen);
     }
 
     // ------------------------------------------------------------------ lưu kỳ
@@ -196,7 +203,7 @@ public class DeptPeriodService {
             throw new ConflictException(blocked);
         }
         yearLockService.assertOpen(period.getYear());
-        DeptReport report = snapshot(period);
+        DeptReport report = snapshot(period, true);
         if (report == null) {
             throw new ConflictException("Kỳ " + period.getName() + " chưa thiết lập biểu nào nên không có số liệu để lưu.");
         }
@@ -214,10 +221,14 @@ public class DeptPeriodService {
                 || yearLockService.lockReason(period.getYear()).isPresent()) {
             return null;
         }
-        return snapshot(period);
+        return snapshot(period, false);
     }
 
-    private DeptReport snapshot(ReportPeriod period) {
+    /**
+     * @param strict {@code true} = vướng điều kiện lưu (phát hiện sau khi giữ khoá năm) thì báo lỗi;
+     *               {@code false} = bỏ qua, trả {@code null} (chốt đợt vẫn tiếp tục)
+     */
+    private DeptReport snapshot(ReportPeriod period, boolean strict) {
         record Form(Template template, TemplateVersion version) {
         }
         List<Form> forms = new ArrayList<>();
@@ -239,7 +250,22 @@ public class DeptPeriodService {
         }
 
         int year = period.getYear();
-        // Khoá bộ đếm của năm trước khi ghi: mọi lượt ghi số liệu Sở của năm xếp hàng tại đây.
+        // Khoá bộ đếm của năm trước khi ghi: mọi lượt ghi số liệu Sở của năm xếp hàng tại đây. Rồi KIỂM LẠI:
+        // hai lượt lưu chạy song song (cùng kỳ, hai kỳ chồng thời gian, hoặc năm vừa nộp UBND) đều đã qua
+        // bước kiểm đầu — lượt sau chỉ thấy phần lượt trước vừa commit sau khi giữ khoá.
+        versionService.lockYear(year);
+        String late = reportRepository.findByPeriodId(period.getId()).isPresent()
+                ? "Kỳ " + period.getName() + " đã lưu số liệu tổng hợp rồi."
+                : overlapReason(period);
+        if (late == null) {
+            late = yearLockService.lockReason(year).orElse(null);
+        }
+        if (late != null) {
+            if (strict) {
+                throw new ConflictException(late);
+            }
+            return null;
+        }
         int version = versionService.nextVersion(year);
         String actor = CurrentUser.username().orElse("hệ thống");
         Instant now = Instant.now();
@@ -388,8 +414,11 @@ public class DeptPeriodService {
 
     /** SHA-256 của tập "id:revisionNo" đã sắp xếp — không phụ thuộc thứ tự nạp. */
     static String fingerprint(List<ReportRow> reports) {
-        String canonical = reports.stream()
-                .map(row -> row.reportId() + ":" + row.revisionNo())
+        return digest(reports.stream().map(row -> row.reportId() + ":" + row.revisionNo()));
+    }
+
+    private static String digest(Stream<String> entries) {
+        String canonical = entries
                 .sorted()
                 .collect(Collectors.joining("\n"));
         try {

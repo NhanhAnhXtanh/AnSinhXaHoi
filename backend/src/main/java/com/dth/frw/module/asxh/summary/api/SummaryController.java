@@ -1,5 +1,6 @@
 package com.dth.frw.module.asxh.summary.api;
 
+import com.dth.frw.module.asxh.annual.security.AnnualReportPermissions;
 import com.dth.frw.module.asxh.summary.api.dto.SnapshotRequest;
 import com.dth.frw.module.asxh.summary.query.ScopeKind;
 import com.dth.frw.module.asxh.summary.query.SummaryRow;
@@ -100,9 +101,14 @@ public class SummaryController {
         return aggregation.yearRollup(schoolYear, unitIds, template.orElse(null));
     }
 
-    /** Đơn vị ĐƯỢC GIAO biểu trong tập kỳ (kể cả chưa nộp). */
+    /**
+     * Đơn vị ĐƯỢC GIAO biểu trong tập kỳ (kể cả chưa nộp). Người xem báo cáo năm ({@code annual_reports:read},
+     * gồm UBND không có quyền Tổng hợp) cũng gọi được: script biểu năm dựng dòng đơn vị từ đây — chỉ là danh
+     * sách đơn vị, không có số liệu.
+     */
     @GetMapping("/period-organizations")
-    @PreAuthorize("hasAuthority('" + SummaryPermissions.SUMMARY_READ + "')")
+    @PreAuthorize("hasAnyAuthority('" + SummaryPermissions.SUMMARY_READ + "', '"
+            + AnnualReportPermissions.ANNUAL_READ + "')")
     public List<UnitOption> periodOrganizations(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
