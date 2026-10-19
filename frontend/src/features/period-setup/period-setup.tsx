@@ -17,6 +17,7 @@ import {
   Undo2,
   UsersRound,
 } from "lucide-react";
+import { useCan, useWarnAboutChange } from "@refinedev/core";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -152,6 +153,14 @@ export function PeriodSetup() {
     setSelectedId(pickDefault(periods, locks));
   }, [periods, locks, selectedId]);
 
+  // Rời màn (bấm mục menu khác…) hoặc đổi năm khi còn ô chưa lưu: hộp hỏi chung của ứng
+  // dụng (UnsavedChangesGuard) — trước đây các ô chờ lưu mất mà không hỏi.
+  const { setWarnWhen } = useWarnAboutChange();
+  useEffect(() => {
+    setWarnWhen(hasPending);
+    return () => setWarnWhen(false);
+  }, [hasPending, setWarnWhen]);
+
   // Đóng tab khi còn ô chưa lưu: trình duyệt hỏi lại.
   useEffect(() => {
     if (!hasPending) return;
@@ -179,7 +188,15 @@ export function PeriodSetup() {
   );
 
   const lock = selected ? (locks.get(selected.id) ?? null) : null;
-  const mode = selected ? matrixMode(selected, lock) : "view";
+  // Quyền ghi (máy chủ kiểm lại): tích ma trận / áp dụng cho kỳ khác cần
+  // `period_assignments:write`; mở đợt, chốt, gia hạn, thu hồi cần `publications:write`.
+  // Tài khoản chỉ có quyền xem (vd. cán bộ duyệt phiếu) trước đây vẫn thấy đủ nút rồi gặp 403.
+  const { data: canEditData } = useCan({ resource: "period_assignments", action: "edit" });
+  const { data: canOperateData } = useCan({ resource: "publications", action: "create" });
+  const canEditMatrix = canEditData?.can === true;
+  const canOperate = canOperateData?.can === true;
+  const baseMode = selected ? matrixMode(selected, lock) : "view";
+  const mode = canEditMatrix || baseMode === "locked" ? baseMode : "view";
   const assigned = useMemo(() => assignedUnitIds(saved), [saved]);
 
   /** Cột ma trận: biểu đang ban hành + biểu đã gán cho kỳ mà nay đã ngừng ban hành. */
@@ -504,7 +521,15 @@ export function PeriodSetup() {
     }
   };
 
-  const headerActions = plan();
+  const rawActions = plan();
+  // Bỏ nút / mục mà tài khoản không có quyền: nút chính khi còn ô chờ lưu là Lưu / Mở đợt bổ
+  // sung (quyền ma trận), còn lại là thao tác điều hành kỳ.
+  const headerActions = rawActions && {
+    primary: (hasPending ? canEditMatrix : canOperate) ? rawActions.primary : undefined,
+    items: rawActions.items.filter((i) =>
+      i.key === "copy" || i.key === "discard" ? canEditMatrix : canOperate
+    ),
+  };
 
   /* ---------- Dòng phụ dưới tên kỳ ---------- */
 
@@ -755,7 +780,11 @@ export function PeriodSetup() {
 
             {/* Chân: ghi chú chỉ xem + phân trang */}
             <MatrixFooter
-              note={footerNote(selected, mode)}
+              note={
+                !canEditMatrix && baseMode !== mode
+                  ? "Tài khoản của bạn chỉ được xem thiết lập, không tích hoặc bỏ biểu mẫu được."
+                  : footerNote(selected, mode)
+              }
               first={filtered.length === 0 ? 0 : currentPage * PAGE_SIZE + 1}
               last={currentPage * PAGE_SIZE + pageUnits.length}
               total={filtered.length}

@@ -31,7 +31,7 @@ export function statusLine(r: InputReportRecord): string {
     case "locked":
       return "Sở đã chốt số liệu · chỉ xem";
     case "approved":
-      return `Sở duyệt ${r.approvedAt ? formatDateTime(r.approvedAt) : ""}`;
+      return `Sở duyệt ${r.approvedAt ? formatDateTime(r.approvedAt) : ""}${r.status === "LOCKED" ? " · đã khoá, chỉ xem" : ""}`;
     case "cancelled":
       return "Phiếu đã huỷ · chỉ xem";
     case "superseded":

@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router";
 
 import { AsxhPage, YearSelect, useReportYear } from "@/shared/components/asxh";
+import { useConfirmDiscard } from "@/shared/components/form/unsaved-changes-guard";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
 import { PeriodMode } from "./period-mode";
@@ -16,16 +17,23 @@ type Mode = "ky" | "nam";
 export function SummaryPage() {
   const [params, setParams] = useSearchParams();
   const mode: Mode = params.get("xem") === "nam" ? "nam" : "ky";
-  const setMode = (m: Mode) =>
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (m === "nam") next.set("xem", "nam");
-        else next.delete("xem");
-        return next;
-      },
-      { replace: true }
+  // Đổi chế độ đi bằng `replace` — UnsavedChangesGuard không chặn — nên tự hỏi khi đang có
+  // số tổng hợp sửa dở chưa lưu ở chế độ Theo kỳ.
+  const confirmDiscard = useConfirmDiscard();
+  const setMode = (m: Mode) => {
+    if (m === mode) return;
+    confirmDiscard(() =>
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (m === "nam") next.set("xem", "nam");
+          else next.delete("xem");
+          return next;
+        },
+        { replace: true }
+      )
     );
+  };
 
   const { year, setYear } = useReportYear();
 

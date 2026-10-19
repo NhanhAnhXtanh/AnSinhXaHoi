@@ -41,6 +41,9 @@ export function reviewStatus(r: InputReportRecord): ReviewStatus | null {
       return "returned";
     case "APPROVED":
       return "approved";
+    case "LOCKED":
+      // Khoá sau khi duyệt (còn ngày duyệt) vẫn là phiếu đã duyệt; không có = chốt khi chưa nộp.
+      return r.approvedAt ? "approved" : null;
     case "DRAFT":
       return "notSubmitted";
     default:
@@ -51,6 +54,7 @@ export function reviewStatus(r: InputReportRecord): ReviewStatus | null {
 /** Nhãn + màu badge — cả các trạng thái ngoài hàng đợi khi mở thẳng một phiếu. */
 export function badgeOf(r: InputReportRecord): { label: string; tone: StatusTone } {
   const s = reviewStatus(r);
+  if (s === "approved" && r.status === "LOCKED") return { label: "Đã phê duyệt · đã khoá", tone: "success" };
   if (s === "approved" && r.period.status === "closed") return { label: "Đã chốt", tone: "locked" };
   if (s) return STATUS_META[s];
   switch (r.status) {
@@ -89,6 +93,12 @@ function daysBetween(from: string, to: string): number {
   return Math.round((startOfDay(to) - startOfDay(from)) / DAY_MS);
 }
 
+/** Hôm nay theo giờ máy (yyyy-MM-dd). `toISOString()` là ngày UTC — 0h–7h sáng ở Việt Nam còn là hôm qua. */
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function timeOf(d: string): string {
   return formatDateTime(d).slice(11);
 }
@@ -118,7 +128,7 @@ export function statusSubline(r: InputReportRecord): string {
         return `Quá hạn nộp${deadline ? ` ${formatDate(deadline)}` : ""} · đơn vị bị khoá nhập`;
       }
       if (!deadline) return "Chưa nộp";
-      const left = daysBetween(new Date().toISOString().slice(0, 10), deadline);
+      const left = daysBetween(todayLocal(), deadline);
       const when = left > 0 ? `còn ${left} ngày` : left === 0 ? "hết hạn hôm nay" : `quá hạn ${-left} ngày`;
       return `Hạn nộp ${formatDate(deadline)} · ${when}`;
     }

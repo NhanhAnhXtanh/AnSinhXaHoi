@@ -474,7 +474,7 @@ function UnitDetail({
   const stats = [
     {
       label: "Đã duyệt",
-      value: reports.filter((r) => r.status === "APPROVED").length,
+      value: reports.filter((r) => r.status === "APPROVED" || (r.status === "LOCKED" && r.approvedAt)).length,
       text: "text-success-text",
     },
     {
@@ -489,7 +489,7 @@ function UnitDetail({
     },
     {
       label: "Đang nhập liệu",
-      value: reports.filter((r) => r.status === "DRAFT" || r.status === "LOCKED").length,
+      value: reports.filter((r) => r.status === "DRAFT" || (r.status === "LOCKED" && !r.approvedAt)).length,
       text: "text-info-text",
     },
   ];
@@ -519,7 +519,7 @@ function UnitDetail({
 
       {reports.map((r) => {
         const period = periods.find((x) => x.id === r.periodId);
-        const badge = reportBadge(r.status, r.sheetsDone);
+        const badge = reportBadge(r.status, r.sheetsDone, r.approvedAt);
         const editable = r.status === "DRAFT" || r.status === "RETURNED";
         const link =
           r.status === "SUBMITTED" && canApprove ? `/report-review/${r.id}` : `/input-reports/${r.id}`;

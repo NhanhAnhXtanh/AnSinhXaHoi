@@ -13,6 +13,7 @@ import {
   WorkCard,
 } from "@/shared/components/asxh";
 import type { PeriodItem, PrimaryAction } from "@/shared/components/asxh";
+import { useConfirmDiscard } from "@/shared/components/form/unsaved-changes-guard";
 import { Button } from "@/shared/ui/button";
 
 import {
@@ -34,7 +35,9 @@ import { formatRange } from "./period-text";
 
 /** Kỳ mặc định: kỳ gần nhất đã có phiếu được duyệt / đã lưu số liệu; không có thì kỳ gần nhất đã thiết lập. */
 function defaultPeriodId(periods: SummaryPeriodItem[]): number | null {
-  const today = new Date().toISOString().slice(0, 10);
+  // Ngày theo giờ máy — `toISOString()` là ngày UTC, 0h–7h sáng ở Việt Nam còn là hôm qua.
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const started = periods.filter((p) => p.fromDate <= today);
   const pick = (list: SummaryPeriodItem[]) => list[list.length - 1]?.id ?? null;
   return (
@@ -56,6 +59,8 @@ export function PeriodMode({ year }: { year: number }) {
   const periodsState = useApiArray<SummaryPeriodItem>(`${SUMMARY_URL}/periods`, { year });
   const periods = useMemo(() => periodsState.data ?? [], [periodsState.data]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Đổi kỳ dựng lại panel phải: số tổng hợp đang sửa chưa lưu sẽ mất — hỏi trước.
+  const confirmDiscard = useConfirmDiscard();
 
   useEffect(() => {
     if (periodsState.data && (selectedId === null || !periodsState.data.some((p) => p.id === selectedId))) {
@@ -109,7 +114,10 @@ export function PeriodMode({ year }: { year: number }) {
     <PeriodList
       periods={items}
       selectedId={selectedId === null ? null : String(selectedId)}
-      onSelect={(id) => setSelectedId(Number(id))}
+      onSelect={(id) => {
+        const next = Number(id);
+        if (next !== selectedId) confirmDiscard(() => setSelectedId(next));
+      }}
       empty={empty}
     />
   );

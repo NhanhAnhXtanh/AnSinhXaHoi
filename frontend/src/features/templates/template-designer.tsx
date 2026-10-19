@@ -155,6 +155,8 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
   const [mode, setMode] = useState<Mode>("design");
   const [fullscreen, setFullscreen] = useState(false);
   const [workbookDirty, setWorkbookDirty] = useState(false);
+  /** Đếm lần sửa (bảng + quy tắc) — sửa thêm trong lúc đang lưu không bị coi là đã lưu. */
+  const editSeq = useRef(0);
   const [saving, setSaving] = useState(false);
 
   /* ---------------- quy tắc nhập ---------------- */
@@ -213,6 +215,7 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
     }
     if (scriptDirty) values.scriptText = script;
 
+    const seq = editSeq.current;
     setSaving(true);
     const result = await actions.saveVersion(version.id, values);
     setSaving(false);
@@ -221,8 +224,11 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
       return;
     }
     if (json) setSaved(json);
-    setWorkbookDirty(false);
-    setScriptDirty(false);
+    // Sửa thêm trong lúc chờ máy chủ: phần đó chưa có trong bản vừa lưu → giữ cờ "chưa lưu".
+    if (editSeq.current === seq) {
+      setWorkbookDirty(false);
+      setScriptDirty(false);
+    }
     toast.success(
       `Đã lưu thiết kế và quy tắc của ${formLabel(form).toLowerCase()}, ${versionLabel(version).toLowerCase()}.`
     );
@@ -277,6 +283,7 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
     }
     try {
       await api.importFile(file);
+      editSeq.current += 1;
       setWorkbookDirty(true);
       const sheets = api.getSheetNames().length;
       if (sheets > 1) {
@@ -513,7 +520,9 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
           spreadRef.current = api;
         }}
         onDirtyChange={(d) => {
-          if (d) setWorkbookDirty(true);
+          if (!d) return;
+          editSeq.current += 1;
+          setWorkbookDirty(true);
         }}
       />
     );
@@ -570,6 +579,7 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
             readOnly={!editable}
             onChange={(next) => {
               setScript(next);
+              editSeq.current += 1;
               setScriptDirty(true);
             }}
             hook={hook}

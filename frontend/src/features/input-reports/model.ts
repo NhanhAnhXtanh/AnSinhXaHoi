@@ -38,7 +38,8 @@ export function displayStatus(r: InputReportRecord): DisplayStatus {
     case "APPROVED":
       return "approved";
     case "LOCKED":
-      return "locked";
+      // Khoá sau khi duyệt (còn ngày duyệt) vẫn là phiếu đã duyệt; không có = chốt khi chưa nộp.
+      return r.approvedAt ? "approved" : "locked";
     case "CANCELLED":
       return "cancelled";
     case "SUPERSEDED":
@@ -121,13 +122,14 @@ export type DueLine = { text: string; tone?: "destructive" };
 /** Dòng phụ dưới Hạn nộp (UC-33 bước 4). */
 export function dueLine(r: InputReportRecord): DueLine {
   const due = r.period.deadline;
-  if (r.status === "LOCKED") return { text: "Kỳ đã chốt" };
-  if (r.submittedAt && (r.status === "SUBMITTED" || r.status === "APPROVED")) {
+  const approved = r.status === "APPROVED" || (r.status === "LOCKED" && r.approvedAt !== null);
+  if (r.status === "LOCKED" && !approved) return { text: "Kỳ đã chốt" };
+  if (r.submittedAt && (r.status === "SUBMITTED" || approved)) {
     if (!due) return { text: "Đã nộp" };
     const late = daysBetween(due, localDateOf(r.submittedAt));
     return late > 0 ? { text: `Nộp muộn ${late} ngày` } : { text: "Đã nộp đúng hạn" };
   }
-  if (r.status === "APPROVED") return { text: "Đã nộp đúng hạn" };
+  if (approved) return { text: "Đã nộp đúng hạn" };
   if (r.period.status === "overdue") return { text: "Hết hạn nộp", tone: "destructive" };
   if (r.period.status === "published") return { text: "Kỳ chưa mở nhập" };
   if (!due) return { text: "" };

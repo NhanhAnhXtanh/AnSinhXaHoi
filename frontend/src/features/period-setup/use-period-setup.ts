@@ -2,9 +2,11 @@ import { useMemo } from "react";
 import {
   useCustom,
   useCustomMutation,
+  useDataProvider,
   useList,
   type HttpError,
 } from "@refinedev/core";
+import { useQuery } from "@tanstack/react-query";
 
 import { API_URL } from "@/shared/api/constants";
 import { customResult } from "@/shared/hooks/use-custom-result";
@@ -144,11 +146,28 @@ const OPENED: ReadonlySet<string> = new Set(["published", "open", "overdue", "cl
 export function useSelectedPeriod(period: Period | null) {
   const periodId = period?.id ?? null;
 
-  const assignmentsList = useList<ApiAssignment>({
-    resource: "period_assignments",
-    pagination: { currentPage: 1, pageSize: ALL },
-    filters: periodId ? [{ field: "period.id", operator: "eq", value: periodId }] : [],
-    queryOptions: { enabled: periodId !== null },
+  // Một kỳ có thể vượt trần 1.000 dòng/trang của máy chủ (dữ liệu thật: 105 đơn vị × 13 biểu =
+  // 1.362 ô) — đọc một trang thì ~360 ô đã gán hiện như chưa gán, bấm tích lại thành "gán thêm".
+  // Nên đọc lần lượt từng trang tới hết.
+  const dataProvider = useDataProvider();
+  const assignmentsQuery = useQuery({
+    queryKey: ["asxh", "period_assignments", "all-pages", periodId],
+    enabled: periodId !== null,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const provider = dataProvider();
+      const rows: ApiAssignment[] = [];
+      for (let page = 1; page <= 50; page += 1) {
+        const { data, total } = await provider.getList<ApiAssignment>({
+          resource: "period_assignments",
+          pagination: { currentPage: page, pageSize: ALL, mode: "server" },
+          filters: [{ field: "period.id", operator: "eq", value: periodId }],
+        });
+        rows.push(...data);
+        if (data.length < ALL || rows.length >= total) break;
+      }
+      return rows;
+    },
   });
 
   const setupQuery = useCustom<ApiSetupState>({
@@ -167,8 +186,8 @@ export function useSelectedPeriod(period: Period | null) {
   });
 
   const assignments = useMemo(
-    () => (periodId ? (assignmentsList.result?.data ?? []) : []),
-    [periodId, assignmentsList.result?.data]
+    () => (periodId ? (assignmentsQuery.data ?? []) : []),
+    [periodId, assignmentsQuery.data]
   );
 
   const saved: ReadonlySet<string> = useMemo(
@@ -210,11 +229,11 @@ export function useSelectedPeriod(period: Period | null) {
     setup: setupForThis,
     reports,
     progress,
-    isLoading: periodId !== null && (assignmentsList.query.isLoading || setupQuery.query.isLoading),
-    isError: assignmentsList.query.isError || setupQuery.query.isError,
+    isLoading: periodId !== null && (assignmentsQuery.isLoading || setupQuery.query.isLoading),
+    isError: assignmentsQuery.isError || setupQuery.query.isError,
     refetch: () => {
       if (periodId === null) return;
-      void assignmentsList.query.refetch();
+      void assignmentsQuery.refetch();
       void setupQuery.query.refetch();
       if (hasReports) void reportsList.query.refetch();
     },

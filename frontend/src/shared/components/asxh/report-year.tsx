@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
+import { useConfirmDiscard } from "@/shared/components/form/unsaved-changes-guard";
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -116,13 +117,17 @@ export function useReportYear(): ReportYearValue {
 /** Ô "Năm 2026" có icon lịch, đặt ở cụm phải đầu trang. */
 export function YearSelect({ className }: { className?: string }) {
   const { year, setYear, years } = useReportYear();
+  // Đổi năm thay cả khung làm việc mà không đổi đường dẫn, nên hộp hỏi "Bỏ thay đổi chưa
+  // lưu?" của UnsavedChangesGuard không tự bắt được — màn đang có số chưa lưu (ma trận
+  // thiết lập, sửa số tổng hợp, lịch báo cáo…) phải hỏi trước, không thì mất im lặng.
+  const confirmDiscard = useConfirmDiscard();
 
   return (
     <Select
       value={String(year)}
       onValueChange={(v) => {
         const n = Number(v);
-        if (Number.isInteger(n)) setYear(n);
+        if (Number.isInteger(n) && n !== year) confirmDiscard(() => setYear(n));
       }}
     >
       <SelectTrigger

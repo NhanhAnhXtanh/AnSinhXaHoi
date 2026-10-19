@@ -33,7 +33,10 @@ function revisionBadge(r: Revision): { label: string; tone: StatusTone } {
     case "APPROVED":
       return { label: "Đã phê duyệt", tone: "success" };
     case "LOCKED":
-      return { label: "Đã chốt", tone: "locked" };
+      // Khoá sau khi duyệt (còn ngày duyệt) vẫn là phiếu đã duyệt; không có ngày duyệt = chốt khi chưa nộp.
+      return r.approvedAt
+        ? { label: "Đã phê duyệt · đã khoá", tone: "success" }
+        : { label: "Đã chốt", tone: "locked" };
     case "CANCELLED":
       return { label: "Đã huỷ", tone: "neutral" };
     case "DRAFT":

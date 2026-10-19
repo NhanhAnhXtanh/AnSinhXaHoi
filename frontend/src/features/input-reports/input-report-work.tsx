@@ -146,6 +146,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
     { dataJson: string; version: number | null }
   >();
   const { mutateAsync: postAction } = useCustomMutation<InputReportRecord>();
+  const { mutateAsync: postSheetAction } = useCustomMutation<InputReportSheetRecord>();
 
   // ------------------------------------------------------------ dữ liệu
 
@@ -175,6 +176,8 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const saved = useRef(new Map<number, WorkbookJson>());
   const versions = useRef(new Map<number, number>());
   const apiRef = useRef<SpreadWorkbookApi | null>(null);
+  /** Đếm lần sửa trên bảng tính — số gõ thêm trong lúc đang lưu không bị coi là đã lưu. */
+  const editSeq = useRef(0);
 
   const [dirty, setDirty] = useState<ReadonlySet<number>>(new Set());
   const [pane, setPane] = useState<Pane | null>(null);
@@ -286,6 +289,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const save = async (quiet = false): Promise<boolean> => {
     const api = apiRef.current;
     if (!api || !sheetEditable || sheetId === undefined || !sheet) return false;
+    const seq = editSeq.current;
     const json = api.toJSON();
     setBusy("save");
     try {
@@ -302,7 +306,8 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
       versions.current.set(sheetId, Math.max(data.version, versions.current.get(sheetId) ?? 0));
       saved.current.set(sheetId, json);
       drafts.current.delete(sheetId);
-      markDirty(sheetId, false);
+      // Gõ thêm trong lúc chờ máy chủ: phần đó chưa có trong bản vừa lưu → giữ cờ "chưa lưu".
+      if (editSeq.current === seq) markDirty(sheetId, false);
       if (!quiet) toast.success(`Đã lưu số liệu biểu ${sheet.template.shortName}.`);
       return true;
     } catch (error) {
@@ -318,7 +323,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const runSheetAction = async (action: "complete" | "no_data" | "reopen"): Promise<boolean> => {
     if (sheetId === undefined) return false;
     try {
-      await postAction({
+      const { data } = await postSheetAction({
         url: sheetActionUrl(sheetId, action),
         method: "post",
         values: {},
@@ -326,6 +331,11 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
         successNotification: false,
         errorNotification: false,
       });
+      // Đổi đánh dấu cũng tăng số hiệu bản lưu ở máy chủ (@Version) — không cập nhật thì lần
+      // "Lưu dữ liệu" sau "Sửa lại" bị từ chối là "đã lưu ở phiên làm việc khác".
+      if (data && typeof data.version === "number" && data.id === sheetId) {
+        versions.current.set(sheetId, Math.max(data.version, versions.current.get(sheetId) ?? 0));
+      }
       await refreshAfterChange();
       return true;
     } catch (error) {
@@ -395,7 +405,9 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
     if (!sheet || busy) return;
     setBusy("reopen");
     try {
-      freezePane();
+      // KHÔNG freezePane ở đây: bảng đang chỉ xem đã khoá MỌI ô và gỡ nút ＋/✕ trong ô —
+      // chụp lại rồi nạp vào chế độ sửa thì không gõ được ô nào. Số liệu không đổi khi chỉ
+      // xem, nên nạp lại từ đúng bản đang dùng (`pane.workbook`, chụp lúc còn sửa được).
       if (await runSheetAction("reopen")) {
         toast.success(`Đã mở lại biểu ${sheet.template.shortName} để nhập tiếp.`);
       }
@@ -499,13 +511,15 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
 
   // Ctrl+S = Lưu, chặn hộp "Lưu trang" của trình duyệt (nguyên tắc §11).
   const editableRef = useRef(sheetEditable);
-  editableRef.current = sheetEditable && paneReady;
+  const busyRef = useRef<Busy>(busy);
+  busyRef.current = busy;
+  editableRef.current = sheetEditable && paneReady && busy === null;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         if (editableRef.current) void saveRef.current();
-        else toast.info("Biểu này đang ở chế độ chỉ xem nên không có gì để lưu.");
+        else if (busyRef.current === null) toast.info("Biểu này đang ở chế độ chỉ xem nên không có gì để lưu.");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -665,7 +679,9 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
           scriptText={scriptText}
           scriptContext={scriptContext}
           onDirtyChange={(d) => {
-            if (d) markDirty(paneSheetId, true);
+            if (!d) return;
+            editSeq.current += 1;
+            markDirty(paneSheetId, true);
           }}
           onReady={(api) => {
             apiRef.current = api;

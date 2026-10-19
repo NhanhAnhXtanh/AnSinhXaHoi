@@ -100,6 +100,8 @@ export type ApiInputReport = {
     | "LOCKED"
     | "CANCELLED"
     | "SUPERSEDED";
+  /** Có ngày duyệt mà trạng thái LOCKED = phiếu khoá sau khi duyệt, vẫn tính là đã duyệt. */
+  approvedAt?: string | null;
 };
 
 /** Thân trả về của các thao tác điều hành / lưu ma trận / áp dụng cho kỳ khác. */
@@ -212,7 +214,7 @@ export function toProgress(reports: ApiInputReport[]): PeriodProgress {
   let notSubmitted = 0;
   for (const r of live) {
     units.add(r.unit.id);
-    if (r.status === "APPROVED") approved += 1;
+    if (r.status === "APPROVED" || (r.status === "LOCKED" && r.approvedAt)) approved += 1;
     else if (r.status === "SUBMITTED") pendingReview += 1;
     else if (r.status === "DRAFT" || r.status === "RETURNED") {
       notSubmitted += 1;

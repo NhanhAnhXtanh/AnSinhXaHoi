@@ -164,7 +164,8 @@ export function toItems(
       );
       push(r.approvedAt, "Sở phê duyệt phiếu", r.approvedBy);
       // Khoá khi chốt đợt không lưu thời điểm riêng — lấy lần đổi cuối của phiếu.
-      if (r.status === "LOCKED") push(r.updatedAt, "Khoá phiếu khi Sở chốt đợt", null, true);
+      if (r.status === "LOCKED")
+        push(r.updatedAt, r.approvedAt ? "Sở khoá phiếu đã duyệt" : "Khoá phiếu khi Sở chốt đợt", null, true);
     }
     events.sort((a, b) => a.at.getTime() - b.at.getTime());
     items.push({
@@ -172,7 +173,8 @@ export function toItems(
       unitName: latest.unit.name,
       unitGroup: groupOf(unitId),
       forms: latest.progress?.total ?? 0,
-      status: latest.status,
+      // Phiếu khoá SAU khi duyệt vẫn là phiếu đã duyệt (số liệu đã ghi nhận).
+      status: latest.status === "LOCKED" && latest.approvedAt ? "APPROVED" : latest.status,
       history: events,
     });
   });

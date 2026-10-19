@@ -80,7 +80,8 @@ export const CELL_STATUS: Record<CellState, { label: string; tone: StatusTone }>
 /** Tình trạng một phiếu ở khối "Chi tiết đơn vị". */
 export function reportBadge(
   status: ReportStatus,
-  sheetsDone: number
+  sheetsDone: number,
+  approvedAt: string | null = null
 ): { label: string; tone: StatusTone } {
   switch (status) {
     case "APPROVED":
@@ -90,7 +91,10 @@ export function reportBadge(
     case "RETURNED":
       return { label: "Bị trả lại", tone: "destructive" };
     case "LOCKED":
-      return { label: "Đã chốt", tone: "locked" };
+      // Khoá sau khi duyệt (còn ngày duyệt) vẫn là phiếu đã duyệt.
+      return approvedAt
+        ? { label: "Đã duyệt · đã khoá", tone: "success" }
+        : { label: "Đã chốt", tone: "locked" };
     case "DRAFT":
       return sheetsDone > 0
         ? { label: "Đang nhập", tone: "info" }
