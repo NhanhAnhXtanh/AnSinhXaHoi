@@ -2,6 +2,7 @@ package com.dth.frw.shared.exception;
 
 import com.dth.frw.shared.security.rowlevel.PolicyValidationException;
 import com.dth.frw.shared.security.rowlevel.RowLevelViolationException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -11,6 +12,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -61,6 +63,8 @@ public class ApiExceptionHandler {
     static final String MSG_IN_USE =
             "Không thực hiện được vì dữ liệu này đang được dùng ở nơi khác hoặc bị trùng với dữ liệu đã có.";
     static final String MSG_NOT_FOUND = "Không tìm thấy trang hoặc dữ liệu yêu cầu.";
+    static final String MSG_CONCURRENT_CHANGE =
+            "Dữ liệu vừa được thay đổi ở một phiên làm việc khác. Bạn tải lại trang để xem dữ liệu mới nhất rồi thử lại.";
     static final String MSG_SERVER_ERROR =
             "Hệ thống gặp sự cố ngoài ý muốn. Bạn thử lại sau ít phút; nếu vẫn lỗi, hãy báo quản trị viên.";
     static final String MSG_FIELD_INVALID = "Giá trị chưa hợp lệ.";
@@ -202,6 +206,17 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleIntegrityViolation(DataIntegrityViolationException e) {
         return body(HttpStatus.CONFLICT, MSG_IN_USE, Map.of());
+    }
+
+    /**
+     * Hai phiên cùng ghi một bản ghi: số hiệu bản lưu ({@code @Version}) đã đổi giữa lúc đọc và lúc
+     * ghi (vd hai tab cùng lưu một tờ biểu, hoặc lưu số liệu đúng lúc tab kia bấm "Đã nhập xong"),
+     * hoặc khoá dòng không lấy được. Đây là xung đột dữ liệu người dùng tự xử lý được (tải lại
+     * trang) — trước đây rơi xuống {@link #handleUnexpected} thành 500 "Hệ thống gặp sự cố".
+     */
+    @ExceptionHandler({ConcurrencyFailureException.class, OptimisticLockException.class})
+    public ResponseEntity<Map<String, Object>> handleConcurrentChange(Exception e) {
+        return body(HttpStatus.CONFLICT, MSG_CONCURRENT_CHANGE, Map.of());
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.dth.frw.module.asxh.attachment.service;
 
+import com.dth.frw.shared.exception.ResourceNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -45,11 +46,17 @@ public class AttachmentStorage {
         return relative;
     }
 
-    /** Mở luồng đọc; người gọi đóng luồng. */
+    /**
+     * Mở luồng đọc; người gọi đóng luồng.
+     *
+     * @throws ResourceNotFoundException bản ghi còn mà nội dung không có trên đĩa (vd file chuyển từ
+     *                                   bản Jmix chưa được chép sang) — 404 có câu tiếng Việt, không
+     *                                   phải 500 "Hệ thống gặp sự cố"
+     */
     public InputStream open(String relativePath) {
         Path source = resolve(relativePath);
         if (!Files.isRegularFile(source)) {
-            throw new IllegalStateException("Không tìm thấy nội dung file đính kèm trên máy chủ.");
+            throw new ResourceNotFoundException("Nội dung file đính kèm", relativePath);
         }
         try {
             return Files.newInputStream(source);

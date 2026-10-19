@@ -14,6 +14,7 @@ import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSpecifications;
+import com.dth.frw.module.asxh.unit.security.ReportUnitAccountScope;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
@@ -31,8 +32,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,17 +85,31 @@ public class InputReportService {
     private final com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks;
     // Khoá năm theo báo cáo năm (slice dept, UC-60): năm đã nộp UBND thì không nhập / nộp / duyệt.
     private final DeptYearLockService yearLockService;
+    // Cấp tài khoản (UC-69/72): tài khoản gắn đơn vị không được duyệt / trả lại phiếu (UC-41 3f).
+    // null chỉ ở đường dựng tay của test cũ — khi đó không kiểm cấp tài khoản.
+    private final ReportUnitAccountScope accountScope;
 
     public InputReportService(InputReportRepository repository,
                               InputReportSheetRepository sheetRepository,
                               RowLevelSecurity rowLevel,
                               com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks,
                               DeptYearLockService yearLockService) {
+        this(repository, sheetRepository, rowLevel, workflowHooks, yearLockService, null);
+    }
+
+    @Autowired
+    public InputReportService(InputReportRepository repository,
+                              InputReportSheetRepository sheetRepository,
+                              RowLevelSecurity rowLevel,
+                              com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks workflowHooks,
+                              DeptYearLockService yearLockService,
+                              ReportUnitAccountScope accountScope) {
         this.repository = repository;
         this.sheetRepository = sheetRepository;
         this.rowLevel = rowLevel;
         this.workflowHooks = workflowHooks;
         this.yearLockService = yearLockService;
+        this.accountScope = accountScope;
     }
 
     // ------------------------------------------------------------------ đọc
@@ -170,6 +187,7 @@ public class InputReportService {
      */
     @Transactional
     public InputReport approve(Long id) {
+        requireProvinceAccount(accountScope, "phê duyệt");
         InputReport report = repository.findForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("InputReport", id));
         if (report.getStatus() != ReportStatus.SUBMITTED) {
@@ -202,6 +220,7 @@ public class InputReportService {
             throw new IllegalArgumentException("Lý do trả lại tối đa " + RETURN_REASON_MAX + " ký tự");
         }
 
+        requireProvinceAccount(accountScope, "trả lại");
         InputReport current = repository.findForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("InputReport", id));
         if (current.getStatus() != ReportStatus.SUBMITTED) {
@@ -361,6 +380,22 @@ public class InputReportService {
                 ? "Năm " + year + " đã được UBND duyệt báo cáo năm"
                 : "Năm " + year + " đã nộp báo cáo năm lên UBND")
                 + " nên không " + action + " được nữa: số liệu các kỳ trong năm đã khoá.");
+    }
+
+    /**
+     * Duyệt / trả lại / khoá / huỷ phiếu là việc của tài khoản cấp Sở (UC-41 3f, UC-42, UC-47).
+     *
+     * <p>Các đường này đọc phiếu KHÔNG qua phạm vi dòng ({@code findForUpdate}) và trước đây chỉ dựa
+     * vào mã quyền: tài khoản đơn vị lỡ được gán thêm vai trò có {@code input_reports:approve} sẽ
+     * duyệt được phiếu của CHÍNH mình và của mọi đơn vị khác. Cấp tài khoản suy từ đơn vị gắn với
+     * tài khoản (BR-69.1), không từ vai trò, nên gán thêm vai trò không vượt qua được.
+     *
+     * @throws AccessDeniedException tài khoản gắn đơn vị (→ 403)
+     */
+    static void requireProvinceAccount(ReportUnitAccountScope accountScope, String action) {
+        if (accountScope != null && !accountScope.current().unrestricted()) {
+            throw new AccessDeniedException("Chỉ tài khoản cấp Sở mới được " + action + " phiếu.");
+        }
     }
 
     static String currentUsername() {

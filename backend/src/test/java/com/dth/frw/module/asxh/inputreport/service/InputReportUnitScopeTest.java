@@ -14,6 +14,7 @@ import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.domain.asxh.report.InputReportSheet;
 import com.dth.frw.domain.asxh.report.Publication;
 import com.dth.frw.domain.asxh.report.PublicationKind;
+import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateKind;
 import com.dth.frw.domain.asxh.template.TemplateSet;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -66,6 +68,9 @@ class InputReportUnitScopeTest {
 
     @Autowired
     private InputReportQueryService queries;
+
+    @Autowired
+    private InputReportClosureService closures;
 
     @Autowired
     private InputReportSheetRepository sheetRepository;
@@ -189,6 +194,33 @@ class InputReportUnitScopeTest {
         assertEquals(2, visible.size());
         assertEquals(reportOfB.getId(), reports.get(reportOfB.getId()).getId());
         assertEquals(sheetOfB.getId(), sheets.get(sheetOfB.getId()).getId());
+    }
+
+    @Test
+    @DisplayName("Tài khoản gắn đơn vị không duyệt / trả lại / khoá / huỷ được phiếu, kể cả khi có quyền (UC-41 3f)")
+    void unitAccountCannotReview() {
+        // Đường duyệt đọc phiếu không qua phạm vi dòng; trước đây chỉ mã quyền chặn, nên tài khoản
+        // đơn vị được gán thêm vai trò duyệt sẽ tự duyệt phiếu của mình và của đơn vị khác.
+        reportOfA.setStatus(ReportStatus.SUBMITTED);
+        reportOfB.setStatus(ReportStatus.SUBMITTED);
+        entityManager.flush();
+
+        signInAs(officerOfA);
+        assertThrows(AccessDeniedException.class, () -> reports.approve(reportOfA.getId()),
+                "không tự duyệt phiếu của đơn vị mình");
+        assertThrows(AccessDeniedException.class, () -> reports.approve(reportOfB.getId()),
+                "không duyệt phiếu đơn vị khác");
+        assertThrows(AccessDeniedException.class, () -> reports.returnReport(reportOfB.getId(), "Sai số"));
+        assertThrows(AccessDeniedException.class, () -> closures.lock(reportOfB.getId()));
+        assertThrows(AccessDeniedException.class, () -> closures.cancel(reportOfB.getId()));
+
+        SecurityContextHolder.clearContext();
+        entityManager.clear();
+        assertEquals(ReportStatus.SUBMITTED, reports.get(reportOfB.getId()).getStatus(), "phiếu không bị đổi");
+
+        // Tài khoản Sở vẫn duyệt bình thường (biểu chưa nhập gì → không có số liệu để lưu).
+        signInAs(provinceOfficer);
+        assertEquals(ReportStatus.APPROVED, reports.approve(reportOfB.getId()).getStatus());
     }
 
     // ------------------------------------------------------------ hỗ trợ
