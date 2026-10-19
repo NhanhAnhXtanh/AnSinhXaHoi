@@ -41,8 +41,10 @@ import java.util.Set;
  * <p>Quy ước (giữ như bản Jmix, chỉnh theo máy trạng thái phiếu của bản mới):
  * <ul>
  *   <li>Phiếu {@code SUPERSEDED} và {@code CANCELLED} không tính (BR-75.1).</li>
- *   <li>{@code LOCKED} ở bản mới là phiếu ĐANG NHẬP bị khoá khi chốt đợt — không phải "đã duyệt
- *       rồi khoá" như bản Jmix — nên đếm riêng, và ở chế độ đơn vị tính như chưa nộp.</li>
+ *   <li>{@code LOCKED} thường là phiếu ĐANG NHẬP bị khoá khi chốt đợt (không có ngày duyệt) —
+ *       đếm riêng, và ở chế độ đơn vị tính như chưa nộp. Phiếu khoá SAU khi duyệt (có
+ *       {@code approvedAt}, đường REST {@code lock}) vẫn là phiếu đã duyệt — tính vào "đã duyệt",
+ *       cùng quy tắc số liệu hiệu lực của tổng hợp ({@link #isApproved}).</li>
  *   <li>"Quá hạn" = phiếu đang nhập ({@code DRAFT}) trong kỳ đã quá hạn nộp. Phiếu bị trả lại
  *       vẫn là "bị trả lại" — lý do trả lại có ích cho người xem hơn.</li>
  *   <li>Kỳ quá hạn = trạng thái {@code OVERDUE}, hoặc còn nhận số liệu mà hạn nộp đã qua
@@ -159,6 +161,11 @@ public final class HomeDashboardCalculator {
         return deadline == null ? null : (int) ChronoUnit.DAYS.between(today, deadline);
     }
 
+    /** Phiếu đã duyệt: {@code APPROVED}, hoặc {@code LOCKED} mà có ngày duyệt (khoá sau khi duyệt). */
+    static boolean isApproved(ReportStatus status, Instant approvedAt) {
+        return status == ReportStatus.APPROVED || (status == ReportStatus.LOCKED && approvedAt != null);
+    }
+
     /** Đếm phiếu theo tình trạng; phiếu không còn sống bị bỏ qua. */
     public static Counts count(List<ReportRow> reports) {
         int entering = 0;
@@ -175,7 +182,13 @@ public final class HomeDashboardCalculator {
                 case SUBMITTED -> pending++;
                 case RETURNED -> returned++;
                 case APPROVED -> approved++;
-                case LOCKED -> locked++;
+                case LOCKED -> {
+                    if (isApproved(report.status(), report.approvedAt())) {
+                        approved++;
+                    } else {
+                        locked++;
+                    }
+                }
                 default -> {
                     // SUPERSEDED, CANCELLED: không tính.
                 }
@@ -336,15 +349,18 @@ public final class HomeDashboardCalculator {
         int approved;
         int draftSheetsDone;
 
-        void add(ReportStatus status, SheetStat sheets) {
-            switch (status) {
+        void add(ReportRow report, SheetStat sheets) {
+            if (isApproved(report.status(), report.approvedAt())) {
+                approved++;
+                return;
+            }
+            switch (report.status()) {
                 case DRAFT, LOCKED -> {
                     draft++;
                     draftSheetsDone += sheets.done();
                 }
                 case RETURNED -> returned++;
                 case SUBMITTED -> pending++;
-                case APPROVED -> approved++;
                 default -> {
                 }
             }
@@ -373,8 +389,8 @@ public final class HomeDashboardCalculator {
         }
 
         void add(ReportRow report, SheetStat sheets) {
-            all.add(report.status(), sheets);
-            byPeriod.computeIfAbsent(report.periodId(), id -> new Bucket()).add(report.status(), sheets);
+            all.add(report, sheets);
+            byPeriod.computeIfAbsent(report.periodId(), id -> new Bucket()).add(report, sheets);
             sheetsTotal += sheets.total();
             sheetsDone += sheets.done();
             if (report.submittedAt() != null

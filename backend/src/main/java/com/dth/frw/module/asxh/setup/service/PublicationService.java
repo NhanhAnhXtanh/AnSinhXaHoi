@@ -13,6 +13,7 @@ import com.dth.frw.module.asxh.period.service.ReportPeriodService;
 import com.dth.frw.module.asxh.setup.repo.PeriodAssignmentRepository;
 import com.dth.frw.module.asxh.setup.repo.PublicationRepository;
 import com.dth.frw.module.asxh.setup.repo.PublicationSpecifications;
+import com.dth.frw.module.asxh.template.service.TemplateDates;
 import com.dth.frw.module.asxh.template.service.TemplateVersionService;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.exception.ConflictException;
@@ -179,7 +180,9 @@ public class PublicationService {
             throw new ConflictException("Hãy gán biểu mẫu cho ít nhất một đơn vị rồi mới mở đợt được.");
         }
 
-        LocalDate today = LocalDate.now();
+        // "Hôm nay" theo giờ Việt Nam, không theo múi giờ máy chủ (máy chủ UTC thì 0h–7h lệch một ngày
+        // và ghim nhầm phiên bản cũ vào phiếu đúng ngày bản mới có hiệu lực).
+        LocalDate today = TemplateDates.today();
         Map<Long, TemplateVersion> versions = new LinkedHashMap<>();
         Set<String> missing = new LinkedHashSet<>();
         for (PeriodAssignment assignment : assignments) {

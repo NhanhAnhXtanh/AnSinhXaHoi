@@ -289,6 +289,33 @@ class HomeDashboardCalculatorTest {
     }
 
     @Test
+    @DisplayName("Phiếu khoá SAU khi duyệt (có ngày duyệt) vẫn là đã duyệt; khoá khi chốt đợt là chưa nộp")
+    void lockedAfterApprovalCountsAsApproved() {
+        Instant approvedAt = Instant.parse("2026-10-08T03:00:00Z");
+        ReportRow lockedApproved = new ReportRow(nextId++, XA_A, "UBND xã An Phước", ReportUnitType.UBND_XA,
+                T9.id(), 1, ReportStatus.LOCKED, Instant.parse("2026-10-03T03:00:00Z"), approvedAt, null, null);
+        ReportRow lockedUnsubmitted = new ReportRow(nextId++, XA_B, "UBND xã Bình An", ReportUnitType.UBND_XA,
+                T9.id(), 1, ReportStatus.LOCKED, null, null, null, null);
+
+        HomeDashboardResponse result = compute(List.of(lockedApproved, lockedUnsubmitted), List.of(), true);
+
+        Counts counts = result.kpi().counts();
+        assertEquals(2, counts.total());
+        assertEquals(1, counts.approved(), "khoá sau duyệt tính vào đã duyệt");
+        assertEquals(1, counts.locked(), "chỉ phiếu chốt mà chưa nộp mới là 'đã chốt'");
+        assertEquals(1, result.kpi().submitted());
+
+        UnitBoard board = result.units();
+        UnitRow a = board.items().stream().filter(row -> row.id() == XA_A).findFirst().orElseThrow();
+        UnitRow b = board.items().stream().filter(row -> row.id() == XA_B).findFirst().orElseThrow();
+        assertEquals(UnitState.COMPLETE, a.state());
+        assertEquals(CellState.APPROVED, a.periodStates().get(9L));
+        assertEquals(UnitState.NOT_SUBMITTED, b.state());
+        assertEquals(1, board.summary().complete());
+        assertEquals(1, board.summary().notSubmitted());
+    }
+
+    @Test
     @DisplayName("Năm không có phiếu: mọi số bằng 0, danh sách rỗng")
     void emptyYear() {
         HomeDashboardResponse result = HomeDashboardCalculator.compute(new Input(2027, TODAY, false, ALL,

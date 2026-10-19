@@ -6,6 +6,7 @@ import com.dth.frw.module.asxh.dept.service.DeptPeriodService;
 import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.module.asxh.inputreport.service.InputReportService;
 import com.dth.frw.module.asxh.period.service.ReportPeriodService;
+import com.dth.frw.module.asxh.template.service.TemplateDates;
 import com.dth.frw.shared.exception.ConflictException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -214,7 +215,7 @@ public class PeriodLifecycleService {
         if (period.getYear() != null) {
             yearLockService.assertOpen(period.getYear());
         }
-        if (newDeadline == null || newDeadline.isBefore(LocalDate.now())) {
+        if (newDeadline == null || newDeadline.isBefore(TemplateDates.today())) {
             throw new ConflictException("Hạn nộp mới phải từ hôm nay trở đi.");
         }
         // Dời hạn TRƯỚC rồi mới mở lại, cùng giao dịch.

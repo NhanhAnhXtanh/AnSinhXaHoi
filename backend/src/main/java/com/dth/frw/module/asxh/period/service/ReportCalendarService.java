@@ -13,6 +13,7 @@ import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.rowlevel.Action;
 import com.dth.frw.shared.web.ListParams;
 import java.time.Year;
+import java.time.ZoneId;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -322,7 +323,7 @@ public class ReportCalendarService {
     }
 
     private static void requireYearInRange(int year) {
-        int now = Year.now().getValue();
+        int now = Year.now(ZoneId.of("Asia/Ho_Chi_Minh")).getValue();
         if (year < now - YEARS_BACK || year > now + YEARS_AHEAD) {
             throw new IllegalArgumentException(
                     "Năm phải từ " + (now - YEARS_BACK) + " đến " + (now + YEARS_AHEAD) + ".");

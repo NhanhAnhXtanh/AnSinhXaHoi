@@ -5,11 +5,13 @@ import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.report.PeriodAssignment;
 import com.dth.frw.domain.asxh.report.Publication;
 import com.dth.frw.domain.asxh.template.Template;
+import com.dth.frw.domain.asxh.template.TemplateKind;
 import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.module.asxh.inputreport.service.InputReportService;
 import com.dth.frw.module.asxh.period.service.ReportPeriodService;
 import com.dth.frw.module.asxh.setup.repo.PeriodAssignmentRepository;
 import com.dth.frw.module.asxh.setup.repo.PeriodAssignmentSpecifications;
+import com.dth.frw.module.asxh.template.service.TemplateDates;
 import com.dth.frw.module.asxh.template.service.TemplateService;
 import com.dth.frw.module.asxh.template.service.TemplateVersionService;
 import com.dth.frw.module.asxh.unit.service.ReportUnitService;
@@ -155,8 +157,16 @@ public class PeriodAssignmentService {
                     + " đang ở trạng thái " + PublicationService.statusLabel(status) + ".");
         }
         if (!toAdd.isEmpty()) {
-            // Gỡ thiết lập thừa ở kỳ bị khoá vẫn cho; chỉ gán thêm mới bị chặn (UC-31 1a).
+            // Gỡ thiết lập thừa ở kỳ bị khoá vì trùng kỳ vẫn cho; chỉ gán thêm mới bị chặn (UC-31 1a).
             lockService.assertSetupAllowed(period);
+        } else {
+            // ...nhưng khoá NĂM (năm đã nộp UBND) chặn hẳn, kể cả gỡ (UC-31 1a; bản Jmix
+            // unassignOrganizations gọi assertYearOpen).
+            lockService.lock(period)
+                    .filter(found -> found.kind() == PeriodSetupLockService.LockKind.YEAR)
+                    .ifPresent(found -> {
+                        throw new ConflictException(found.reason());
+                    });
         }
 
         // Ô đang có của kỳ, nạp một lần cho cả hai bước.
@@ -281,7 +291,7 @@ public class PeriodAssignmentService {
         }
 
         // Lọc ô của kỳ nguồn theo BR-23.2 một lần cho mọi kỳ đích.
-        LocalDate today = LocalDate.now();
+        LocalDate today = TemplateDates.today();
         Map<Long, Boolean> templateUsable = new HashMap<>();
         List<PeriodAssignment> usable = new ArrayList<>(sourceCells.size());
         int skippedPerTarget = 0;
@@ -289,7 +299,8 @@ public class PeriodAssignmentService {
             ReportUnit unit = cell.getUnit();
             Template template = cell.getTemplate();
             boolean templateOk = templateUsable.computeIfAbsent(template.getId(),
-                    id -> templateVersionService.findEffective(id, today).isPresent());
+                    id -> template.getKind() == TemplateKind.CHI_TIET
+                            && templateVersionService.findEffective(id, today).isPresent());
             if (templateOk && unit.isActive() && unit.isReceivesReports()) {
                 usable.add(cell);
             } else {
@@ -349,11 +360,22 @@ public class PeriodAssignmentService {
         return units;
     }
 
+    /**
+     * Chỉ biểu chi tiết mới giao cho đơn vị nhập; biểu tổng hợp chỉ dùng ở màn Tổng hợp
+     * (BR-22.1). Màn ma trận đã lọc cột theo loại, máy chủ chặn lại cho lời gọi thẳng API.
+     */
     private Map<Long, Template> resolveTemplates(List<Cell> cells) {
         Map<Long, Template> templates = new HashMap<>();
         for (Cell cell : cells) {
             templates.computeIfAbsent(cell.templateId(), templateService::get);
         }
+        templates.values().stream()
+                .filter(template -> template.getKind() != TemplateKind.CHI_TIET)
+                .findFirst()
+                .ifPresent(template -> {
+                    throw new ConflictException("Biểu " + template.getShortName()
+                            + " là biểu tổng hợp, không giao cho đơn vị nhập được.");
+                });
         return templates;
     }
 
