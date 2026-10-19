@@ -93,7 +93,8 @@ public class InputReportAttachmentService {
      * @throws ConflictException        phiếu không còn sửa được hoặc đợt đã đóng (→ 409)
      */
     @Transactional
-    public InputReportAttachment upload(InputReport report, String originalFileName, byte[] content) {
+    public InputReportAttachment upload(InputReport given, String originalFileName, byte[] content) {
+        InputReport report = lockCurrent(given);
         assertEditable(report);
         String fileName = AttachmentFiles.validate(originalFileName, content);
         if (repository.countActiveByReportId(report.getId()) >= MAX_FILES_PER_REPORT) {
@@ -120,7 +121,8 @@ public class InputReportAttachmentService {
      * thì đây là chứng từ của hồ sơ Sở đang xử lý.
      */
     @Transactional
-    public InputReportAttachment delete(InputReport report, Long attachmentId) {
+    public InputReportAttachment delete(InputReport given, Long attachmentId) {
+        InputReport report = lockCurrent(given);
         assertEditable(report);
         InputReportAttachment attachment = get(report, attachmentId);
         attachment.setDeletedAt(Instant.now());
@@ -137,7 +139,8 @@ public class InputReportAttachmentService {
 
     /** Đơn vị tích / bỏ tích "Đã có phiếu xác nhận của Kho bạc". */
     @Transactional
-    public TreasuryStatus setTreasuryConfirmed(InputReport report, boolean confirmed) {
+    public TreasuryStatus setTreasuryConfirmed(InputReport given, boolean confirmed) {
+        InputReport report = lockCurrent(given);
         assertEditable(report);
         TreasuryConfirmation confirmation = confirmationRepository.findByReportId(report.getId())
                 .orElseGet(() -> new TreasuryConfirmation(report));
@@ -167,6 +170,17 @@ public class InputReportAttachmentService {
                         ? "Chưa nộp được phiếu: chưa tải lên xác nhận của Kho bạc."
                         : "Chưa nộp được phiếu: chưa tích xác nhận đã có phiếu xác nhận của Kho bạc.");
         throw new ConflictException(message);
+    }
+
+    /**
+     * Khoá dòng phiếu và lấy trạng thái mới nhất (cùng khoá với nộp phiếu). Phiếu người gọi đưa vào
+     * được nạp ở giao dịch đọc trước: phiếu vừa nộp ở tab khác vẫn mang trạng thái "đang nhập", kiểm
+     * trên bản đó thì tải / gỡ file, đổi ô tích lọt vào hồ sơ đã nộp. Thao tác nào đến sau lúc nộp
+     * thì chờ khoá rồi thấy phiếu đã nộp.
+     */
+    private InputReport lockCurrent(InputReport report) {
+        return repository.lockReport(report.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("InputReport", report.getId()));
     }
 
     private void assertEditable(InputReport report) {

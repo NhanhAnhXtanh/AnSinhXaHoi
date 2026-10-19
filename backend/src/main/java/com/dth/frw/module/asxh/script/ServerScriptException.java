@@ -9,6 +9,8 @@ package com.dth.frw.module.asxh.script;
  *   <li>{@link Kind#DATA} — chính script báo lỗi số liệu ({@code ctx.issues.add} mức ERROR) hoặc
  *       trả về giá trị không phải số. Thông điệp là chữ nghiệp vụ, đưa thẳng cho người dùng được.</li>
  *   <li>{@link Kind#TIMEOUT} — bị huỷ vì quá thời gian hoặc vượt giới hạn số câu lệnh.</li>
+ *   <li>{@link Kind#MEMORY} — script dùng hết bộ nhớ máy chủ (dựng mảng / chuỗi khổng lồ). Trước đây
+ *       bị gộp vào {@code TIMEOUT} nên cán bộ nhận câu "quá thời gian" dù script dừng ngay.</li>
  *   <li>{@link Kind#SCRIPT} — mẫu biểu viết sai (biên dịch lỗi, ném ngoại lệ, gọi API chỉ có ở
  *       trình duyệt). Thông điệp mang chi tiết kỹ thuật — chỉ ghi nhật ký, không đưa cho cán bộ.</li>
  * </ul>
@@ -18,6 +20,7 @@ public class ServerScriptException extends RuntimeException {
     public enum Kind {
         DATA,
         TIMEOUT,
+        MEMORY,
         SCRIPT
     }
 

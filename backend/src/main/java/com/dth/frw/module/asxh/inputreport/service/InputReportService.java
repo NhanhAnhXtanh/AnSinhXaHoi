@@ -156,6 +156,14 @@ public class InputReportService {
      */
     @Transactional
     public InputReport submit(Long id) {
+        // Khoá dòng phiếu TRƯỚC khi đọc trạng thái (như approve): bấm Nộp hai lần, hoặc Nộp trong lúc
+        // tab khác đang lưu / đánh dấu biểu, thì lượt sau chờ rồi đọc trạng thái mới nhất. Lưu / đánh
+        // dấu biểu và đính kèm cũng giữ khoá này, nên số liệu không đổi được sau khi đã nộp.
+        // Khoá trước, kiểm phạm vi sau: lấy phiếu qua phạm vi trước rồi mới khoá thì Hibernate giữ bản
+        // đã nạp (trạng thái cũ) dù câu khoá trả dòng mới — kiểm trạng thái sẽ trên số cũ.
+        // Phiếu ngoài phạm vi: câu thứ hai không thấy dòng → cùng 404 như id không tồn tại.
+        repository.findForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("InputReport", id));
         InputReport report = repository.findOne(rowLevel.byId(InputReport.class, Action.WRITE, id))
                 .orElseThrow(() -> new ResourceNotFoundException("InputReport", id));
         if (!report.getStatus().isEditable()) {

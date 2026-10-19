@@ -5,6 +5,7 @@ import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.domain.asxh.report.InputReportSheet;
 import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.unit.ReportUnit;
+import com.dth.frw.shared.security.rowlevel.RowLevelResource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -44,6 +45,8 @@ import java.util.Objects;
  * nối bảng phiếu. Mọi quan hệ LAZY: truy vấn đọc dùng phép chiếu, không nạp thực thể.
  */
 @Entity
+// Phạm vi dữ liệu theo đơn vị (UC-72): xem module/asxh/ledger/security.
+@RowLevelResource("ledger_entries")
 @Table(
         name = "asxh_ledger_entries",
         uniqueConstraints = @UniqueConstraint(

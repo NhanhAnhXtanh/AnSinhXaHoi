@@ -43,6 +43,9 @@ public class LedgerWriteService {
     /** Biểu "nhập hộ": một phiếu nhập cho NHIỀU đơn vị, đơn vị lấy theo từng dòng (UC-46). */
     private static final Set<String> PER_ROW_UNIT_SHORT_NAMES = Set.of("1g");
 
+    /** Không gian khoá tư vấn của bước chống cộng đôi khi duyệt (khoá thứ hai là id đơn vị). */
+    static final int APPROVAL_LOCK_NAMESPACE = 410_41;
+
     private final LedgerEntryRepository entryRepository;
     private final LedgerReplaceService replaceService;
     private final LedgerAuditService auditService;
@@ -184,6 +187,9 @@ public class LedgerWriteService {
         if (templateIds.isEmpty()) {
             return;
         }
+        // Đếm DƯỚI khoá theo đơn vị: hai phiếu kỳ giao nhau duyệt đồng thời thì lượt sau chờ lượt trước
+        // commit rồi mới đếm, thấy số liệu vừa ghi và bị từ chối — không thì cả hai cùng lọt.
+        entryRepository.lockUnitForApproval(APPROVAL_LOCK_NAMESPACE, report.getUnit().getId());
         long conflicts = entryRepository.countOverlappingEffective(
                 report.getUnit().getId(), report.getId(), templateIds, period.getId(), year, from, to,
                 ReportStatus.APPROVED, ReportStatus.LOCKED);
@@ -260,6 +266,8 @@ public class LedgerWriteService {
             case DATA -> label + " có số liệu không đọc được (" + e.getMessage() + "). Cần sửa biểu trước khi duyệt.";
             case TIMEOUT -> label + " đọc số liệu quá lâu nên bị dừng. Vui lòng báo người quản trị mẫu biểu"
                     + " kiểm tra.";
+            case MEMORY -> label + " có lượng dữ liệu quá lớn, máy chủ không đọc hết được nên đã dừng. Vui lòng"
+                    + " báo người quản trị mẫu biểu kiểm tra.";
             case SCRIPT -> label + " có số liệu không đọc được do mẫu biểu đang có lỗi. Vui lòng báo người quản"
                     + " trị mẫu biểu kiểm tra.";
         };

@@ -1,6 +1,7 @@
 package com.dth.frw.module.asxh.inputreport.api.dto;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 /**
  * {@code PUT /api/input_report_sheets/{id}} — lưu số liệu của biểu.
@@ -11,6 +12,8 @@ import jakarta.validation.constraints.NotNull;
  */
 public record SheetDataRequest(
         @NotNull(message = "Thiếu số liệu của biểu")
+        // Lớp chặn thứ hai sau WorkbookBodySizeFilter (thân không khai Content-Length) — trần 20MB.
+        @Size(max = 20_971_520, message = "Bảng tính quá lớn (tối đa 20MB). Hãy xoá bớt dòng, cột hoặc vùng trống thừa rồi lưu lại.")
         String dataJson,
         Long version) {
 }

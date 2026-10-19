@@ -430,6 +430,7 @@ public class DeptSheetService {
         DeptReport report = lockReport(reportId);
         assertEditable(report);
         checkVersion(report, versionNo);
+        assertRestorableVersion(report, versionNo);
         if (!pendingSheets(reportId).isEmpty()) {
             throw new ConflictException("Còn biểu đang sửa dở. Hoàn tất hoặc bỏ các số đang sửa trước rồi mới khôi phục.");
         }
@@ -601,6 +602,9 @@ public class DeptSheetService {
                         + " có số liệu chưa hợp lệ: " + e.getMessage());
                 case TIMEOUT -> new ConflictException("Biểu " + template.getShortName()
                         + " đọc số liệu quá lâu nên bị dừng. Vui lòng báo người quản trị mẫu biểu kiểm tra.");
+                case MEMORY -> new ConflictException("Biểu " + template.getShortName()
+                        + " có lượng dữ liệu quá lớn, máy chủ không đọc hết được nên đã dừng. Vui lòng báo người"
+                        + " quản trị mẫu biểu kiểm tra.");
                 case SCRIPT -> new ConflictException("Biểu " + template.getShortName()
                         + " chưa đọc được số liệu do mẫu biểu đang có lỗi. Vui lòng báo người quản trị mẫu biểu kiểm tra.");
             };
@@ -844,6 +848,25 @@ public class DeptSheetService {
         if (version < 1 || version > current) {
             throw new IllegalArgumentException("Số liệu năm " + report.getReportYear() + " không có phiên bản "
                     + version + ".");
+        }
+    }
+
+    /**
+     * Số phiên bản đánh chung cho CẢ NĂM, nên một phiên bản nhỏ hơn lần lưu đầu của kỳ vẫn qua được
+     * {@link #checkVersion} — nhưng ở phiên bản đó kỳ chưa có dòng số liệu nào. Khôi phục về đó sẽ
+     * đóng hết dòng hiện hành, tức xoá sạch số liệu kỳ dưới danh nghĩa "khôi phục". Chặn từ phiên bản
+     * của lần lưu đầu (mốc sớm nhất trong lịch sử của kỳ) trở về trước.
+     */
+    private void assertRestorableVersion(DeptReport report, int versionNo) {
+        Integer first = changeRepository.findByReport(report.getId()).stream()
+                .map(DeptChange::getVersionNo)
+                .filter(Objects::nonNull)
+                .min(Integer::compare)
+                .orElse(null);
+        if (first != null && versionNo < first) {
+            throw new ConflictException("Phiên bản " + versionNo + " có trước lần lưu số liệu đầu tiên của kỳ này"
+                    + " nên không khôi phục được — khôi phục về đó sẽ xoá hết số liệu của kỳ. Hãy chọn một phiên"
+                    + " bản trong lịch sử của kỳ (từ phiên bản " + first + " trở đi).");
         }
     }
 

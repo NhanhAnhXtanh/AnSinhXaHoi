@@ -17,7 +17,10 @@ public final class DeptRequests {
 
     /** {@code PUT /api/dept_reports/{id}/sheets/{sheet}/draft} — "Lưu dữ liệu" bảng đang sửa. */
     public record DraftRequest(
-            @NotBlank(message = "Bảng tính rỗng, chưa có gì để lưu") String workbookJson,
+            @NotBlank(message = "Bảng tính rỗng, chưa có gì để lưu")
+            // Lớp chặn thứ hai sau WorkbookBodySizeFilter (thân không khai Content-Length) — trần 20MB.
+            @Size(max = 20_971_520, message = "Bảng tính quá lớn (tối đa 20MB). Hãy xoá bớt dòng, cột hoặc vùng trống thừa rồi lưu lại.")
+            String workbookJson,
             @NotNull(message = "Thiếu số hiệu bản lưu của biểu") Long revision) {
     }
 

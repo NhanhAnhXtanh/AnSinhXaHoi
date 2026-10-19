@@ -568,14 +568,42 @@ public class ServerScriptRunner {
      * còn lại là lỗi script.
      */
     private static ServerScriptException translate(String prefix, PolyglotException e) {
-        if (e.isCancelled() || e.isResourceExhausted() || e.isInterrupted()) {
+        ServerScriptException.Kind limit = limitKind(e.isCancelled(), e.isInterrupted(), e.isResourceExhausted());
+        if (limit == ServerScriptException.Kind.TIMEOUT) {
             return new ServerScriptException(ServerScriptException.Kind.TIMEOUT,
                     prefix + ": bị huỷ do vượt thời gian / giới hạn thực thi cho phép.", e);
+        }
+        if (limit == ServerScriptException.Kind.MEMORY) {
+            return new ServerScriptException(ServerScriptException.Kind.MEMORY,
+                    prefix + ": bị dừng do dùng hết bộ nhớ (" + e.getMessage() + ").", e);
         }
         if (e.isHostException() && e.asHostException() instanceof ServerScriptException own) {
             return own;
         }
         return new ServerScriptException(ServerScriptException.Kind.SCRIPT, prefix + ": " + e.getMessage(), e);
+    }
+
+    /**
+     * Phân loại lần chạy bị dừng vì giới hạn, theo đúng cờ GraalJS 25 đặt (đã thử trên JDK 21):
+     * <ul>
+     *   <li>đồng hồ canh {@code close(true)} → {@code cancelled};</li>
+     *   <li>vượt giới hạn số câu lệnh → {@code cancelled} VÀ {@code resourceExhausted};</li>
+     *   <li>hết bộ nhớ heap ("Java heap space") → CHỈ {@code resourceExhausted}.</li>
+     * </ul>
+     * Trước đây {@code resourceExhausted} một mình cũng thành {@code TIMEOUT}, nên script dựng mảng
+     * khổng lồ bị báo "đọc số liệu quá lâu" dù dừng ngay. (Đệ quy quá sâu là lỗi {@code RangeError}
+     * thường của JS → {@code SCRIPT}.)
+     *
+     * @return {@code TIMEOUT}, {@code MEMORY}, hoặc {@code null} khi không phải dừng vì giới hạn
+     */
+    static ServerScriptException.Kind limitKind(boolean cancelled, boolean interrupted, boolean resourceExhausted) {
+        if (cancelled || interrupted) {
+            return ServerScriptException.Kind.TIMEOUT;
+        }
+        if (resourceExhausted) {
+            return ServerScriptException.Kind.MEMORY;
+        }
+        return null;
     }
 
     private static void collectRows(String scriptName, Value result, List<ScriptRow> rows) {

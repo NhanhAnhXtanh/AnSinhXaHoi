@@ -110,7 +110,7 @@ public class InputReportSheetService {
             throw new ConflictException("Số liệu của biểu đã được lưu ở phiên làm việc khác. "
                     + "Hãy tải lại trang rồi nhập lại.");
         }
-        // TODO: giới hạn kích thước (bản Jmix chặn 20MB) — hiện dựa vào giới hạn của máy chủ web.
+        // Trần 20MB như bản Jmix: chặn ở config/WorkbookBodySizeFilter (413) và @Size của SheetDataRequest.
         sheet.setDataJson(dataJson);
         sheet.setDataUpdatedAt(Instant.now());
         sheet.setDataUpdatedBy(InputReportService.currentUsername());
@@ -181,6 +181,11 @@ public class InputReportSheetService {
      * @param action cụm động từ ghép vào câu báo, ví dụ "lưu số liệu"
      */
     private InputReportSheet loadEditable(Long id, String action) {
+        // Khoá dòng phiếu TRƯỚC khi nạp tờ biểu (cùng khoá với nộp): nạp tờ biểu trước thì phiếu đã
+        // nằm trong phiên với trạng thái cũ, câu khoá không đọc lại nữa — lưu đè lọt sau khi phiếu
+        // vừa nộp xong. Phạm vi kiểm ngay sau: tờ biểu ngoài phạm vi vẫn là 404.
+        repository.lockReportOfSheet(id)
+                .orElseThrow(() -> new ResourceNotFoundException("InputReportSheet", id));
         InputReportSheet sheet = repository.findOne(rowLevel.byId(InputReportSheet.class, Action.WRITE, id))
                 .orElseThrow(() -> new ResourceNotFoundException("InputReportSheet", id));
         InputReport report = sheet.getReport();

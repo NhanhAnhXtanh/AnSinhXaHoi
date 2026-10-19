@@ -79,12 +79,19 @@ public class RefreshTokenService {
     public User consume(String rawToken, Instant now) {
         RefreshToken token = repository.findByTokenHash(hash(rawToken))
                 .filter(candidate -> candidate.isUsable(now))
-                .orElseThrow(() -> new BadCredentialsException(
-                        "Phiên đăng nhập đã hết hạn. Bạn đăng nhập lại để tiếp tục."));
+                .orElseThrow(RefreshTokenService::sessionExpired);
 
-        token.revoke(now);
-        repository.save(token);
+        // Đọc-rồi-ghi không đủ: hai lần làm mới đồng thời bằng cùng một token đều đọc thấy "còn dùng
+        // được" và trước đây cả hai cùng nhận cặp token mới — token bị đánh cắp vẫn dùng song song
+        // được với người dùng thật. Đốt có điều kiện để chỉ một lần thắng; lần kia nhận 401.
+        if (repository.revokeIfUnused(token.getId(), now) != 1) {
+            throw sessionExpired();
+        }
         return token.getUser();
+    }
+
+    private static BadCredentialsException sessionExpired() {
+        return new BadCredentialsException("Phiên đăng nhập đã hết hạn. Bạn đăng nhập lại để tiếp tục.");
     }
 
     /** Ends one session. Unknown tokens are ignored: signing out cannot fail. */

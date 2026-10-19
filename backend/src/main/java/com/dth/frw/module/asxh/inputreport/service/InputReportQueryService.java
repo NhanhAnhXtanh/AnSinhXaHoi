@@ -10,6 +10,7 @@ import com.dth.frw.module.asxh.inputreport.api.dto.InputReportSummaryResponse;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSpecifications;
+import com.dth.frw.module.asxh.unit.security.ReportUnitAccountScope;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.security.rowlevel.Action;
 import com.dth.frw.shared.web.ListParams;
@@ -59,15 +60,19 @@ public class InputReportQueryService {
     private final InputReportSheetRepository sheetRepository;
     private final InputReportService reportService;
     private final RowLevelSecurity rowLevel;
+    // Cấp tài khoản (UC-72): lựa chọn ô lọc của tài khoản đơn vị chỉ lấy từ phiếu của đơn vị mình.
+    private final ReportUnitAccountScope accountScope;
 
     public InputReportQueryService(InputReportRepository repository,
                                    InputReportSheetRepository sheetRepository,
                                    InputReportService reportService,
-                                   RowLevelSecurity rowLevel) {
+                                   RowLevelSecurity rowLevel,
+                                   ReportUnitAccountScope accountScope) {
         this.repository = repository;
         this.sheetRepository = sheetRepository;
         this.reportService = reportService;
         this.rowLevel = rowLevel;
+        this.accountScope = accountScope;
     }
 
     // ------------------------------------------------------------ số đếm
@@ -100,16 +105,31 @@ public class InputReportQueryService {
         List<InputReportSummaryResponse.PeriodOption> periods = new ArrayList<>();
         List<InputReportSummaryResponse.TemplateSetOption> sets = new ArrayList<>();
         List<InputReportSummaryResponse.UnitOption> districts = new ArrayList<>();
-        if (year != null) {
-            for (ReportPeriod period : repository.findPeriodsOfYear(year)) {
+        // Lựa chọn ô lọc đọc thẳng kho (không qua phạm vi dòng) nên phải tự thu theo đơn vị: tài
+        // khoản cấp Đơn vị chỉ thấy kỳ / bộ mẫu / huyện của phiếu đơn vị mình — không lộ kỳ hay bộ
+        // mẫu chỉ phát cho đơn vị khác. Tài khoản đơn vị không xác định được thì không có lựa chọn.
+        ReportUnitAccountScope.Restriction restriction = accountScope.current();
+        boolean unrestricted = restriction.unrestricted();
+        Long unitId = restriction.unitId();
+        if (year != null && (unrestricted || unitId != null)) {
+            List<ReportPeriod> periodRows = unrestricted
+                    ? repository.findPeriodsOfYear(year)
+                    : repository.findPeriodsOfYearForUnit(year, unitId);
+            for (ReportPeriod period : periodRows) {
                 periods.add(new InputReportSummaryResponse.PeriodOption(
                         period.getId(), period.getName(), period.getFromDate(), period.getToDate(),
                         period.getStatus()));
             }
-            for (Object[] row : sheetRepository.findTemplateSetsOfYear(year)) {
+            List<Object[]> setRows = unrestricted
+                    ? sheetRepository.findTemplateSetsOfYear(year)
+                    : sheetRepository.findTemplateSetsOfYearForUnit(year, unitId);
+            for (Object[] row : setRows) {
                 sets.add(new InputReportSummaryResponse.TemplateSetOption((Long) row[0], (String) row[1]));
             }
-            for (Object[] row : repository.findParentUnitsOfYear(year)) {
+            List<Object[]> districtRows = unrestricted
+                    ? repository.findParentUnitsOfYear(year)
+                    : repository.findParentUnitsOfYearForUnit(year, unitId);
+            for (Object[] row : districtRows) {
                 districts.add(new InputReportSummaryResponse.UnitOption((Long) row[0], (String) row[1]));
             }
         }

@@ -60,12 +60,27 @@ public interface InputReportRepository extends SecuredRepository<InputReport, Lo
     List<ReportPeriod> findPeriodsOfYear(@Param("year") Integer year);
 
     /**
+     * Như {@link #findPeriodsOfYear} nhưng chỉ kỳ có phiếu CỦA MỘT ĐƠN VỊ — cho tài khoản cấp Đơn
+     * vị: ô "Kỳ" chỉ được liệt kê kỳ mà đơn vị mình có phiếu, không lộ kỳ chỉ đơn vị khác được phát.
+     */
+    @Query("select distinct p from InputReport r join r.period p where p.calendar.year = :year "
+            + "and r.unit.id = :unitId "
+            + "and r.status <> com.dth.frw.domain.asxh.report.ReportStatus.SUPERSEDED "
+            + "order by p.fromDate desc, p.id desc")
+    List<ReportPeriod> findPeriodsOfYearForUnit(@Param("year") Integer year, @Param("unitId") Long unitId);
+
+    /**
      * Các đơn vị cha (huyện / thành phố) của đơn vị có phiếu trong năm, mỗi dòng
      * {@code [id, tên]} — ô "Huyện / thành phố" của màn duyệt.
      */
     @Query("select distinct p.id, p.name from InputReport r join r.unit u join u.parent p "
             + "where r.period.calendar.year = :year order by p.name asc")
     List<Object[]> findParentUnitsOfYear(@Param("year") Integer year);
+
+    /** Như {@link #findParentUnitsOfYear} nhưng chỉ đơn vị cha của chính đơn vị đó (tài khoản cấp Đơn vị). */
+    @Query("select distinct p.id, p.name from InputReport r join r.unit u join u.parent p "
+            + "where r.period.calendar.year = :year and u.id = :unitId order by p.name asc")
+    List<Object[]> findParentUnitsOfYearForUnit(@Param("year") Integer year, @Param("unitId") Long unitId);
 
     /**
      * Tên đơn vị cha (huyện / thành phố) của đơn vị trên từng phiếu: mỗi dòng

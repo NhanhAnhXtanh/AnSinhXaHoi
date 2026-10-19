@@ -25,6 +25,7 @@ import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.domain.asxh.unit.ReportUnitType;
 import com.dth.frw.domain.security.user.User;
 import com.dth.frw.domain.security.user.UserStatus;
+import com.dth.frw.module.asxh.inputreport.api.dto.InputReportSummaryResponse;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.JwtService;
@@ -32,7 +33,9 @@ import com.dth.frw.shared.web.ListParams;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -221,6 +224,56 @@ class InputReportUnitScopeTest {
         // Tài khoản Sở vẫn duyệt bình thường (biểu chưa nhập gì → không có số liệu để lưu).
         signInAs(provinceOfficer);
         assertEquals(ReportStatus.APPROVED, reports.approve(reportOfB.getId()).getStatus());
+    }
+
+    @Test
+    @DisplayName("Ô lọc Kỳ / Bộ biểu mẫu / Huyện của tài khoản đơn vị chỉ liệt kê từ phiếu của đơn vị mình")
+    void summaryOptionsFollowUnitScope() {
+        // Đơn vị B thuộc một huyện và được phát thêm một kỳ (Quý II) với bộ mẫu riêng — A không có phiếu
+        // nào ở đó. Trước đây ô lọc của A vẫn liệt kê Quý II, bộ mẫu riêng của B và huyện của B.
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        ReportUnit districtOfB = new ReportUnit("HB" + suffix, "Huyện Kiểm Thử B", null,
+                ReportUnitType.UBND_HUYEN, ReportBlock.HUYEN);
+        entityManager.persist(districtOfB);
+        ReportUnit unitB = reportOfB.getUnit();
+        unitB.setParent(districtOfB);
+
+        int year = period.getYear();
+        ReportPeriod secondQuarter = new ReportPeriod(period.getCalendar(), PeriodKind.QUY, 2, "Q2-" + year,
+                "Quý II/" + year, LocalDate.of(year, 4, 1), LocalDate.of(year, 6, 30), LocalDate.of(year, 7, 1),
+                LocalDate.of(year, 7, 15));
+        secondQuarter.setStatus(PeriodStatus.OPEN);
+        entityManager.persist(secondQuarter);
+        TemplateSet setOfB = new TemplateSet("Bộ riêng đơn vị B " + suffix, null);
+        entityManager.persist(setOfB);
+        Template templateOfB = new Template(setOfB, "T" + suffix, "1b", "Biểu 1b kiểm thử", TemplateKind.CHI_TIET, 1);
+        entityManager.persist(templateOfB);
+        TemplateVersion versionOfB = new TemplateVersion(templateOfB, 1, null);
+        versionOfB.setStatus(TemplateStatus.PUBLISHED);
+        versionOfB.setEffectiveFrom(LocalDate.of(year, 1, 1));
+        entityManager.persist(versionOfB);
+        Publication secondPublication = new Publication(secondQuarter, PublicationKind.LAN_DAU, 1, null);
+        entityManager.persist(secondPublication);
+        reports.issue(secondPublication, List.of(new InputReportService.IssueRequest(unitB, templateOfB, versionOfB)));
+        entityManager.flush();
+
+        LinkedMultiValueMap<String, String> query = new LinkedMultiValueMap<>();
+        query.add("year", String.valueOf(year));
+
+        signInAs(officerOfA);
+        InputReportSummaryResponse mine = queries.summary(query);
+        assertEquals(List.of(period.getId()), mine.periods().stream()
+                .map(InputReportSummaryResponse.PeriodOption::id).toList(), "chỉ kỳ A có phiếu");
+        assertEquals(1, mine.templateSets().size(), "chỉ bộ mẫu trong phiếu của A");
+        assertTrue(mine.templateSets().stream().noneMatch(option -> option.id().equals(setOfB.getId())));
+        assertTrue(mine.districts().isEmpty(), "huyện của đơn vị B không lộ cho A");
+
+        signInAs(provinceOfficer);
+        InputReportSummaryResponse all = queries.summary(query);
+        assertTrue(all.periods().stream().map(InputReportSummaryResponse.PeriodOption::id)
+                .collect(Collectors.toSet()).containsAll(Set.of(period.getId(), secondQuarter.getId())));
+        assertTrue(all.templateSets().stream().anyMatch(option -> option.id().equals(setOfB.getId())));
+        assertTrue(all.districts().stream().anyMatch(option -> option.id().equals(districtOfB.getId())));
     }
 
     // ------------------------------------------------------------ hỗ trợ
