@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
+  useCan,
   useDelete,
   useList,
   useUpdate,
@@ -112,6 +113,13 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  */
 export function ReportUnitList() {
   const navigate = useNavigate();
+  // Người chỉ có quyền xem (vd. cán bộ duyệt): không thêm / sửa / ngừng / xoá — máy chủ vẫn kiểm lại.
+  const { data: canCreateData } = useCan({ resource: UNIT_RESOURCE, action: "create" });
+  const { data: canWriteData } = useCan({ resource: UNIT_RESOURCE, action: "edit" });
+  const { data: canDeleteData } = useCan({ resource: UNIT_RESOURCE, action: "delete" });
+  const canCreate = canCreateData?.can === true;
+  const canWrite = canWriteData?.can === true;
+  const canDelete = canDeleteData?.can === true;
 
   const [search, setSearch] = useState("");
   const [block, setBlock] = useState<BlockFilter>("all");
@@ -320,7 +328,8 @@ export function ReportUnitList() {
 
   function rowItems(unit: ReportUnit): ActionItem[] {
     const hasChildren = (index.get(unit.id)?.length ?? 0) > 0;
-    return [
+    const items: ActionItem[] = [];
+    if (canWrite) items.push(
       {
         key: "edit",
         label: "Sửa đơn vị",
@@ -339,7 +348,9 @@ export function ReportUnitList() {
             label: "Kích hoạt lại",
             icon: Power,
             onSelect: () => void reactivate(unit),
-          },
+          }
+    );
+    if (canDelete) items.push(
       {
         key: "delete",
         label: "Xoá đơn vị",
@@ -351,8 +362,9 @@ export function ReportUnitList() {
           ? "Còn đơn vị cấp dưới nên chưa xoá được. Hãy chuyển hoặc xoá các đơn vị cấp dưới trước."
           : undefined,
         onSelect: () => ask({ kind: "delete", unit }),
-      },
-    ];
+      }
+    );
+    return items;
   }
 
   function secondaryLine(unit: ReportUnit): string {
@@ -388,11 +400,15 @@ export function ReportUnitList() {
       description="Các đơn vị báo cáo của tỉnh, xếp theo cấp trên – cấp dưới."
       actions={
         <HeaderActions
-          primary={{
-            label: "Thêm đơn vị",
-            icon: Plus,
-            onClick: () => navigate("/report-units/create"),
-          }}
+          primary={
+            canCreate
+              ? {
+                  label: "Thêm đơn vị",
+                  icon: Plus,
+                  onClick: () => navigate("/report-units/create"),
+                }
+              : undefined
+          }
         />
       }
     >
@@ -561,7 +577,9 @@ export function ReportUnitList() {
             description={
               filtering
                 ? "Thử đổi từ khoá tìm kiếm hoặc bỏ bớt điều kiện lọc."
-                : "Bấm Thêm đơn vị để tạo đơn vị đầu tiên."
+                : canCreate
+                  ? "Bấm Thêm đơn vị để tạo đơn vị đầu tiên."
+                  : "Sở Tài chính chưa thêm đơn vị nào."
             }
             action={
               filtering ? (
@@ -643,7 +661,7 @@ export function ReportUnitList() {
                     </StatusBadge>
                   </TableCell>
                   <TableCell align="right" className="pe-4">
-                    <RowActions items={rowItems(row.unit)} />
+                    {(canWrite || canDelete) && <RowActions items={rowItems(row.unit)} />}
                   </TableCell>
                 </TableRow>
               ))}

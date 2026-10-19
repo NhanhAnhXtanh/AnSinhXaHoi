@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useCan } from "@refinedev/core";
 import { FolderPen, FolderPlus, Inbox, Plus, RotateCw, Trash, TriangleAlert } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -52,6 +53,16 @@ export function TemplateSets() {
 
   const setsQuery = useTemplateSets();
   const sets = setsQuery.sets;
+
+  // Ẩn nút ghi với người chỉ có quyền xem (vd. cán bộ duyệt) — máy chủ vẫn kiểm lại.
+  const { data: canSetWriteData } = useCan({ resource: "template_sets", action: "create" });
+  const { data: canSetDeleteData } = useCan({ resource: "template_sets", action: "delete" });
+  const { data: canFormWriteData } = useCan({ resource: "templates", action: "create" });
+  const { data: canFormDeleteData } = useCan({ resource: "templates", action: "delete" });
+  const canSetWrite = canSetWriteData?.can === true;
+  const canSetDelete = canSetDeleteData?.can === true;
+  const canFormWrite = canFormWriteData?.can === true;
+  const canFormDelete = canFormDeleteData?.can === true;
 
   const [setDialog, setSetDialog] = useState<{ open: boolean; editing: TemplateSet | null }>({
     open: false,
@@ -131,7 +142,7 @@ export function TemplateSets() {
   /* ---------------- đầu trang ---------------- */
 
   const templateCount = selectedSet?.templateCount ?? 0;
-  const headerItems: ActionItem[] = [
+  const allHeaderItems: ActionItem[] = [
     {
       key: "create-set",
       label: "Tạo bộ mẫu",
@@ -163,6 +174,9 @@ export function TemplateSets() {
       },
     },
   ];
+  const headerItems = allHeaderItems.filter((i) =>
+    i.key === "delete-set" ? canSetDelete : canSetWrite
+  );
 
   const dialogs = (
     <>
@@ -283,12 +297,18 @@ export function TemplateSets() {
             <EmptyState
               icon={Inbox}
               title="Chưa có bộ mẫu nào"
-              description="Tạo bộ mẫu đầu tiên, rồi thêm các biểu mẫu vào bộ."
+              description={
+                canSetWrite
+                  ? "Tạo bộ mẫu đầu tiên, rồi thêm các biểu mẫu vào bộ."
+                  : "Sở Tài chính chưa tạo bộ mẫu nào."
+              }
               action={
-                <Button onClick={() => setSetDialog({ open: true, editing: null })}>
-                  <Plus aria-hidden />
-                  Tạo bộ mẫu
-                </Button>
+                canSetWrite ? (
+                  <Button onClick={() => setSetDialog({ open: true, editing: null })}>
+                    <Plus aria-hidden />
+                    Tạo bộ mẫu
+                  </Button>
+                ) : undefined
               }
             />
           </div>
@@ -307,6 +327,7 @@ export function TemplateSets() {
       selectedId={selectedVersionId}
       onSelect={(id) => select({ version: id })}
       itemsFor={commands.itemsFor}
+      canWrite={commands.canWrite}
       onOpenDesigner={(v: TemplateVersion) => navigate(designerPath(v.id))}
       onPublish={commands.requestPublish}
       onClone={commands.clone}
@@ -342,7 +363,9 @@ export function TemplateSets() {
         select({ form: formId });
         if (!wide) setDetailOpen(true);
       }}
-      onCreateForm={() => setCreateFormIn(selectedSet)}
+      onCreateForm={canFormWrite ? () => setCreateFormIn(selectedSet) : undefined}
+      canWriteVersion={commands.canWrite}
+      canDeleteForm={canFormDelete}
       onOpenDesigner={(v) => navigate(designerPath(v.id))}
       onPublish={commands.requestPublish}
       onClone={commands.clone}
@@ -360,11 +383,15 @@ export function TemplateSets() {
       fill
       actions={
         <HeaderActions
-          primary={{
-            label: "Tạo biểu mẫu",
-            icon: Plus,
-            onClick: () => setCreateFormIn(selectedSet),
-          }}
+          primary={
+            canFormWrite
+              ? {
+                  label: "Tạo biểu mẫu",
+                  icon: Plus,
+                  onClick: () => setCreateFormIn(selectedSet),
+                }
+              : undefined
+          }
           items={headerItems}
         />
       }

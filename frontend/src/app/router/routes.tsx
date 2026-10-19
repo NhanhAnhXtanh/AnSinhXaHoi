@@ -343,8 +343,23 @@ export function AppRoutes() {
           }
         >
           <Route index element={<ReportUnitList />} />
-          <Route path="create" element={<ReportUnitCreate />} />
-          <Route path="edit/:id" element={<ReportUnitEdit />} />
+          {/* Quyền xem danh sách chưa đủ: gõ tay đường dẫn thêm / sửa cũng phải có quyền ghi. */}
+          <Route
+            path="create"
+            element={
+              <CanAccess resource="report_units" action="create" fallback={<Forbidden />}>
+                <ReportUnitCreate />
+              </CanAccess>
+            }
+          />
+          <Route
+            path="edit/:id"
+            element={
+              <CanAccess resource="report_units" action="edit" fallback={<Forbidden />}>
+                <ReportUnitEdit />
+              </CanAccess>
+            }
+          />
         </Route>
         <Route
           path="/report-calendar"

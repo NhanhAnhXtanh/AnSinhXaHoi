@@ -45,6 +45,33 @@ function useAppNotificationProvider(): NotificationProvider {
   };
 }
 
+/**
+ * Không thử lại một yêu cầu mà máy chủ đã trả lời dứt khoát.
+ *
+ * react-query mặc định thử lại 3 lần (chờ tăng dần, tổng cỡ chục giây) với
+ * MỌI lỗi. Với 404 (phiếu / biểu / phiên bản không còn), 403 (thiếu quyền),
+ * 400 / 409 / 422 thì thử lại cũng ra đúng câu trả lời đó — người dùng chỉ
+ * phải nhìn vòng quay lâu hơn rồi mới thấy "Không tìm thấy…". Lỗi mạng và 5xx
+ * vẫn được thử lại như cũ.
+ *
+ * Để ở cấp module: Refine dựng QueryClient một lần theo object này.
+ */
+const NO_RETRY_STATUSES = new Set([400, 401, 403, 404, 409, 410, 422]);
+const reactQueryClientConfig = {
+  defaultOptions: {
+    queries: {
+      retry: (failureCount: number, error: unknown) => {
+        const status =
+          error && typeof error === "object" && "statusCode" in error
+            ? Number((error as { statusCode?: unknown }).statusCode)
+            : NaN;
+        if (NO_RETRY_STATUSES.has(status)) return false;
+        return failureCount < 3;
+      },
+    },
+  },
+};
+
 function App() {
   const notificationProvider = useAppNotificationProvider();
   return (
@@ -68,6 +95,7 @@ function App() {
               options={{
                 syncWithLocation: true,
                 warnWhenUnsavedChanges: true,
+                reactQuery: { clientConfig: reactQueryClientConfig },
                 projectId: "OjKL83-Rc63sQ-E2vtK1",
                 // Drives the sidebar brand block and the document title.
                 title: {

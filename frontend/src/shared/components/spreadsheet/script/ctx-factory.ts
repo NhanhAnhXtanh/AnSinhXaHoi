@@ -132,7 +132,7 @@ export function createScriptContext(
         adapter.deleteRow(resolveSheet(adapter, sheetName), row);
       },
     }),
-    api: Object.freeze(createScriptApi()),
+    api: Object.freeze(createScriptApi(options.shared)),
     ui: Object.freeze({
       message(text: string) {
         options.onMessage?.(String(text));
@@ -199,9 +199,25 @@ function resolveApiPath(path: string): string {
   return raw.slice(prefix.length);
 }
 
-function createScriptApi(): ScriptContext["api"] {
+/** Đường số liệu tổng hợp sống mà script tổng hợp có sẵn gọi cứng. */
+const LIVE_SUMMARY_DATA_PATHS = ["/rest/qt/summary/data", "/api/summary/data"] as const;
+
+/**
+ * Script tổng hợp viết cứng đường số liệu sống: ở màn số liệu Sở đã lưu / số năm / phiếu năm thì
+ * đổi sang `shared.summaryDataUrl` (đúng nguồn, đúng phiên bản đang xem), giữ nguyên tham số —
+ * như `rewriteSummaryDataPath` của bản Jmix. Đường khác giữ nguyên.
+ */
+function rewriteSummaryDataPath(path: string, shared: Record<string, unknown>): string {
+  const target = shared.summaryDataUrl;
+  if (typeof target !== "string" || target === "" || target === "/api/summary/data") return path;
+  const live = LIVE_SUMMARY_DATA_PATHS.find((p) => path === p || path.startsWith(`${p}?`));
+  if (!live) return path;
+  return target + path.slice(live.length);
+}
+
+function createScriptApi(shared: Record<string, unknown>): ScriptContext["api"] {
   const request = async (path: string, init: RequestInit = {}): Promise<unknown> => {
-    const relative = resolveApiPath(path);
+    const relative = resolveApiPath(rewriteSummaryDataPath(String(path ?? ""), shared));
     const method = (init.method ?? "GET").toUpperCase();
     if (!SCRIPT_API_METHODS.has(method)) {
       throw new Error(

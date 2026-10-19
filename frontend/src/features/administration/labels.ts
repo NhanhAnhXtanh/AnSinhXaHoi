@@ -31,6 +31,17 @@ export const RESOURCE_LABELS: Record<string, string> = {
   templates: "Bộ biểu mẫu",
   report_calendar: "Lịch và kỳ báo cáo",
   publication_history: "Lịch sử mở đợt",
+  // Mã tài nguyên của API (quyền, phạm vi dữ liệu) chưa trùng tên màn nào ở trên.
+  ledger_entries: "Số liệu đã duyệt",
+  input_report_sheets: "Biểu trong phiếu nhập",
+  input_report_attachments: "File đính kèm phiếu nhập",
+  annual_reports: "Báo cáo năm",
+  period_assignments: "Thiết lập biểu cho đơn vị",
+  publications: "Đợt báo cáo đã mở",
+  report_calendars: "Lịch báo cáo",
+  report_periods: "Kỳ báo cáo",
+  template_sets: "Bộ mẫu",
+  template_versions: "Phiên bản mẫu",
 };
 
 export function resourceLabel(resource: string | null | undefined): string {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useCustom, useList, type CrudFilter } from "@refinedev/core";
 import {
@@ -131,6 +131,16 @@ export function ReviewList() {
 
   const rows = result.data;
   const total = result.total ?? 0;
+
+  // Tải lại / có người khác thao tác làm tổng số phiếu giảm: trang đang đứng có thể vượt trang
+  // cuối — máy chủ trả trang rỗng. Kẹp về trang cuối hợp lệ (chỉ theo kết quả thật, không theo
+  // dữ liệu giữ chỗ của trang trước) để gửi lại đúng `_start`.
+  const serverTotal = query.isPlaceholderData || query.isFetching ? undefined : result.total;
+  useEffect(() => {
+    if (serverTotal === undefined) return;
+    const last = Math.max(1, Math.ceil(serverTotal / pageSize));
+    if (page > last) setPage(last);
+  }, [serverTotal, page, pageSize]);
 
   const periods = summary?.periods ?? [];
   const districts: FilterOption[] = useMemo(

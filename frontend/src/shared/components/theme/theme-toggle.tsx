@@ -19,9 +19,9 @@ const NEXT_MODE: Record<ThemeMode, ThemeMode> = {
 };
 
 const LABEL: Record<ThemeMode, string> = {
-  light: "Light",
-  dark: "Dark",
-  system: "System",
+  light: "Sáng",
+  dark: "Tối",
+  system: "Theo máy",
 };
 
 type ThemeToggleProps = {
@@ -42,7 +42,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           variant="ghost"
           size="icon"
           onClick={() => setMode(NEXT_MODE[mode])}
-          aria-label={`Theme: ${LABEL[mode]}. Switch to ${LABEL[NEXT_MODE[mode]]}.`}
+          aria-label={`Giao diện: ${LABEL[mode]}. Bấm để chuyển sang ${LABEL[NEXT_MODE[mode]]}.`}
           className={cn(
             "relative size-9 rounded-lg text-muted-foreground",
             "hover:bg-accent hover:text-foreground",
@@ -54,7 +54,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           <ModeIcon icon={Monitor} isActive={mode === "system"} />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="bottom">Theme: {LABEL[mode]}</TooltipContent>
+      <TooltipContent side="bottom">Giao diện: {LABEL[mode]}</TooltipContent>
     </Tooltip>
   );
 }

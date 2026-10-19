@@ -129,7 +129,8 @@ export function dueLine(r: InputReportRecord): DueLine {
     const late = daysBetween(due, localDateOf(r.submittedAt));
     return late > 0 ? { text: `Nộp muộn ${late} ngày` } : { text: "Đã nộp đúng hạn" };
   }
-  if (approved) return { text: "Đã nộp đúng hạn" };
+  // Phiếu đã duyệt nhưng không có ngày nộp (dữ liệu chuyển từ bản cũ): không đoán là "đúng hạn".
+  if (approved) return { text: "Đã duyệt" };
   if (r.period.status === "overdue") return { text: "Hết hạn nộp", tone: "destructive" };
   if (r.period.status === "published") return { text: "Kỳ chưa mở nhập" };
   if (!due) return { text: "" };

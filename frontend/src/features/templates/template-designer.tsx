@@ -17,7 +17,7 @@ import {
   TriangleAlert,
   Undo2,
 } from "lucide-react";
-import { useWarnAboutChange } from "@refinedev/core";
+import { useCan, useWarnAboutChange } from "@refinedev/core";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -79,8 +79,11 @@ const TITLE = "Thiết kế mẫu";
 export function TemplateDesigner() {
   const { id } = useParams<{ id: string }>();
   const { version, isLoading, isError, statusCode } = useTemplateVersion(id);
+  // Người chỉ có quyền xem (vd. cán bộ duyệt) mở thiết kế ở chế độ chỉ xem — không Lưu / Ban hành.
+  // Chờ câu trả lời quyền rồi mới dựng: đổi giữa Designer và bảng chỉ xem là dựng lại cả bảng tính.
+  const { data: canWriteData, isLoading: canLoading } = useCan({ resource: "template_versions", action: "edit" });
 
-  if (isLoading) {
+  if (isLoading || canLoading) {
     return (
       <AsxhPage title={TITLE} backTo="/templates" fill>
         <div className="bg-card flex min-h-0 flex-1 rounded-lg border shadow-e1">
@@ -115,7 +118,7 @@ export function TemplateDesigner() {
   }
 
   // Đổi biểu (tab dưới) là đổi phiên bản: dựng lại vùng làm việc từ đầu.
-  return <DesignerWorkspace key={version.id} data={version} />;
+  return <DesignerWorkspace key={version.id} data={version} canWrite={canWriteData?.can === true} />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,7 +131,7 @@ const clock = () => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
+function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWrite: boolean }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const actions = useTemplateActions();
@@ -136,7 +139,7 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
   const version = useMemo(() => toVersion(data), [data]);
   const form = useMemo(() => formOfVersion(data), [data]);
   const setName = data.template.set.name;
-  const editable = isEditable(version.status);
+  const editable = canWrite && isEditable(version.status);
 
   const context = useDesignerContext(form.setId, form.id);
   const chain = context.chain.length > 0 ? context.chain : [version];
@@ -356,7 +359,7 @@ function DesignerWorkspace({ data }: { data: ApiTemplateVersion }) {
         reason: dirty ? "Lưu thay đổi trước đã." : undefined,
         onClick: () => commands.requestPublish(version),
       }
-    : version.status === "published" && cloneable.ok
+    : canWrite && version.status === "published" && cloneable.ok
       ? {
           label: "Tạo phiên bản kế tiếp",
           icon: CopyPlus,

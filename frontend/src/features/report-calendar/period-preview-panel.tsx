@@ -42,6 +42,7 @@ export function PeriodPreviewPanel({
   loading,
   error,
   onDeadlineChange,
+  readOnly = false,
 }: {
   periods: PeriodRow[];
   kinds: PeriodKind[];
@@ -52,6 +53,8 @@ export function PeriodPreviewPanel({
   /** Câu báo lỗi khi không tải được; kèm nút thử lại nếu có. */
   error?: { message: string; action?: ReactNode } | null;
   onDeadlineChange: (slot: string, iso: string) => void;
+  /** Người chỉ có quyền xem: ô hạn nộp không sửa được. */
+  readOnly?: boolean;
 }) {
   const [tab, setTab] = useState<TabValue>("all");
   const shownKinds = KIND_ORDER.filter((k) => kinds.includes(k));
@@ -133,8 +136,10 @@ export function PeriodPreviewPanel({
                           value={p.deadline}
                           periodEnd={p.toDate}
                           periodName={p.name}
-                          disabled={!p.editable}
-                          disabledReason={deadlineLockReason(p.status)}
+                          disabled={readOnly || !p.editable}
+                          disabledReason={
+                            readOnly ? "Bạn chỉ có quyền xem lịch báo cáo." : deadlineLockReason(p.status)
+                          }
                           onChange={(iso) => onDeadlineChange(p.slot, iso)}
                         />
                       </TableCell>

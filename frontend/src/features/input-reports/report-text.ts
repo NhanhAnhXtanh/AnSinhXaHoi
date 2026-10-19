@@ -29,7 +29,10 @@ export function statusLine(r: InputReportRecord): string {
     case "overdue":
       return `Hết hạn nộp${r.period.deadline ? ` ${formatDate(r.period.deadline)}` : ""} · liên hệ Sở Tài chính nếu cần gia hạn`;
     case "locked":
-      return "Sở đã chốt số liệu · chỉ xem";
+      // Khoá khi chưa duyệt: số liệu của phiếu KHÔNG vào tổng hợp — đừng nói "đã chốt số liệu".
+      return r.submittedAt
+        ? "Kỳ đã chốt, phiếu chưa được duyệt · chỉ xem"
+        : "Kỳ đã chốt, đơn vị chưa nộp · chỉ xem";
     case "approved":
       return `Sở duyệt ${r.approvedAt ? formatDateTime(r.approvedAt) : ""}${r.status === "LOCKED" ? " · đã khoá, chỉ xem" : ""}`;
     case "cancelled":

@@ -62,6 +62,12 @@ const FIELD_PART_LABELS: Record<string, string> = {
   organization: "Đơn vị",
   role: "Vai trò",
   user: "Người dùng",
+  // Phiếu nhập / số liệu đã duyệt (input_reports, ledger_entries).
+  unit: "Đơn vị báo cáo",
+  submitterUnit: "Đơn vị nộp",
+  period: "Kỳ báo cáo",
+  template: "Biểu mẫu",
+  report: "Phiếu nhập",
 };
 
 export function fieldLabel(path: string): string {

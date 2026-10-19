@@ -76,7 +76,7 @@ function metaOf(r: InputReportRecord): string {
     case "LOCKED":
       return r.approvedAt
         ? `${submitted} · Sở duyệt ${formatDate(r.approvedAt)} · Phiếu đã khoá, chỉ xem`
-        : `${submitted} · Kỳ đã chốt số liệu, chỉ xem`;
+        : `${submitted} · Kỳ đã chốt, ${r.submittedAt ? "phiếu chưa được duyệt" : "đơn vị chưa nộp"} · chỉ xem`;
     case "CANCELLED":
       return `${submitted} · Phiếu đã huỷ, chỉ xem`;
   }

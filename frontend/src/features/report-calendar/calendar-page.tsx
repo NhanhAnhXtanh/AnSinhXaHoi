@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
+  useCan,
   useCreate,
   useCustom,
   useDataProvider,
@@ -107,6 +108,11 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 export function ReportCalendar() {
   const { year, setYear } = useReportYear();
   const [creating, setCreating] = useState(false);
+  // Người chỉ có quyền xem (vd. cán bộ duyệt): không tạo / sửa / xoá lịch — máy chủ vẫn kiểm lại.
+  const { data: canWriteData } = useCan({ resource: CALENDAR_RESOURCE, action: "edit" });
+  const { data: canDeleteData } = useCan({ resource: CALENDAR_RESOURCE, action: "delete" });
+  const canWrite = canWriteData?.can === true;
+  const canDelete = canDeleteData?.can === true;
 
   const { result, query } = useList<ReportCalendarRecord>({
     resource: CALENDAR_RESOURCE,
@@ -155,12 +161,14 @@ export function ReportCalendar() {
         year={year}
         calendar={calendar}
         takenYears={takenYears}
+        canWrite={canWrite}
+        canDelete={canDelete}
       />
     );
   }
 
   // UC-06 bước 1: chưa có lịch nào thì mở thẳng form tạo.
-  if (creating || calendars.length === 0) {
+  if (canWrite && (creating || calendars.length === 0)) {
     return (
       <CalendarWorkspace
         key="create"
@@ -169,6 +177,8 @@ export function ReportCalendar() {
         takenYears={takenYears}
         onYearChange={setYear}
         onCreated={() => setCreating(false)}
+        canWrite={canWrite}
+        canDelete={canDelete}
       />
     );
   }
@@ -185,12 +195,18 @@ export function ReportCalendar() {
           <EmptyState
             icon={CalendarX}
             title={`Năm ${year} chưa có lịch báo cáo`}
-            description="Tạo lịch để hệ thống tự sinh các kỳ tháng, quý, 6 tháng, năm."
+            description={
+              canWrite
+                ? "Tạo lịch để hệ thống tự sinh các kỳ tháng, quý, 6 tháng, năm."
+                : "Sở Tài chính chưa lập lịch báo cáo cho năm này."
+            }
             action={
-              <Button type="button" onClick={() => setCreating(true)}>
-                <CalendarPlus aria-hidden />
-                Tạo lịch báo cáo
-              </Button>
+              canWrite ? (
+                <Button type="button" onClick={() => setCreating(true)}>
+                  <CalendarPlus aria-hidden />
+                  Tạo lịch báo cáo
+                </Button>
+              ) : undefined
             }
           />
         </div>
@@ -214,6 +230,8 @@ function CalendarWorkspace({
   takenYears,
   onYearChange,
   onCreated,
+  canWrite,
+  canDelete,
 }: {
   mode: "create" | "view";
   year: number;
@@ -222,6 +240,9 @@ function CalendarWorkspace({
   takenYears: Set<number>;
   onYearChange?: (year: number) => void;
   onCreated?: () => void;
+  /** Quyền tạo / sửa lịch (gồm hạn nộp từng kỳ). Không có thì cả khung chỉ xem. */
+  canWrite: boolean;
+  canDelete: boolean;
 }) {
   const form = useForm<CalendarFormValues>({
     resolver: zodResolver(schema),
@@ -643,13 +664,17 @@ function CalendarWorkspace({
         <>
           <YearSelect />
           <HeaderActions
-            primary={{
-              label: mode === "view" ? "Lưu lịch" : "Tạo lịch",
-              onClick: submit,
-              loading: busy,
-            }}
+            primary={
+              canWrite
+                ? {
+                    label: mode === "view" ? "Lưu lịch" : "Tạo lịch",
+                    onClick: submit,
+                    loading: busy,
+                  }
+                : undefined
+            }
             items={
-              mode === "view"
+              mode === "view" && canDelete
                 ? [
                     {
                       key: "delete",
@@ -678,6 +703,7 @@ function CalendarWorkspace({
           yearOptions={yearOptions}
           onYearChange={(y) => onYearChange?.(y)}
           locked={locked}
+          readOnly={!canWrite}
         />
         <PeriodPreviewPanel
           periods={rows}
@@ -685,6 +711,7 @@ function CalendarWorkspace({
           daysValid={days !== null}
           loading={panelLoading}
           error={panelError}
+          readOnly={!canWrite}
           onDeadlineChange={(slot, iso) =>
             form.setValue(
               "overrides",

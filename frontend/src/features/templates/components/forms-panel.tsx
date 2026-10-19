@@ -65,6 +65,8 @@ export function FormsPanel({
   selectedFormId,
   onSelectForm,
   onCreateForm,
+  canWriteVersion,
+  canDeleteForm: canDeleteFormPermission,
   onOpenDesigner,
   onPublish,
   onClone,
@@ -76,7 +78,12 @@ export function FormsPanel({
   logs: ChangeLogEntry[];
   selectedFormId: string | null;
   onSelectForm: (formId: string) => void;
-  onCreateForm: () => void;
+  /** Không truyền = không có quyền tạo biểu (ẩn nút). */
+  onCreateForm?: () => void;
+  /** Quyền sửa phiên bản: ban hành, tạo phiên bản kế tiếp, mở thiết kế để sửa. */
+  canWriteVersion: boolean;
+  /** Quyền xoá biểu. */
+  canDeleteForm: boolean;
   onOpenDesigner: (version: TemplateVersion) => void;
   onPublish: (version: TemplateVersion) => void;
   onClone: (version: TemplateVersion) => void;
@@ -105,7 +112,7 @@ export function FormsPanel({
     const latest = chain[0];
     const items: ActionItem[] = [];
     if (latest) {
-      const editable = isEditable(latest.status);
+      const editable = canWriteVersion && isEditable(latest.status);
       items.push({
         key: "design",
         label: editable
@@ -115,7 +122,7 @@ export function FormsPanel({
         onSelect: () => onOpenDesigner(latest),
       });
       const publish = canPublish(latest);
-      items.push({
+      if (canWriteVersion) items.push({
         key: "publish",
         label: editable
           ? `Ban hành ${versionLabel(latest).toLowerCase()}`
@@ -126,11 +133,12 @@ export function FormsPanel({
         onSelect: () => onPublish(latest),
       });
     }
+    if (!canWriteVersion && !canDeleteFormPermission) return items;
     const base = current?.status === "published" ? current : undefined;
     const cloneable = base
       ? canClone(chain, base)
       : { ok: false as const, reason: "Chưa có phiên bản đã ban hành." };
-    items.push({
+    if (canWriteVersion) items.push({
       key: "clone",
       label: "Tạo phiên bản kế tiếp",
       icon: CopyPlus,
@@ -139,7 +147,7 @@ export function FormsPanel({
       onSelect: () => base && onClone(base),
     });
     const removable = canDeleteForm(chain);
-    items.push({
+    if (canDeleteFormPermission) items.push({
       key: "delete-form",
       label: "Xoá biểu",
       icon: Trash,
@@ -195,12 +203,18 @@ export function FormsPanel({
             <EmptyState
               icon={FilePlus}
               title="Bộ này chưa có biểu mẫu nào"
-              description="Tạo biểu mẫu đầu tiên rồi mở thiết kế để dựng bảng."
+              description={
+                onCreateForm
+                  ? "Tạo biểu mẫu đầu tiên rồi mở thiết kế để dựng bảng."
+                  : "Sở Tài chính chưa thêm biểu mẫu nào vào bộ này."
+              }
               action={
-                <Button onClick={onCreateForm}>
-                  <FilePlus aria-hidden />
-                  Tạo biểu mẫu
-                </Button>
+                onCreateForm ? (
+                  <Button onClick={onCreateForm}>
+                    <FilePlus aria-hidden />
+                    Tạo biểu mẫu
+                  </Button>
+                ) : undefined
               }
             />
           ) : (

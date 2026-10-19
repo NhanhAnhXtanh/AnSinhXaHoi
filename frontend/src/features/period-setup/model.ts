@@ -102,6 +102,8 @@ export type ApiInputReport = {
     | "SUPERSEDED";
   /** Có ngày duyệt mà trạng thái LOCKED = phiếu khoá sau khi duyệt, vẫn tính là đã duyệt. */
   approvedAt?: string | null;
+  /** Không có ngày nộp mà trạng thái LOCKED = khoá khi chốt đợt lúc đơn vị chưa nộp. */
+  submittedAt?: string | null;
 };
 
 /** Thân trả về của các thao tác điều hành / lưu ma trận / áp dụng cho kỳ khác. */
@@ -216,7 +218,12 @@ export function toProgress(reports: ApiInputReport[]): PeriodProgress {
     units.add(r.unit.id);
     if (r.status === "APPROVED" || (r.status === "LOCKED" && r.approvedAt)) approved += 1;
     else if (r.status === "SUBMITTED") pendingReview += 1;
-    else if (r.status === "DRAFT" || r.status === "RETURNED") {
+    else if (
+      r.status === "DRAFT" ||
+      r.status === "RETURNED" ||
+      // Khoá khi chốt đợt mà chưa từng nộp: đơn vị vẫn là CHƯA nộp, không phải "đã nộp".
+      (r.status === "LOCKED" && !r.submittedAt)
+    ) {
       notSubmitted += 1;
       editableUnits.add(r.unit.id);
     }

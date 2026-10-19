@@ -488,7 +488,9 @@ function UnitDetail({
       text: "text-destructive-text",
     },
     {
-      label: "Đang nhập liệu",
+      // Cùng nhóm "chưa nộp (gồm đã chốt)" của máy chủ: phiếu khoá khi chốt đợt mà chưa duyệt
+      // không còn nhập được — gọi "Đang nhập liệu" là sai.
+      label: "Chưa nộp",
       value: reports.filter((r) => r.status === "DRAFT" || (r.status === "LOCKED" && !r.approvedAt)).length,
       text: "text-info-text",
     },

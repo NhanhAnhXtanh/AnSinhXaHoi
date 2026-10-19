@@ -36,6 +36,7 @@ export function VersionPanel({
   selectedId,
   onSelect,
   itemsFor,
+  canWrite,
   onOpenDesigner,
   onPublish,
   onClone,
@@ -47,6 +48,8 @@ export function VersionPanel({
   selectedId: string | null;
   onSelect: (versionId: string) => void;
   itemsFor: (version: TemplateVersion) => ActionItem[];
+  /** Quyền sửa phiên bản — không có thì chỉ còn "Xem thiết kế". */
+  canWrite: boolean;
   onOpenDesigner: (version: TemplateVersion) => void;
   onPublish: (version: TemplateVersion) => void;
   onClone: (version: TemplateVersion) => void;
@@ -107,17 +110,19 @@ export function VersionPanel({
           {selected && (
             <div className="flex flex-col gap-2 border-t p-4">
               <FooterButton
-                icon={isEditable(selected.status) ? Pencil : Eye}
-                label={isEditable(selected.status) ? "Mở thiết kế" : "Xem thiết kế"}
+                icon={canWrite && isEditable(selected.status) ? Pencil : Eye}
+                label={canWrite && isEditable(selected.status) ? "Mở thiết kế" : "Xem thiết kế"}
                 onClick={() => onOpenDesigner(selected)}
               />
-              <SecondButton
-                chain={chain}
-                version={selected}
-                onPublish={onPublish}
-                onClone={onClone}
-                onSelect={onSelect}
-              />
+              {canWrite && (
+                <SecondButton
+                  chain={chain}
+                  version={selected}
+                  onPublish={onPublish}
+                  onClone={onClone}
+                  onSelect={onSelect}
+                />
+              )}
             </div>
           )}
         </>

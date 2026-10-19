@@ -25,6 +25,8 @@ export function Toaster({ ...props }: ToasterProps) {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // Nhãn trợ năng mặc định của sonner là tiếng Anh ("Notifications alt+T", "Close toast").
+      customAriaLabel="Thông báo (phím tắt Alt+T)"
       icons={{
         success: <CircleCheck className="size-4 text-success" />,
         warning: <TriangleAlert className="size-4 text-warning" />,
@@ -35,6 +37,7 @@ export function Toaster({ ...props }: ToasterProps) {
         ),
       }}
       toastOptions={{
+        closeButtonAriaLabel: "Đóng thông báo",
         classNames: {
           toast: "!rounded-lg !border-border !shadow-e3 !items-start",
           title: "!text-[13px] !font-semibold !text-foreground",

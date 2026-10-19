@@ -129,7 +129,7 @@ export const { dataProvider, kyInstance } = createSimpleRestDataProvider({
 
           throw {
             message:
-              body?.message || response.statusText || "Request failed",
+              body?.message || "Yêu cầu chưa thực hiện được. Bạn thử lại sau ít phút.",
             statusCode: response.status,
             errors: body?.errors,
           };

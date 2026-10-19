@@ -13,6 +13,7 @@ import {
   Trash,
   Undo2,
 } from "lucide-react";
+import { useCan } from "@refinedev/core";
 import { toast } from "sonner";
 
 import {
@@ -69,9 +70,14 @@ export function useVersionCommands({
   const [lastRevoke, setLastRevoke] = useState<TemplateVersion | null>(null);
   const [lastDelete, setLastDelete] = useState<TemplateVersion | null>(null);
   const [busy, setBusy] = useState(false);
+  // Người chỉ có quyền xem: menu ⋯ chỉ còn "Xem thiết kế", không ban hành / tạo / khoá / xoá.
+  const { data: canWriteData } = useCan({ resource: "template_versions", action: "edit" });
+  const { data: canDeleteData } = useCan({ resource: "template_versions", action: "delete" });
+  const canWrite = canWriteData?.can === true;
+  const canDeleteVersion = canDeleteData?.can === true;
 
   async function clone(version: TemplateVersion) {
-    if (busy) return;
+    if (busy || !canWrite) return;
     setBusy(true);
     const result = await actions.nextVersion(version.formId);
     setBusy(false);
@@ -114,6 +120,16 @@ export function useVersionCommands({
 
   /** Mục menu ⋯ của một phiên bản (khung 311:82742). */
   function itemsFor(version: TemplateVersion): ActionItem[] {
+    if (!canWrite) {
+      return [
+        {
+          key: "design",
+          label: "Xem thiết kế",
+          icon: Eye,
+          onSelect: () => onOpenDesigner?.(version),
+        },
+      ];
+    }
     const chain = chainOf(version);
     const editable = isEditable(version.status);
     const publish = canPublish(version);
@@ -194,7 +210,7 @@ export function useVersionCommands({
           setRevoking(version);
         },
       },
-      {
+      ...(canDeleteVersion ? [{
         key: "delete",
         label: "Xoá phiên bản",
         icon: Trash,
@@ -205,7 +221,7 @@ export function useVersionCommands({
           setLastDelete(version);
           setDeleting(version);
         },
-      }
+      } satisfies ActionItem] : [])
     );
     return items;
   }
@@ -294,7 +310,11 @@ export function useVersionCommands({
     itemsFor,
     dialogs,
     busy,
-    requestPublish: (v: TemplateVersion) => setPublishing(v),
+    /** Có quyền sửa phiên bản (ban hành, tạo phiên bản kế tiếp, khoá…). */
+    canWrite,
+    requestPublish: (v: TemplateVersion) => {
+      if (canWrite) setPublishing(v);
+    },
     clone: (v: TemplateVersion) => void clone(v),
   };
 }

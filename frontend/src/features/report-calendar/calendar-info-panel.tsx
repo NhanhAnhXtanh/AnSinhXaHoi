@@ -58,6 +58,7 @@ export function CalendarInfoPanel({
   yearOptions,
   onYearChange,
   locked,
+  readOnly = false,
 }: {
   form: UseFormReturn<CalendarFormValues>;
   mode: "create" | "view";
@@ -67,6 +68,8 @@ export function CalendarInfoPanel({
   onYearChange: (year: number) => void;
   /** Loại kỳ đã gán cho đơn vị — không bỏ chọn được. */
   locked: Set<PeriodKind>;
+  /** Người chỉ có quyền xem: mọi ô chỉ đọc. */
+  readOnly?: boolean;
 }) {
   const kinds = form.watch("kinds");
 
@@ -140,6 +143,7 @@ export function CalendarInfoPanel({
                   <FormControl>
                     <Input
                       {...field}
+                      disabled={readOnly}
                       inputMode="numeric"
                       autoComplete="off"
                       className="tabular-nums"
@@ -162,15 +166,17 @@ export function CalendarInfoPanel({
                   <FormLabel className={cn(LABEL_CLASS, "text-sm font-medium")}>
                     Loại kỳ cần sinh
                   </FormLabel>
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto p-0"
-                    onClick={selectAll}
-                    disabled={kinds.length === KIND_ORDER.length}
-                  >
-                    Chọn tất cả
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0"
+                      onClick={selectAll}
+                      disabled={kinds.length === KIND_ORDER.length}
+                    >
+                      Chọn tất cả
+                    </Button>
+                  )}
                 </div>
                 <div role="group" aria-label="Loại kỳ cần sinh" className="grid auto-rows-fr gap-4 sm:grid-cols-2">
                   {KIND_ORDER.map((k) => {
@@ -195,7 +201,7 @@ export function CalendarInfoPanel({
                           <Checkbox
                             id={id}
                             checked={checked}
-                            disabled={isLocked}
+                            disabled={isLocked || readOnly}
                             className="disabled:opacity-100"
                             onCheckedChange={(next) =>
                               field.onChange(

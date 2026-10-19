@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useCustomMutation, useWarnAboutChange } from "@refinedev/core";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckCheck,
   Download,
@@ -92,6 +93,9 @@ export function DeptPeriodView({
   const [reloadNo, setReloadNo] = useState(0);
   const apiRef = useRef<SpreadWorkbookApi | null>(null);
   const revisionRef = useRef<number | null>(null);
+  /** Đếm lần sửa trên bảng — số gõ thêm trong lúc đang cất không bị coi là đã cất. */
+  const editSeq = useRef(0);
+  const queryClient = useQueryClient();
   const { setWarnWhen } = useWarnAboutChange();
   const { mutateAsync: send } = useCustomMutation();
 
@@ -153,6 +157,7 @@ export function DeptPeriodView({
   const saveDraft = async (quiet: boolean): Promise<boolean> => {
     const api = apiRef.current;
     if (!api || !runtime || !sheet) return false;
+    const seq = editSeq.current;
     setBusy("draft");
     try {
       const { data } = await send({
@@ -164,7 +169,8 @@ export function DeptPeriodView({
         errorNotification: false,
       });
       revisionRef.current = (data as unknown as DraftResult).revision;
-      setDirty(false);
+      // Gõ thêm trong lúc chờ máy chủ: phần đó chưa có trong bản vừa cất → giữ cờ "chưa lưu".
+      if (editSeq.current === seq) setDirty(false);
       void detailState.refetch();
       if (!quiet) toast.success(`Đã lưu số liệu đang sửa của biểu ${sheet.shortName}.`);
       return true;
@@ -181,6 +187,17 @@ export function DeptPeriodView({
     if (dirty && sheetEditable && !(await saveDraft(true))) return;
     setDirty(false);
     apiRef.current = null;
+    // Bản biểu cũ trong bộ nhớ đệm là bản lúc mở (trước khi cất) — quay lại biểu này phải đọc lại
+    // từ máy chủ, nếu không bảng hiện số cũ và lần cất sau ghi đè lên bản vừa cất.
+    if (sheet) {
+      const leftUrl = deptSheetUrl(reportId, sheet.templateId);
+      queryClient.removeQueries({
+        predicate: (q) =>
+          q.queryKey.some(
+            (part) => typeof part === "object" && part !== null && (part as { url?: unknown }).url === leftUrl
+          ),
+      });
+    }
     setSheetKey(key);
   };
 
@@ -414,7 +431,9 @@ export function DeptPeriodView({
           scriptText={runtime.scriptText}
           scriptContext={scriptContext}
           onDirtyChange={(d) => {
-            if (d && sheetEditable) setDirty(true);
+            if (!d || !sheetEditable) return;
+            editSeq.current += 1;
+            setDirty(true);
           }}
           onReady={(api) => {
             apiRef.current = api;

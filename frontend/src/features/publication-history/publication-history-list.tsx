@@ -141,6 +141,15 @@ export function PublicationHistoryList() {
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const current = Math.min(page, pages - 1);
+  // Tổng số đợt giảm sau khi lọc / tải lại: trang đang đứng vượt trang cuối thì máy chủ trả
+  // trang rỗng (bảng trống mà chân bảng vẫn ghi số). Kẹp `page` — không chỉ `current` hiển thị —
+  // theo kết quả thật để gửi lại đúng `_start`.
+  const serverTotal = query.isPlaceholderData || query.isFetching ? undefined : result?.total;
+  useEffect(() => {
+    if (serverTotal === undefined) return;
+    const lastPage = Math.max(0, Math.ceil(serverTotal / pageSize) - 1);
+    if (page > lastPage) setPage(lastPage);
+  }, [serverTotal, page, pageSize]);
   const first = total === 0 ? 0 : current * pageSize + 1;
   const last = current * pageSize + rows.length;
 
