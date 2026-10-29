@@ -1,18 +1,12 @@
-# CI cho dự án ASXH (Spring Boot backend + React frontend). Chỉ kiểm, KHÔNG triển khai.
-#
-# - backend, frontend: chạy trên mọi pull request và push vào main / nhatanh — là cổng chặn PR.
-# - e2e (Playwright 4 luồng chính, ASX-159..162): nặng (dựng cả backend lẫn frontend) nên chỉ
-#   chạy khi push vào main hoặc bấm tay (workflow_dispatch); không chặn PR.
-name: CI
+# E2E Playwright 4 luồng chính (ASX-159..162). Nặng (dựng cả backend lẫn frontend) nên KHÔNG chạy
+# tự động trên PR hay push — chỉ chạy khi bấm tay: Actions → E2E → Run workflow.
+name: E2E
 
 on:
-  pull_request:
-  push:
-    branches: [main, nhatanh]
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -23,86 +17,8 @@ env:
   JAVA_VERSION: "25"
 
 jobs:
-  backend:
-    name: Backend — gradle test
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: dth-framework
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d dth-framework"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/dth-framework
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-      - uses: gradle/actions/setup-gradle@v4
-      # gradlew trong repo không mang bit thực thi, nên gọi qua bash.
-      - name: Test (Liquibase dựng schema + seed trên CSDL trống rồi chạy toàn bộ test)
-        run: bash ./gradlew --no-daemon test
-      - name: Lưu báo cáo test khi lỗi
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-test-report
-          path: backend/build/reports/tests/test
-          retention-days: 7
-
-  frontend:
-    name: Frontend — tsc, eslint, verify, build
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: frontend
-    env:
-      # Bản build SpreadJS cần nhiều heap (cục bộ: 3 GB không đủ).
-      NODE_OPTIONS: --max-old-space-size=6144
-      # Rỗng vẫn build được (bảng tính chạy bản dùng thử).
-      VITE_SPREADJS_LICENSE_KEY: ${{ secrets.VITE_SPREADJS_LICENSE_KEY }}
-      VITE_SPREADJS_DESIGNER_LICENSE_KEY: ${{ secrets.VITE_SPREADJS_DESIGNER_LICENSE_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - name: Typecheck
-        run: npx tsc --noEmit
-      - name: Typecheck e2e
-        run: npx tsc -p e2e --noEmit
-      - name: Lint
-        run: npx eslint .
-      - name: Luật phụ thuộc giữa các tầng
-        run: npm run verify:arch
-      - name: Build
-        run: npm run build
-      - name: Trang đầu không tải SpreadJS / Designer / Monaco
-        run: npm run verify:bundle
-
   e2e:
     name: E2E — Playwright 4 luồng chính
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
