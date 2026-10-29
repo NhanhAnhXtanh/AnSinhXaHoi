@@ -44,6 +44,8 @@ import {
 } from "./api";
 import { ActionHistoryDialog } from "./components/action-history-dialog";
 import { ApproveErrorDialog } from "./components/approve-error-dialog";
+import { OnBehalfStrip } from "./components/on-behalf-units";
+import { useReportDataUnits } from "./components/use-report-data-units";
 import { ReturnDialog } from "./components/return-dialog";
 import { TreasuryDialog } from "./components/treasury-dialog";
 import { VersionHistoryDialog } from "./components/version-history-dialog";
@@ -144,6 +146,7 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
   const invalidate = useInvalidate();
   const { mutateAsync: postAction } = useCustomMutation<InputReportRecord>();
   const { exportReport, exporting } = useReportExport();
+  const dataUnits = useReportDataUnits(report.id);
 
   const { result: sheetsResult, query: sheetsQuery } = useList<InputReportSheetRecord>({
     resource: SHEETS_RESOURCE,
@@ -304,6 +307,8 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
     },
   ];
 
+  const strip = <OnBehalfStrip data={dataUnits.data} submitterName={report.unit.name} />;
+
   const renderBody = () => {
     if (sheetsQuery.isError || contentQuery.isError) {
       return (
@@ -334,6 +339,7 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
     }
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        {strip}
         <SpreadWorkbook
           key={sheetId}
           workbook={workbook}
@@ -352,7 +358,16 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
       backTo={LIST_PATH}
       className={fullscreen ? "h-full" : undefined}
       title={`${report.period.name} — ${report.unit.name}`}
-      badge={<StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>}
+      badge={
+        <span className="flex items-center gap-1.5">
+          <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+          {dataUnits.onBehalf && (
+            <StatusBadge tone="info" className="max-sm:hidden">
+              Nhập hộ
+            </StatusBadge>
+          )}
+        </span>
+      }
       meta={
         <span className="block truncate" title={meta}>
           {meta}
@@ -421,7 +436,12 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
         open={approveOpen}
         onOpenChange={setApproveOpen}
         title="Phê duyệt phiếu?"
-        description={`Phiếu ${report.period.name} của ${report.unit.name} sẽ được duyệt. Số liệu của phiếu sẽ được ghi nhận và dùng để tổng hợp. Sau khi phê duyệt, phiếu không thể chỉnh sửa.`}
+        description={[
+          `Phiếu ${report.period.name} của ${report.unit.name} sẽ được duyệt. Số liệu của phiếu sẽ được ghi nhận và dùng để tổng hợp. Sau khi phê duyệt, phiếu không thể chỉnh sửa.`,
+          dataUnits.approveNote,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         confirmLabel="Phê duyệt phiếu"
         onConfirm={() => void runApprove()}
       />

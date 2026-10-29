@@ -155,6 +155,33 @@ export function reportActionUrl(id: number | string, action: "approve" | "return
 
 export const SUMMARY_URL = `${API_URL}/${REPORTS_RESOURCE}/summary`;
 
+/**
+ * `GET /api/input_reports/{id}/data_units` — phiếu nhập hộ (biểu 1g, UC-46) mang số
+ * liệu của những đơn vị nào. `recorded`: đã duyệt, đọc từ số liệu đã lưu; chưa duyệt
+ * thì đọc từ số trên biểu (đơn vị SẼ được ghi khi duyệt). `sheets` rỗng = phiếu thường.
+ */
+export type ReportDataUnits = {
+  recorded: boolean;
+  sheets: {
+    sheetId: number;
+    templateId: number;
+    templateShortName: string;
+    units: {
+      /** null khi mã không có trong danh mục đơn vị. */
+      id: number | null;
+      budgetCode: string;
+      name: string | null;
+      /** false = phê duyệt sẽ bị từ chối vì mã đơn vị này. */
+      known: boolean;
+    }[];
+  }[];
+  errorMessage: string | null;
+};
+
+export function dataUnitsUrl(id: number | string): string {
+  return `${API_URL}/${REPORTS_RESOURCE}/${id}/data_units`;
+}
+
 export function historyUrl(id: number | string): string {
   return `${API_URL}/${REPORTS_RESOURCE}/${id}/history`;
 }
