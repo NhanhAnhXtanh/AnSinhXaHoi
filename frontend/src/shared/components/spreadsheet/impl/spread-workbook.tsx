@@ -26,6 +26,7 @@ import {
 import type { TempTableValidationIssue } from "../script/types";
 import type { SpreadWorkbookApi, SpreadWorkbookProps } from "../types";
 import { LEGACY_DATA_SHEET_NAME, isTechnicalSheetName } from "../workbook-json";
+import { exposeWorkbookForE2E } from "./e2e-hook";
 import { applySpreadLicense } from "./license";
 import { wrapSpreadWorkbook, type SpreadAdapter } from "./spread-adapter";
 import { useContentVersion } from "./use-content-version";
@@ -261,6 +262,7 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
         },
       });
       registerScriptSession(api, { adapter, shared, mode, sheetCode, report });
+      cleanups.push(exposeWorkbookForE2E(workbook));
       ready = true;
       latestRef.current.onDirtyChange?.(false);
       latestRef.current.onReady?.(api);
