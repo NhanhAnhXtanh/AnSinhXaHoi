@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface IndicatorMeasureRepository extends JpaRepository<IndicatorMeasure, Long> {
 
     List<IndicatorMeasure> findByIndicatorCodeIn(Collection<String> indicatorCodes);
+
+    List<IndicatorMeasure> findAllByOrderByIndicatorCodeAsc();
 }

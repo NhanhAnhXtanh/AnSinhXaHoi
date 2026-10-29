@@ -22,6 +22,7 @@ import { InputReportList, InputReportWork } from "@/features/input-reports";
 import { ReviewList, ReviewWork } from "@/features/report-review";
 import { PeriodSetup } from "@/features/period-setup";
 import { PublicationHistoryList } from "@/features/publication-history";
+import { MeasureKindList } from "@/features/measure-kinds";
 import { SummaryPage } from "@/features/summary";
 import {
   AnnualReviewList,
@@ -181,6 +182,14 @@ export function AppRoutes() {
           element={
             <CanAccess resource="publication_history" action="list" fallback={<Forbidden />}>
               <PublicationHistoryList />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/measure-kinds"
+          element={
+            <CanAccess resource="measure_kinds" action="list" fallback={<Forbidden />}>
+              <MeasureKindList />
             </CanAccess>
           }
         />

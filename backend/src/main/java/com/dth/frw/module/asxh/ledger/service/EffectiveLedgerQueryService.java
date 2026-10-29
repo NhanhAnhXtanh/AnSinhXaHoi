@@ -3,6 +3,7 @@ package com.dth.frw.module.asxh.ledger.service;
 import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.module.asxh.ledger.query.EffectiveLedgerQuery;
 import com.dth.frw.module.asxh.ledger.query.EffectiveLedgerRow;
+import com.dth.frw.module.asxh.ledger.query.IndicatorUsage;
 import com.dth.frw.module.asxh.ledger.query.LedgerCriteria;
 import com.dth.frw.module.asxh.ledger.query.LedgerTotal;
 import jakarta.persistence.EntityManager;
@@ -97,6 +98,20 @@ public class EffectiveLedgerQueryService implements EffectiveLedgerQuery {
         Map<String, Object> params = new HashMap<>();
         String jpql = "select distinct r.id " + from() + where(criteria, params);
         return new LinkedHashSet<>(query(jpql, Long.class, params).getResultList());
+    }
+
+    @Override
+    public List<IndicatorUsage> indicatorUsages() {
+        String jpql = "select new " + IndicatorUsage.class.getName() + "("
+                + "l.indicatorCode, max(l.indicatorName), t.shortName, t.sortOrder, min(l.orderNo), count(l)) "
+                + "from LedgerEntry l join l.report r join l.template t "
+                + "where " + EFFECTIVE
+                + " group by l.indicatorCode, t.id, t.shortName, t.sortOrder"
+                + " order by t.sortOrder, t.id, min(l.orderNo), l.indicatorCode";
+        return entityManager.createQuery(jpql, IndicatorUsage.class)
+                .setParameter("approved", ReportStatus.APPROVED)
+                .setParameter("locked", ReportStatus.LOCKED)
+                .getResultList();
     }
 
     // ------------------------------------------------------------------ nội bộ

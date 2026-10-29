@@ -9,6 +9,7 @@ import {
   House,
   ListTodo,
   RotateCcwClock,
+  Scale,
   ShieldCheck,
   ShieldHalf,
   SquareCheckBig,
@@ -116,6 +117,11 @@ export const resources: ResourceProps[] = [
     name: "publication_history",
     list: "/publication-history",
     meta: { label: "Lịch sử mở đợt", icon: <RotateCcwClock className="h-4 w-4" />, parent: "bieu_mau" },
+  },
+  {
+    name: "measure_kinds",
+    list: "/measure-kinds",
+    meta: { label: "Bản chất chỉ tiêu", icon: <Scale className="h-4 w-4" />, parent: "bieu_mau" },
   },
 
   // Administration. The whole section disappears for anyone without the

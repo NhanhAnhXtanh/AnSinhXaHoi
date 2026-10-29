@@ -48,7 +48,7 @@ export const ACTION_TO_PERMISSION: Record<string, PermissionSuffix> = {
  *   Các hành động còn lại (create/edit/delete/approve) vẫn theo hậu tố chuẩn.
  *
  * Mã quyền thật seed ở `backend/.../db/changelog/changes/` (101, 103, 111, 122,
- * 165) và kiểm bằng `@PreAuthorize` trong `module/asxh/<slice>/security/<Tên>Permissions.java`.
+ * 165, 168) và kiểm bằng `@PreAuthorize` trong `module/asxh/<slice>/security/<Tên>Permissions.java`.
  */
 const SCREEN_PERMISSIONS: Record<
   string,
@@ -61,6 +61,9 @@ const SCREEN_PERMISSIONS: Record<
   report_calendar: { resource: "report_calendars" },
   summary: { resource: "summary" },
   annual_review: { resource: "annual_reports" },
+  // "Bản chất chỉ tiêu" — danh mục chỉ tiêu (gom từ số liệu đã duyệt) kèm bản chất đã khai ở
+  // `indicator_measures` (seed 168).
+  measure_kinds: { resource: "indicator_measures" },
 };
 
 /**

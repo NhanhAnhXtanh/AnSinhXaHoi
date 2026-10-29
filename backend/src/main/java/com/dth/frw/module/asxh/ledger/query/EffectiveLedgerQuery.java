@@ -45,4 +45,10 @@ public interface EffectiveLedgerQuery {
 
     /** Id các phiếu có số liệu còn hiệu lực khớp điều kiện — để biết đơn vị nào đã có số liệu. */
     Set<Long> reportIdsWithData(LedgerCriteria criteria);
+
+    /**
+     * Mọi mã chỉ tiêu có trong số liệu còn hiệu lực (mọi kỳ, mọi đơn vị), một dòng / (biểu, mã) — danh
+     * mục chỉ tiêu cho màn khai bản chất chỉ tiêu. Không mang số liệu, chỉ mã và tên.
+     */
+    List<IndicatorUsage> indicatorUsages();
 }

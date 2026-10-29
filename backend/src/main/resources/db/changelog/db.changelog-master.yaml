@@ -83,3 +83,5 @@ databaseChangeLog:
       file: db/changelog/changes/166-add-user-report-unit.yaml
   - include:
       file: db/changelog/changes/167-seed-asxh-dev-accounts.sql
+  - include:
+      file: db/changelog/changes/168-seed-asxh-indicator-measure-permissions.sql

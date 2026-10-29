@@ -18,8 +18,8 @@ import java.util.Objects;
  * Jmix (bản React chưa có danh mục chỉ tiêu riêng).
  *
  * <p>Chỉ tiêu KHÔNG có dòng ở đây được gộp theo {@link MeasureKind#DEFAULT} (người = MAX, tiền =
- * cộng) — đúng hành vi bản Jmix với chỉ tiêu chưa phân loại. Bảng để trống khi khởi tạo; người
- * quản trị mẫu biểu khai dần (TODO: màn danh mục chỉ tiêu).
+ * cộng) — đúng hành vi bản Jmix với chỉ tiêu chưa phân loại. Bảng để trống khi khởi tạo; Sở / người
+ * quản trị mẫu biểu khai dần ở màn "Bản chất chỉ tiêu" ({@code /api/indicator_measures}).
  */
 @Entity
 @Table(name = "asxh_indicator_measures")
@@ -88,6 +88,14 @@ public class IndicatorMeasure {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     @Override
