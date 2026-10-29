@@ -1,41 +1,70 @@
 import { Authenticated, CanAccess } from "@refinedev/core";
 import { Navigate, Outlet, Route, Routes } from "react-router";
 
-import { Dashboard } from "@/features/dashboard";
-import { NotificationList } from "@/features/notifications";
-import {
-  UserList,
-  UserCreate,
-  UserEdit,
-  UserShow,
-  RoleList,
-  RoleCreate,
-  RoleEdit,
-  RoleShow,
-  RowLevelPolicyList,
-  RowLevelPolicyCreate,
-  RowLevelPolicyEdit,
-  RowLevelPolicyShow,
-} from "@/features/administration";
-import { Login, Profile } from "@/features/identity";
-import { InputReportList, InputReportWork } from "@/features/input-reports";
-import { ReviewList, ReviewWork } from "@/features/report-review";
-import { PeriodSetup } from "@/features/period-setup";
-import { PublicationHistoryList } from "@/features/publication-history";
-import { MeasureKindList } from "@/features/measure-kinds";
-import { SummaryPage } from "@/features/summary";
-import {
-  AnnualReviewList,
-  AnnualReviewWork,
-  AnnualSubmissionHistory,
-} from "@/features/annual-review";
-import {
-  ReportUnitList,
-  ReportUnitCreate,
-  ReportUnitEdit,
-} from "@/features/report-units";
-import { ReportCalendar } from "@/features/report-calendar";
-import { TemplateSets, TemplateDesigner } from "@/features/templates";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
+
+import { LoadingState } from "@/shared/components/asxh";
+
+/**
+ * Mỗi màn tải theo route (React.lazy): trang đăng nhập và khung app chỉ tải mã của
+ * chính chúng, màn nào mở mới kéo chunk của feature đó. Feature chỉ xuất qua
+ * `index.ts` nên nạp động cả index rồi chọn đúng component — các màn cùng một
+ * feature dùng chung một chunk.
+ */
+function lazyNamed<M, K extends keyof M>(load: () => Promise<M>, name: K) {
+  return lazy(async () => ({ default: (await load())[name] as ComponentType }));
+}
+
+const loadAdministration = () => import("@/features/administration");
+const loadIdentity = () => import("@/features/identity");
+const loadInputReports = () => import("@/features/input-reports");
+const loadReportReview = () => import("@/features/report-review");
+const loadAnnualReview = () => import("@/features/annual-review");
+const loadReportUnits = () => import("@/features/report-units");
+const loadTemplates = () => import("@/features/templates");
+
+const Dashboard = lazyNamed(() => import("@/features/dashboard"), "Dashboard");
+const NotificationList = lazyNamed(() => import("@/features/notifications"), "NotificationList");
+const UserList = lazyNamed(loadAdministration, "UserList");
+const UserCreate = lazyNamed(loadAdministration, "UserCreate");
+const UserEdit = lazyNamed(loadAdministration, "UserEdit");
+const UserShow = lazyNamed(loadAdministration, "UserShow");
+const RoleList = lazyNamed(loadAdministration, "RoleList");
+const RoleCreate = lazyNamed(loadAdministration, "RoleCreate");
+const RoleEdit = lazyNamed(loadAdministration, "RoleEdit");
+const RoleShow = lazyNamed(loadAdministration, "RoleShow");
+const RowLevelPolicyList = lazyNamed(loadAdministration, "RowLevelPolicyList");
+const RowLevelPolicyCreate = lazyNamed(loadAdministration, "RowLevelPolicyCreate");
+const RowLevelPolicyEdit = lazyNamed(loadAdministration, "RowLevelPolicyEdit");
+const RowLevelPolicyShow = lazyNamed(loadAdministration, "RowLevelPolicyShow");
+const Login = lazyNamed(loadIdentity, "Login");
+const Profile = lazyNamed(loadIdentity, "Profile");
+const InputReportList = lazyNamed(loadInputReports, "InputReportList");
+const InputReportWork = lazyNamed(loadInputReports, "InputReportWork");
+const ReviewList = lazyNamed(loadReportReview, "ReviewList");
+const ReviewWork = lazyNamed(loadReportReview, "ReviewWork");
+const PeriodSetup = lazyNamed(() => import("@/features/period-setup"), "PeriodSetup");
+const PublicationHistoryList = lazyNamed(
+  () => import("@/features/publication-history"),
+  "PublicationHistoryList"
+);
+const MeasureKindList = lazyNamed(() => import("@/features/measure-kinds"), "MeasureKindList");
+const SummaryPage = lazyNamed(() => import("@/features/summary"), "SummaryPage");
+const AnnualReviewList = lazyNamed(loadAnnualReview, "AnnualReviewList");
+const AnnualReviewWork = lazyNamed(loadAnnualReview, "AnnualReviewWork");
+const AnnualSubmissionHistory = lazyNamed(loadAnnualReview, "AnnualSubmissionHistory");
+const ReportUnitList = lazyNamed(loadReportUnits, "ReportUnitList");
+const ReportUnitCreate = lazyNamed(loadReportUnits, "ReportUnitCreate");
+const ReportUnitEdit = lazyNamed(loadReportUnits, "ReportUnitEdit");
+const ReportCalendar = lazyNamed(() => import("@/features/report-calendar"), "ReportCalendar");
+const TemplateSets = lazyNamed(loadTemplates, "TemplateSets");
+const TemplateDesigner = lazyNamed(loadTemplates, "TemplateDesigner");
+
+/** Chờ chunk của màn: khung app (sidebar, header) vẫn đứng yên, chỉ vùng nội dung hiện chờ. */
+function RouteSuspense({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<LoadingState variant="page" label="Đang mở màn hình…" />}>{children}</Suspense>;
+}
+
 import { ErrorComponent } from "@/shared/components/layout/error-component";
 import { Forbidden } from "@/shared/components/layout/forbidden";
 import { Layout } from "@/shared/components/layout/layout";
@@ -57,7 +86,9 @@ export function AppRoutes() {
         element={
           <Authenticated key="authenticated-routes" redirectOnFail="/login">
             <Layout>
-              <Outlet />
+              <RouteSuspense>
+                <Outlet />
+              </RouteSuspense>
             </Layout>
           </Authenticated>
         }
@@ -274,7 +305,14 @@ export function AppRoutes() {
       */}
       <Route
         element={
-          <Authenticated key="unauthenticated-routes" fallback={<Outlet />}>
+          <Authenticated
+            key="unauthenticated-routes"
+            fallback={
+              <RouteSuspense>
+                <Outlet />
+              </RouteSuspense>
+            }
+          >
             <Navigate to="/" replace />
           </Authenticated>
         }
