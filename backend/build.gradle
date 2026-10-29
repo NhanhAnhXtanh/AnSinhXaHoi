@@ -63,6 +63,15 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+// CI chia test làm hai job: -PtestGroup=asxh chỉ chạy test nghiệp vụ ASXH
+// (com.dth.frw.module.asxh), -PtestGroup=platform chạy mọi test còn lại.
+// Không truyền thì chạy hết như trước.
 tasks.named('test') {
     useJUnitPlatform()
+    def testGroup = findProperty('testGroup')
+    if (testGroup == 'asxh') {
+        include 'com/dth/frw/module/asxh/**'
+    } else if (testGroup == 'platform') {
+        exclude 'com/dth/frw/module/asxh/**'
+    }
 }

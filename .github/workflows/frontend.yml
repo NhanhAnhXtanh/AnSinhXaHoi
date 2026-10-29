@@ -1,0 +1,104 @@
+# CI frontend (React + Vite + SpreadJS). Chỉ kiểm, KHÔNG triển khai.
+# Chạy khi PR hoặc push vào main / nhatanh có đổi trong frontend/ (hoặc chính file này).
+#
+# Bốn job song song, mỗi job một việc để nhìn danh sách check là biết hỏng ở đâu:
+# - Kiểu (TypeScript): tsc cho mã ứng dụng và cho e2e.
+# - Lint (ESLint).
+# - Kiến trúc tầng: luật phụ thuộc app / features / shared / domains (verify:arch).
+# - Build & dung lượng: build bản chạy thật rồi kiểm trang đầu không kéo SpreadJS / Designer / Monaco.
+name: Frontend
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+  push:
+    branches: [main, nhatanh]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  typecheck:
+    name: Kiểu (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Mã ứng dụng
+        run: npx tsc --noEmit
+      - name: Mã e2e
+        run: npx tsc -p e2e --noEmit
+
+  lint:
+    name: Lint (ESLint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx eslint .
+
+  architecture:
+    name: Kiến trúc tầng
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run verify:arch
+
+  build:
+    name: Build & dung lượng
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Bản build SpreadJS cần nhiều heap (cục bộ: 3 GB không đủ).
+      NODE_OPTIONS: --max-old-space-size=6144
+      # Rỗng vẫn build được (bảng tính chạy bản dùng thử).
+      VITE_SPREADJS_LICENSE_KEY: ${{ secrets.VITE_SPREADJS_LICENSE_KEY }}
+      VITE_SPREADJS_DESIGNER_LICENSE_KEY: ${{ secrets.VITE_SPREADJS_DESIGNER_LICENSE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Trang đầu không tải SpreadJS / Designer / Monaco
+        run: npm run verify:bundle
