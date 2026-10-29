@@ -38,18 +38,18 @@ function ScrollBar({
       data-slot="scroll-area-scrollbar"
       orientation={orientation}
       className={cn(
-        "flex touch-none p-px transition-colors select-none",
-        orientation === "vertical" &&
-          "h-full w-2.5 border-l border-l-transparent",
-        orientation === "horizontal" &&
-          "h-2.5 flex-col border-t border-t-transparent",
+        "flex touch-none transition-colors select-none",
+        // Cùng cỡ và màu với thanh cuộn chung của trình duyệt (`--scrollbar-*`
+        // trong styles/index.css), để vùng cuộn Radix không trông khác các chỗ khác.
+        orientation === "vertical" && "h-full w-(--scrollbar-size)",
+        orientation === "horizontal" && "h-(--scrollbar-size) flex-col",
         className
       )}
       {...props}
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
         data-slot="scroll-area-thumb"
-        className="bg-border relative flex-1 rounded-full"
+        className="relative flex-1 rounded-full bg-(--scrollbar-thumb) hover:bg-(--scrollbar-thumb-hover)"
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   );

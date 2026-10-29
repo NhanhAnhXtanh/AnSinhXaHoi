@@ -156,16 +156,13 @@ export const UserShow = () => {
             <DetailRow label="Cấp tài khoản">
               {record ? ACCOUNT_LEVEL_LABELS[accountLevelOf(record)] : null}
             </DetailRow>
-            {/* Nơi công tác của khung quản trị gốc — chỉ hiện khi tài khoản có gắn. */}
+            {/* Nơi công tác của khung quản trị gốc — chỉ hiện khi tài khoản có gắn.
+                Chữ thường, không phải liên kết: màn tổ chức / phòng ban của base
+                không có trên menu ASXH nên đã gỡ route. */}
             {record?.organization && (
             <DetailRow label="Tổ chức">
               {record?.organization ? (
-                <Link
-                  to={`/organizations/show/${record.organization.id}`}
-                  className="hover:underline"
-                >
-                  {record.organization.name}
-                </Link>
+                record.organization.name
               ) : (
                 <EmptyValue>Chưa gắn đơn vị</EmptyValue>
               )}
@@ -174,12 +171,7 @@ export const UserShow = () => {
             {record?.department && (
             <DetailRow label="Phòng ban">
               {record?.department ? (
-                <Link
-                  to={`/departments/show/${record.department.id}`}
-                  className="hover:underline"
-                >
-                  {record.department.name}
-                </Link>
+                record.department.name
               ) : (
                 <EmptyValue>Không thuộc phòng ban nào</EmptyValue>
               )}

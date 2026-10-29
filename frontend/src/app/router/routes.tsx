@@ -1,32 +1,7 @@
 import { Authenticated, CanAccess } from "@refinedev/core";
 import { Navigate, Outlet, Route, Routes } from "react-router";
 
-import {
-  BlogPostList,
-  BlogPostCreate,
-  BlogPostEdit,
-  BlogPostShow,
-} from "@/features/blog-posts";
-import {
-  CategoryList,
-  CategoryCreate,
-  CategoryEdit,
-  CategoryShow,
-} from "@/features/categories";
 import { Dashboard } from "@/features/dashboard";
-import { TaskList, TaskCreate, TaskEdit, TaskShow } from "@/features/tasks";
-import {
-  OrganizationList,
-  OrganizationCreate,
-  OrganizationEdit,
-  OrganizationShow,
-} from "@/features/organizations";
-import {
-  DepartmentList,
-  DepartmentCreate,
-  DepartmentEdit,
-  DepartmentShow,
-} from "@/features/departments";
 import { NotificationList } from "@/features/notifications";
 import {
   UserList,
@@ -37,8 +12,6 @@ import {
   RoleCreate,
   RoleEdit,
   RoleShow,
-  PermissionList,
-  PermissionShow,
   RowLevelPolicyList,
   RowLevelPolicyCreate,
   RowLevelPolicyEdit,
@@ -96,92 +69,6 @@ export function AppRoutes() {
         */}
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        {/*
-          Blog posts render their create / edit / show / clone actions as
-          dialogs on top of the list. Nesting them under the list route keeps
-          `<BlogPostList />` mounted (and its filters, sorting and pagination
-          intact) while `<Outlet />` inside it renders the open dialog. The URLs
-          are unchanged, so the list action buttons and deep links still work.
-        */}
-        <Route path="/blog-posts" element={<BlogPostList />}>
-          <Route path="create" element={<BlogPostCreate />} />
-          <Route path="edit/:id" element={<BlogPostEdit />} />
-          <Route path="show/:id" element={<BlogPostShow />} />
-          <Route path="clone/:id" element={<BlogPostCreate />} />
-        </Route>
-        <Route path="/categories">
-          <Route index element={<CategoryList />} />
-          <Route path="create" element={<CategoryCreate />} />
-          <Route path="edit/:id" element={<CategoryEdit />} />
-          <Route path="show/:id" element={<CategoryShow />} />
-          <Route path="clone/:id" element={<CategoryCreate />} />
-        </Route>
-
-        {/*
-          Tasks — plain full-page routes, guarded like the rest. Not a dialog
-          pattern despite being the busiest screen here: a task's description is
-          long-form and its edit form carries two lookups, which is more than a
-          dialog over a list has room for.
-        */}
-        <Route
-          path="/tasks"
-          element={
-            <CanAccess
-              resource="tasks"
-              action="list"
-              fallback={<Forbidden />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<TaskList />} />
-          <Route path="create" element={<TaskCreate />} />
-          <Route path="edit/:id" element={<TaskEdit />} />
-          <Route path="show/:id" element={<TaskShow />} />
-        </Route>
-
-        {/*
-          Organization structure — plain full-page routes, like categories, and
-          guarded like the administration ones below: the sidebar hides them,
-          but a typed or bookmarked URL would otherwise render a screen whose
-          list request 403s.
-        */}
-        <Route
-          path="/organizations"
-          element={
-            <CanAccess
-              resource="organizations"
-              action="list"
-              fallback={<Forbidden />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<OrganizationList />} />
-          <Route path="create" element={<OrganizationCreate />} />
-          <Route path="edit/:id" element={<OrganizationEdit />} />
-          <Route path="show/:id" element={<OrganizationShow />} />
-        </Route>
-        <Route
-          path="/departments"
-          element={
-            <CanAccess
-              resource="departments"
-              action="list"
-              fallback={<Forbidden />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<DepartmentList />} />
-          <Route path="create" element={<DepartmentCreate />} />
-          <Route path="edit/:id" element={<DepartmentEdit />} />
-          <Route path="show/:id" element={<DepartmentShow />} />
-        </Route>
-
         {/*
           Administration — plain full-page routes, like categories, each wrapped
           in `<CanAccess>`. The sidebar already hides these, so the guard only
@@ -243,22 +130,6 @@ export function AppRoutes() {
           <Route path="edit/:id" element={<RowLevelPolicyEdit />} />
           <Route path="show/:id" element={<RowLevelPolicyShow />} />
         </Route>
-        <Route
-          path="/permissions"
-          element={
-            <CanAccess
-              resource="permissions"
-              action="list"
-              fallback={<Forbidden />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<PermissionList />} />
-          <Route path="show/:id" element={<PermissionShow />} />
-        </Route>
-
         {/*
           Notifications have a list and nothing else. No create screen, because
           the application raises a notification rather than a person writing

@@ -7,17 +7,12 @@ import {
   ClipboardCheck,
   FileSpreadsheet,
   House,
-  KeyRound,
-  ListChecks,
   ListTodo,
-  Network,
-  Newspaper,
   RotateCcwClock,
   ShieldCheck,
   ShieldHalf,
   SquareCheckBig,
   SquarePen,
-  Tags,
   Users,
 } from "lucide-react";
 
@@ -160,59 +155,18 @@ export const resources: ResourceProps[] = [
     meta: { label: "Phạm vi dữ liệu", canDelete: true, icon: <ShieldHalf className="h-4 w-4" />, parent: "administration" },
   },
 
-  // Màn mẫu của base dth-framework: giữ route để không gãy liên kết, ẩn khỏi
-  // menu ASXH (`meta.hide`).
-  {
-    name: "permissions",
-    list: "/permissions",
-    show: "/permissions/show/:id",
-    meta: { label: "Quyền", canDelete: false, hide: true, icon: <KeyRound className="h-4 w-4" />, parent: "administration" },
-  },
+  // Thông báo không có mục menu nhưng chuông trên thanh đầu mở tới đây
+  // ("Xem tất cả"), nên giữ route và ẩn khỏi menu (`meta.hide`).
+  //
+  // Các màn mẫu của base dth-framework (tasks, blog_posts, categories,
+  // organizations, departments, permissions) đã gỡ khỏi đây và khỏi
+  // `routes.tsx`: màn không có trên menu ASXH thì cũng không mở được bằng gõ
+  // đường dẫn. API của chúng vẫn còn — màn vai trò và màn người dùng đọc
+  // `permissions`, `organizations`, `departments` qua data provider, việc đó
+  // không cần resource khai ở đây.
   {
     name: "notifications",
     list: "/notifications",
     meta: { label: "Thông báo", canDelete: true, hide: true, icon: <Bell className="h-4 w-4" /> },
-  },
-  {
-    name: "tasks",
-    list: "/tasks",
-    create: "/tasks/create",
-    edit: "/tasks/edit/:id",
-    show: "/tasks/show/:id",
-    meta: { label: "Tasks", canDelete: true, hide: true, icon: <ListChecks className="h-4 w-4" /> },
-  },
-  {
-    name: "blog_posts",
-    list: "/blog-posts",
-    create: "/blog-posts/create",
-    edit: "/blog-posts/edit/:id",
-    show: "/blog-posts/show/:id",
-    clone: "/blog-posts/clone/:id",
-    meta: { canDelete: false, hide: true, icon: <Newspaper className="h-4 w-4" /> },
-  },
-  {
-    name: "categories",
-    list: "/categories",
-    create: "/categories/create",
-    edit: "/categories/edit/:id",
-    show: "/categories/show/:id",
-    clone: "/categories/clone/:id",
-    meta: { canDelete: false, hide: true, icon: <Tags className="h-4 w-4" /> },
-  },
-  {
-    name: "organizations",
-    list: "/organizations",
-    create: "/organizations/create",
-    edit: "/organizations/edit/:id",
-    show: "/organizations/show/:id",
-    meta: { label: "Organizations", canDelete: true, hide: true, icon: <BuildingComplex className="h-4 w-4" /> },
-  },
-  {
-    name: "departments",
-    list: "/departments",
-    create: "/departments/create",
-    edit: "/departments/edit/:id",
-    show: "/departments/show/:id",
-    meta: { label: "Departments", canDelete: true, hide: true, icon: <Network className="h-4 w-4" /> },
   },
 ];

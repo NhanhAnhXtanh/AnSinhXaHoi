@@ -6,12 +6,13 @@ import {
   useLogout,
   useRefineOptions,
 } from "@refinedev/core";
-import { useKBar } from "@refinedev/kbar";
 import { LogOutIcon, SearchIcon, UserRoundIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
+import { CommandPalette } from "@/shared/components/layout/command-palette";
 import { NotificationBell } from "@/shared/components/layout/notification-bell";
+import { useCommandPaletteShortcut } from "@/shared/components/layout/use-command-palette-shortcut";
 import { ThemeToggle } from "@/shared/components/theme/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar";
 import {
@@ -100,32 +101,38 @@ export function Header() {
 }
 
 /**
- * Opens the refine command palette (`<RefineKbar />`), the same thing Ctrl K does.
+ * Nút mở ô tìm kiếm màn hình (`CommandPalette`), cùng việc với Ctrl K. Phím tắt
+ * gắn ở đây vì header luôn có mặt khi đã đăng nhập, kể cả trên màn hẹp nơi nút
+ * bị ẩn.
  */
 function CommandSearch() {
-  const { query } = useKBar();
+  const [open, setOpen] = useState(false);
+  useCommandPaletteShortcut(setOpen);
 
   return (
-    <button
-      type="button"
-      onClick={() => query.toggle()}
-      aria-label="Tìm kiếm (Ctrl K)"
-      className={cn(
-        "relative hidden h-9 w-56 items-center gap-2 rounded-lg lg:w-72",
-        "border border-input bg-card ps-3 pe-2 text-start text-sm",
-        "text-muted-foreground transition-colors hover:bg-accent/60",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        "sm:flex"
-      )}
-    >
-      <SearchIcon className="size-4 shrink-0" />
-      <span className="flex-1 truncate">Tìm kiếm…</span>
-      {/* Hai phím rời như trên bàn phím Windows, không dùng ký hiệu ⌘ của Mac. */}
-      <span className="hidden shrink-0 items-center gap-2 lg:flex" aria-hidden>
-        <Kbd>Ctrl</Kbd>
-        <Kbd>K</Kbd>
-      </span>
-    </button>
+    <>
+      <CommandPalette open={open} onOpenChange={setOpen} />
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Tìm kiếm (Ctrl K)"
+        className={cn(
+          "relative hidden h-9 w-56 items-center gap-2 rounded-lg lg:w-72",
+          "border border-input bg-card ps-3 pe-2 text-start text-sm",
+          "text-muted-foreground transition-colors hover:bg-accent/60",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "sm:flex"
+        )}
+      >
+        <SearchIcon className="size-4 shrink-0" />
+        <span className="flex-1 truncate">Tìm kiếm…</span>
+        {/* Hai phím rời như trên bàn phím Windows, không dùng ký hiệu ⌘ của Mac. */}
+        <span className="hidden shrink-0 items-center gap-2 lg:flex" aria-hidden>
+          <Kbd>Ctrl</Kbd>
+          <Kbd>K</Kbd>
+        </span>
+      </button>
+    </>
   );
 }
 
