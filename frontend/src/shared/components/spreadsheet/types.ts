@@ -54,6 +54,12 @@ export type SpreadWorkbookProps = {
   stampInputLocks?: boolean;
   /** (Mở rộng ngoài hợp đồng) Kết quả onLoad/afterInject của script (lỗi script, ctx.ui.message). */
   onScriptResult?: (result: ScriptRunResult) => void;
+  /**
+   * (Mở rộng ngoài hợp đồng) Bảng tính chạy ngầm, không ai nhìn (vd chạy lại bước kiểm
+   * tra trước khi nộp): nạp ĐỒNG BỘ toàn bộ workbook và KHÔNG BAO GIỜ vẽ lên canvas.
+   * Script vẫn đọc được mọi ô như bình thường. Mặc định false.
+   */
+  offscreen?: boolean;
 };
 
 export type SpreadDesignerProps = {

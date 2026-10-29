@@ -26,7 +26,8 @@ const JOB_TIMEOUT_MS = 20_000;
 /**
  * Chạy bước kiểm tra `validate` của script mẫu trên các biểu KHÔNG đang mở trên màn,
  * lần lượt từng biểu, trong một bảng tính ẩn ngoài khung nhìn (SpreadJS cần khung
- * có kích thước thật để dựng).
+ * có kích thước thật để dựng). Bảng ẩn chạy chế độ `offscreen`: nạp đồng bộ và không
+ * vẽ canvas, vì không ai nhìn nó.
  *
  * Biểu không mở được hoặc quá lâu được coi là qua (giống bản Jmix: script lỗi
  * biên dịch thì trình duyệt không chặn — UC-35 2b); hàng rào cuối là máy chủ.
@@ -86,6 +87,7 @@ export function SheetValidator({
         workbook={job.workbook}
         readOnly
         hideTabs
+        offscreen
         scriptText={job.scriptText}
         scriptContext={job.context}
         onReady={onReady}
