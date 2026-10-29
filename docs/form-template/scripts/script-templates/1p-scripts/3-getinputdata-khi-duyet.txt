@@ -1,0 +1,51 @@
+// Nguon: DB qt_template_script — bieu 1p, phien ban PB-000030, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1p · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1p".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// QUY TẮC: kinh phí (D) là ô NHẬP TAY (không công thức) → LƯU nguyên (số gốc, không tính lại
+//   được). Mỗi dòng đối tượng = 1 chỉ tiêu, lưu Số đối tượng (q=C) + Kinh phí (a=D).
+//   Không có mức/số tháng. measureKind = NGUOI mặc định (số người MAX, tiền SUM qua kỳ).
+
+const SHEET = '1p';
+
+// row (0-based) + mã + tên của từng dòng đối tượng.
+const BINDINGS = [
+  { row: 8,  indicatorCode: '1P.BHXH_TN.HO_NGHEO',  indicatorName: 'NSNN hỗ trợ đóng BHXH tự nguyện › Hộ nghèo (50%)' },
+  { row: 9,  indicatorCode: '1P.BHXH_TN.CAN_NGHEO', indicatorName: 'NSNN hỗ trợ đóng BHXH tự nguyện › Hộ cận nghèo (40%)' },
+  { row: 10, indicatorCode: '1P.BHXH_TN.DTTS',      indicatorName: 'NSNN hỗ trợ đóng BHXH tự nguyện › Người dân tộc thiểu số (30%)' },
+  { row: 11, indicatorCode: '1P.BHXH_TN.KHAC',      indicatorName: 'NSNN hỗ trợ đóng BHXH tự nguyện › Các đối tượng khác (20%)' },
+];
+const QTY_COL = 2, AMT_COL = 3, NOTE_COL = 4;
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+
+return defineScript({
+  getInputData(ctx) {
+    return BINDINGS
+      .map((b) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: num(ctx.cell.get(SHEET, b.row, QTY_COL)),
+        amount: num(ctx.cell.get(SHEET, b.row, AMT_COL)),
+        note: optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL)),
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});
+

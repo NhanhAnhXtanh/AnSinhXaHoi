@@ -1,0 +1,26 @@
+// Nguon: DB qt_template_script — bieu 1p, phien ban PB-000030, script "Tong hop theo ky"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1p afterInject: Tong hop theo ky ====
+// Do so cai (so doi tuong = quantity) vao o nhap cua bieu 1p khi mo man Tong hop.
+const SHEET = '1p';
+const ROW = {
+  '1P.BHXH_TN.HO_NGHEO':  8,
+  '1P.BHXH_TN.CAN_NGHEO': 9,
+  '1P.BHXH_TN.DTTS':      10,
+  '1P.BHXH_TN.KHAC':      11,
+};
+const COL = 2; // cot so doi tuong (0-based) = QTY_COL cua getInputData
+const CK = 'indi' + 'catorCode';
+function num(v){ if(v==null||v==='')return null; const n=Number(v); return Number.isFinite(n)?n:null; }
+return defineScript({
+  async afterInject(ctx){
+    const periodId = ctx.shared && ctx.shared.periodId;
+    if(!periodId) return; // chi chay o man tong hop, bo qua khi nhap lieu
+    const scope=(ctx.shared&&ctx.shared.scopeKind)?'&scopeKind='+ctx.shared.scopeKind:'';
+    const src=(ctx.shared&&ctx.shared.sourceSheet)?'&sourceSheetCode='+encodeURIComponent(ctx.shared.sourceSheet):'';
+    let rows; try{ rows=await ctx.api.get('/rest/qt/summary/data?periodId='+periodId+scope+src);}catch(e){ctx.ui.message('Loi 1p: '+e.message);return;}
+    let n=0; for(const r of (rows||[])){ const row=ROW[r[CK]]; if(row==null)continue; const q=num(r.quantity); if(q==null)continue; try{ctx.cell.set(SHEET,row,COL,q);n++;}catch(e){} }
+    ctx.ui.message('Da do '+n+' dong so cai vao bieu theo ky.');
+  }
+});

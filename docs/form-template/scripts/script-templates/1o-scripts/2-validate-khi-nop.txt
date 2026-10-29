@@ -1,0 +1,44 @@
+// Nguon: DB qt_template_script — bieu 1o, phien ban PB-000029, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1o · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1o".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Kiểm số hộ (D,F,G) và Tổng kinh phí (L, ô công thức). KHÔNG kiểm Ghi chú (O). Dòng = row 7.
+
+const SHEET = '1o';
+const DATA_ROW = 7;
+
+const NUMERIC_CELLS = [
+  { col: 3,  label: 'Số hộ nghèo' },
+  { col: 5,  label: 'Hộ có thành viên hưởng trợ cấp xã hội hằng tháng (khác)' },
+  { col: 6,  label: 'Hộ có thành viên hưởng trợ cấp xã hội theo quy định' },
+  { col: 11, label: 'Tổng kinh phí thực hiện' },   // L: ô công thức
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    for (const cell of NUMERIC_CELLS) {
+      const n = toNumber(ctx.cell.get(SHEET, DATA_ROW, cell.col));
+      if (Number.isNaN(n)) {
+        issues.push({ severity: 'ERROR', code: 'NOT_NUMBER', message: `${cell.label}: phải là số.` });
+      } else if (typeof n === 'number') {
+        if (n < 0) issues.push({ severity: 'ERROR', code: 'NEGATIVE', message: `${cell.label}: không được âm.` });
+        if (n > 0) anyValue = true;
+      }
+    }
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1O', message: 'Biểu 1o chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

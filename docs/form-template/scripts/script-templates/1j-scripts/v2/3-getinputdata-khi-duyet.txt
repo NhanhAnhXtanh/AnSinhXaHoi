@@ -1,0 +1,61 @@
+// ==== 1j · Script 3/4 (v2): GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1j".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô.
+//
+// ‼ THAY ĐỔI SO VỚI v1: xuất HAI dòng sổ cái thay vì một.
+// Mỗi loại đối tượng có MÃ CHỈ TIÊU RIÊNG — bắt buộc, vì sổ cái khoá theo
+// (phiếu, biểu, đơn vị, mã chỉ tiêu): dùng chung một mã thì dòng sau đè dòng trước.
+//   row 7 → 1J.DATHANG.SO_DOI_TUONG (đặt hàng / giao nhiệm vụ)
+//   row 8 → 1J.XAHOI.SO_DOI_TUONG   (nhu cầu xã hội)
+//
+// CƠ CHẾ SỔ CÁI = SỔ ĐỐI CHIẾU: quantity = Số đối tượng (C); amount = Kinh phí thực hiện
+//   (F = hỗ trợ học phí + SHP, ô công thức — LƯU value đã tính). Mức thu học phí (D), số tháng
+//   (E), mức SHP (C12) gắn template khoá → không lưu. Ghi chú (I) lấy theo TỪNG dòng.
+
+const SHEET = '1j';
+const NOTE_COL = 8;
+
+const BINDINGS = [
+  {
+    row: 7,
+    indicatorCode: '1J.DATHANG.SO_DOI_TUONG',
+    indicatorName: 'SV sư phạm đào tạo theo đặt hàng/giao nhiệm vụ › Số đối tượng',
+    qty: 2, amt: 5,
+  },
+  {
+    row: 8,
+    indicatorCode: '1J.XAHOI.SO_DOI_TUONG',
+    indicatorName: 'SV sư phạm đào tạo theo nhu cầu xã hội › Số đối tượng',
+    qty: 2, amt: 5,
+  },
+];
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+
+return defineScript({
+  getInputData(ctx) {
+    return BINDINGS
+      .map((b) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: num(ctx.cell.get(SHEET, b.row, b.qty)),
+        amount: num(ctx.cell.get(SHEET, b.row, b.amt)),
+        note: optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL)),
+      }))
+      // Dòng trống hoàn toàn thì không ghi sổ — đơn vị chỉ phát sinh một loại đối tượng là bình thường.
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});

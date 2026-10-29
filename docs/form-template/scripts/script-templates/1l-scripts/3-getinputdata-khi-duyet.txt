@@ -1,0 +1,72 @@
+// Nguon: DB qt_template_script — bieu 1l, phien ban PB-000026, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1l · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1l".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// QUY TẮC: mỗi dòng lá lưu Số đối tượng (q=C) + Kinh phí (a=D, NHẬP TAY). Dòng cha/tổng là công
+//   thức =SUM(...) → KHÔNG khai (bị bỏ). Không có mức/số tháng. measureKind = NGUOI mặc định
+//   (số người MAX, tiền SUM qua kỳ).
+
+const SHEET = '1l';
+const QTY_COL = 2, AMT_COL = 3, NOTE_COL = 4;
+
+// 24 dòng lá: row (0-based) + mã (tên rút gọn) + tên hiển thị.
+const BINDINGS = [
+  // Nhóm I — NSNN đóng BHYT
+  { row: 9,  indicatorCode: '1L.HO_NGHEO_DTTS',       indicatorName: 'NSNN đóng BHYT › Hộ gia đình nghèo; người dân tộc thiểu số' },
+  { row: 11, indicatorCode: '1L.TRE_EM_6T.MENH_GIA',  indicatorName: 'NSNN đóng BHYT › Trẻ em dưới 6 tuổi — kinh phí theo mệnh giá thẻ' },
+  { row: 12, indicatorCode: '1L.TRE_EM_6T.TRUY_LINH', indicatorName: 'NSNN đóng BHYT › Trẻ em dưới 6 tuổi — kinh phí truy lĩnh' },
+  { row: 13, indicatorCode: '1L.NGUOI_CO_CONG',       indicatorName: 'NSNN đóng BHYT › Người có công với cách mạng' },
+  { row: 14, indicatorCode: '1L.CUU_CHIEN_BINH_TNXP', indicatorName: 'NSNN đóng BHYT › Cựu chiến binh, thanh niên xung phong' },
+  { row: 15, indicatorCode: '1L.BTXH',                indicatorName: 'NSNN đóng BHYT › Đối tượng BTXH, người hưởng trợ cấp nuôi dưỡng' },
+  { row: 16, indicatorCode: '1L.HIEN_TANG',           indicatorName: 'NSNN đóng BHYT › Người hiến tạng' },
+  { row: 17, indicatorCode: '1L.NGUOI_75_TUOI',       indicatorName: 'NSNN đóng BHYT › Người 75 tuổi trở lên đang hưởng trợ cấp tuất' },
+  { row: 18, indicatorCode: '1L.XA_ATK',              indicatorName: 'NSNN đóng BHYT › Người dân các xã ATK, vùng ATK cách mạng' },
+  { row: 19, indicatorCode: '1L.HUU_TRI_XH',          indicatorName: 'NSNN đóng BHYT › Người hưởng trợ cấp hưu trí xã hội hằng tháng' },
+  { row: 20, indicatorCode: '1L.DAI_BIEU_QH_HDND',    indicatorName: 'NSNN đóng BHYT › Đại biểu Quốc hội, đại biểu Hội đồng nhân dân' },
+  { row: 21, indicatorCode: '1L.CAN_BO_XA_NGHI',      indicatorName: 'NSNN đóng BHYT › Cán bộ xã, phường, thị trấn đã nghỉ việc' },
+  { row: 22, indicatorCode: '1L.DAN_QUAN',            indicatorName: 'NSNN đóng BHYT › Dân quân thường trực' },
+  // Nhóm II — NSNN hỗ trợ mức đóng BHYT
+  { row: 25, indicatorCode: '1L.CAN_NGHEO_100',       indicatorName: 'NSNN hỗ trợ mức đóng › Hộ cận nghèo được hỗ trợ 100%' },
+  { row: 26, indicatorCode: '1L.CAN_NGHEO_70',        indicatorName: 'NSNN hỗ trợ mức đóng › Hộ cận nghèo được hỗ trợ 70%' },
+  { row: 27, indicatorCode: '1L.HSSV_50',             indicatorName: 'NSNN hỗ trợ mức đóng › Học sinh, sinh viên (50%)' },
+  { row: 28, indicatorCode: '1L.HO_NONG_LAM_NGU',     indicatorName: 'NSNN hỗ trợ mức đóng › Hộ làm nông, lâm, ngư, diêm nghiệp' },
+  { row: 29, indicatorCode: '1L.DTTS_DIA_BAN',        indicatorName: 'NSNN hỗ trợ mức đóng › Người DTTS đang sinh sống tại địa bàn' },
+  { row: 30, indicatorCode: '1L.DTTS_XA',             indicatorName: 'NSNN hỗ trợ mức đóng › Người DTTS tại các xã được xác định' },
+  { row: 31, indicatorCode: '1L.LUC_LUONG_ANTT',      indicatorName: 'NSNN hỗ trợ mức đóng › Lực lượng tham gia bảo vệ an ninh trật tự' },
+  { row: 32, indicatorCode: '1L.Y_TE_THON_BAN',       indicatorName: 'NSNN hỗ trợ mức đóng › Nhân viên y tế thôn, bản; cô đỡ thôn, bản' },
+  { row: 33, indicatorCode: '1L.KHONG_CHUYEN_TRACH',  indicatorName: 'NSNN hỗ trợ mức đóng › Người hoạt động không chuyên trách ở thôn, tổ dân phố' },
+  { row: 34, indicatorCode: '1L.NAN_NHAN',            indicatorName: 'NSNN hỗ trợ mức đóng › Nạn nhân theo Luật Phòng, chống mua bán người' },
+  { row: 35, indicatorCode: '1L.NQ_RIENG',            indicatorName: 'NSNN hỗ trợ mức đóng › Hỗ trợ mức đóng BHYT các đối tượng theo Nghị quyết riêng' },
+];
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+return defineScript({
+  getInputData(ctx) {
+    return BINDINGS
+      .map((b) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: num(ctx.cell.get(SHEET, b.row, QTY_COL)),
+        amount: num(ctx.cell.get(SHEET, b.row, AMT_COL)),
+        note: optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL)),
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});
+

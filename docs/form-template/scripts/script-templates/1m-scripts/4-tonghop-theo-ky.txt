@@ -1,0 +1,72 @@
+// Nguon: DB qt_template_script — bieu 1m, phien ban PB-000027, script "Tong hop theo ky"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1m afterInject: Tong hop theo ky ====
+// Do so doi tuong (quantity) tu so cai vao o nhap (col F = 5, 0-based) theo indicatorCode.
+// O kinh phi (G) la cong thuc -> KHONG set, de template tu tinh.
+const SHEET = '1m';
+const COL = 5; // QTY_COL: cot so doi tuong (0-based) - lay tu getInputData
+const ROW = {
+  '1M.A1.01.DUOI4T': 11,
+  '1M.A1.01.4_16T': 12,
+  '1M.A1.02': 14,
+  '1M.A1.03.DUOI4T': 16,
+  '1M.A1.03.4_16T': 17,
+  '1M.A1.03.16T_LEN': 18,
+  '1M.A1.04.1CON': 20,
+  '1M.A1.04.2CON': 21,
+  '1M.A1.04.3CON': 22,
+  '1M.A1.04.4CON': 23,
+  '1M.A1.04.5CON': 24,
+  '1M.A1.04.6CON': 25,
+  '1M.A1.05_1.60_80T': 28,
+  '1M.A1.05_1.80T_LEN': 29,
+  '1M.A1.05_2': 30,
+  '1M.A1.05_3': 31,
+  '1M.A1.05_4': 32,
+  '1M.A1.06_1.DUOI16T': 35,
+  '1M.A1.06_1.16_60T': 36,
+  '1M.A1.06_1.60T_LEN': 37,
+  '1M.A1.06_2.DUOI16T': 39,
+  '1M.A1.06_2.16_60T': 40,
+  '1M.A1.06_2.60T_LEN': 41,
+  '1M.A1.07': 42,
+  '1M.A2.01_1': 45,
+  '1M.A2.01_2.1TRE': 47,
+  '1M.A2.01_2.2TRE': 48,
+  '1M.A2.01_2.3TRE': 49,
+  '1M.A2.02': 50,
+  '1M.A2.03_1.A': 53,
+  '1M.A2.03_1.B': 54,
+  '1M.A2.03_2.1': 56,
+  '1M.A2.03_2.2': 57,
+  '1M.A2.03_2.3': 58,
+  '1M.A2.03_2.4': 59,
+  '1M.A2.03_3.1NGUOI': 61,
+  '1M.A2.03_3.2NGUOI': 62,
+  '1M.A2.03_3.1TRE': 63,
+  '1M.A2.03_3.2TRE': 64,
+  '1M.A3.01_1.DUOI4T': 68,
+  '1M.A3.01_1.4_16T': 69,
+  '1M.A3.01_2.DUOI4T': 71,
+  '1M.A3.01_2.4_16T': 72,
+  '1M.A3.02': 73,
+  '1M.A3.03.DUOI4T': 75,
+  '1M.A3.03.4T_LEN': 76,
+  '1M.A3.04.DUOI4T': 78,
+  '1M.A3.04.4T_LEN': 79,
+  '1M.B.MAI_TANG': 80,
+};
+const CK = 'indi' + 'catorCode';
+function num(v){ if(v==null||v==='')return null; const n=Number(v); return Number.isFinite(n)?n:null; }
+return defineScript({
+  async afterInject(ctx){
+    const periodId = ctx.shared && ctx.shared.periodId;
+    if(!periodId) return; // chi chay o man tong hop, bo qua khi nhap lieu
+    const scope=(ctx.shared&&ctx.shared.scopeKind)?'&scopeKind='+ctx.shared.scopeKind:'';
+    const src=(ctx.shared&&ctx.shared.sourceSheet)?'&sourceSheetCode='+encodeURIComponent(ctx.shared.sourceSheet):'';
+    let rows; try{ rows=await ctx.api.get('/rest/qt/summary/data?periodId='+periodId+scope+src);}catch(e){ctx.ui.message('Loi 1m: '+e.message);return;}
+    let n=0; for(const r of (rows||[])){ const row=ROW[r[CK]]; if(row==null)continue; const q=num(r.quantity); if(q==null)continue; try{ctx.cell.set(SHEET,row,COL,q);n++;}catch(e){} }
+    ctx.ui.message('Da do '+n+' dong so cai vao bieu theo ky.');
+  }
+});

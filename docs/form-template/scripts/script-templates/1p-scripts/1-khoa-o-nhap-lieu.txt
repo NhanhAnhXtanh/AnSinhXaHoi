@@ -1,0 +1,55 @@
+// Nguon: DB qt_template_script — bieu 1p, phien ban PB-000030, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1p · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1p".
+// Nguồn: form-template/1p.xlsx (sheet '1p', A1:J16). Tọa độ 0-based.
+//
+// Biểu 1p (Phụ lục 01p — NSNN hỗ trợ đóng BHXH tự nguyện) — DỌC 4 DÒNG đối tượng (row 9..12):
+//   C(c2)=Số đối tượng | D(c3)=Kinh phí thực hiện (NHẬP TAY, không công thức) | E(c4)=Ghi chú
+//   Tiểu tổng C8,D8 (row 8) là =SUM(...) → giữ khoá.
+// Kinh phí do đơn vị TỰ TÍNH & nhập (không có công thức/tham số) → lưu nguyên.
+
+const SHEET = '1p';
+const LEAF_ROWS = [8, 9, 10, 11]; // 4 dòng đối tượng (0-based)
+const INPUT_COLS = [2, 3, 4];     // C số đối tượng, D kinh phí, E ghi chú
+
+function isEditable(row, col) {
+  if (row === 2 && col === 1) return true;  // B3 tháng/năm
+  return LEAF_ROWS.indexOf(row) >= 0 && INPUT_COLS.indexOf(col) >= 0;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 2, 1, false);
+  LEAF_ROWS.forEach((row) => INPUT_COLS.forEach((col) => ctx.cell.lock(SHEET, row, col, false)));
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tự điền tên đơn vị của phiếu vào ô ĐƠN VỊ (A1) rồi GIỮ KHOÁ (đơn vị không sửa).
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

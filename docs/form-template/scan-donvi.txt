@@ -1,0 +1,573 @@
+==========================================================================================
+SHEET: '01'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)'
+r  2: A='TỔNG HỢP KẾT QUẢ THỰC HIỆN CÁC CHÍNH SÁCH, CHẾ ĐỘ ASXH NĂM 2025'
+r  3: G='Đơn\xa0vị tính: Triệu đồng'
+r  4: A='STT' | B='Chính sách, chế độ' | C='Kết quả thực hiện năm 2025' | E='Đối chiếu theo mục lục ngân sách theo Thông tư số 130/2025/TT-BTC' | G='Ghi chú' | H='Làm rõ Loại - Khoản/Mục - Tiểu Mục'
+r  5: C='Số đối tượng' | D='Kinh\xa0phí NSNN\xa0thực hiện chính sách theo chế độ, chính sáchnăm 2025' | E='Loại - Khoản' | F='Mục- Tiểu mục'
+r  7: C='số đối tượng yêu cầu sử dụng hàm MAX nếu các phụ lục chi tiết thể hiện dạng (06 tháng đầu năm- 06 tháng cuối năm; Học kỳ II-Học kỳ I;..)'
+r  8: A='A' | B='B' | C=1.0 | D=2.0 | G=11.0
+r  9: B='TỔNG SỐ' | C='=C10+C54+C78+C91' | D='=D10+D54+D78+D91'
+r 10: A=1.0 | B='Các chính sách thuộc sự nghiệp giáo dục - đào tạo và dạy nghề' | C='=C11+C17+C21+C24+C33+C34+C40+C41+C46+C49' | D='=D11+D17+D21+D24+D33+D34+D40+D41+D46+D49' | E=70.0 | H='Loại: GD - ĐT và dạy nghề'
+r 11: A='1.1' | B='Hỗ Trợ Chi Phí Học Tập Và Cấp Bù Học Phí Theo Nghị Định Số 238/2025/NĐ-CP' | C='=C12+C16' | D='=D12+D16' | E='070 - 071, 072, 073, 074' | F='6150 - 6156, 6157; 7750 - 7766' | G='Chi tiết theo phụ lục số 01a \n(*)' | H='Khoản:\n071 - GD Mầm non\n072 - GD tiểu học\n073 - GD THCS\n074 - GD THPT'
+r 12: A='-' | B='Cấp bù miễn, giảm học phí' | C='=sum(C13:C15)' | D='=SUM(D13:D15)'
+r 13: B=' + Miễn học phí' | C="=MAX('1a-sgd-xp-dhcdtc'!D13,'1a-sgd-xp-dhcdtc'!F13)" | D="='1a-sgd-xp-dhcdtc'!E13+'1a-sgd-xp-dhcdtc'!G13" | E='070-071….' | F='6157-6199'
+r 14: B=' + Hỗ trợ 70% học phí' | C="=MAX('1a-sgd-xp-dhcdtc'!D25,'1a-sgd-xp-dhcdtc'!F25)" | D="='1a-sgd-xp-dhcdtc'!E25+'1a-sgd-xp-dhcdtc'!G25"
+r 15: B=' + Hỗ trợ 50% học phí' | C="=MAX('1a-sgd-xp-dhcdtc'!D29,'1a-sgd-xp-dhcdtc'!F29)" | D="='1a-sgd-xp-dhcdtc'!E29+'1a-sgd-xp-dhcdtc'!G29"
+r 16: A='-' | B='Hỗ trợ chi phí học tập' | C="=MAX('1a-sgd-xp-dhcdtc'!D10,'1a-sgd-xp-dhcdtc'!F10)" | D="='1a-sgd-xp-dhcdtc'!E10+'1a-sgd-xp-dhcdtc'!G10"
+r 17: A='1.2' | B='Chính sách phát triển giáo dục mầm non Nghị định 105/2020/NĐ-CP ngày 08/09/2020 của Chính phủ ' | C='=SUM(C18:C20)' | D='=SUM(D18:D20)' | E='070 - 071' | F='6100 - 6149; 6150 - 6199; 6400 - 6401' | G='Chi tiết theo phụ lục số 01b, 01c'
+r 18: A='-' | B='Hỗ trợ tiền ăn trưa trẻ em 3-5 tuổi' | C="=MAX('1b-sgd-xp'!C9,'1b-sgd-xp'!G9)" | D="='1b-sgd-xp'!J9+'1b-sgd-xp'!F9" | G='phụ lục số 01b'
+r 19: A='-' | B='Hỗ trợ nấu ăn' | C="='1b-sgd-xp'!K9" | D="='1b-sgd-xp'!L9"
+r 20: A='-' | B='Hỗ trợ giáo viên dạy lớp ghép' | C="='1c-sgd-xp'!C9" | D="='1c-sgd-xp'!F9" | G='phụ lục số 01c'
+r 21: A='1.3' | B='Học bổng, chi phí học tập cho học sinh khuyết tật theo Thông tư liên tịch số 42/2013/TTLT-BGDĐT-BLĐTBXH-BTC ngày 31/12/2013' | C='=SUM(C22:C23)' | D='=SUM(D22:D23)' | E='070 - 071, 072, 073, 074,075,081' | F='6157-6199' | G='Chi tiết theo phụ lục số 01d'
+r 22: A='-' | B='Hỗ trợ học bổng 80% mức lương cơ sở' | C="='1d-sgd-xp'!H9" | D="='1d-sgd-xp'!F9+'1d-sgd-xp'!K9"
+r 23: A='-' | B='Hỗ trợ mua phương tiện đồ dùng học tập 01 trđ/người/năm học.' | C="='1d-sgd-xp'!H9" | D="='1d-sgd-xp'!G9+'1d-sgd-xp'!L9"
+r 24: A='1.4' | B='Kinh phí hỗ trợ học sinh PTTH vùng ĐBKK theo Nghị định số 116/2016/NĐ-CP ngày 18/07/2016 và số 66/2025/NĐ-CP ngày 12/3/2025 của Chính phủ' | C='=C25+C30' | D='=D25+D30' | E='070 - 071, 072, 073, 074' | G='Chi tiết theo phụ lục số 01e'
+r 25: A='-' | B='Học sinh bán trú, học sinh dân tộc nội trú và học sinh dự bị đại học' | C='=SUM(C26:C29)' | D='=SUM(D26:D29)'
+r 26: B='- Hỗ trợ tiền ăn' | C="=MAX('1e-sgd-xp'!D11,'1e-sgd-xp'!O11)" | D="='1e-sgd-xp'!H11+'1e-sgd-xp'!S11"
+r 27: B='- Hỗ trợ tiền nhà ở' | C="=MAX('1e-sgd-xp'!E11,'1e-sgd-xp'!P11)" | D="='1e-sgd-xp'!J11+'1e-sgd-xp'!U11"
+r 28: B='- Hỗ trợ Trường PTDT bán trú mua sắm dụng cụ, tủ thuốc dùng chung' | C=0.0 | D="='1e-sgd-xp'!V11"
+r 29: B='- Hỗ trợ kinh phí tổ chức nấu ăn cho trường' | C=0.0 | D="='1e-sgd-xp'!L11+'1e-sgd-xp'!Z11"
+r 30: A='-' | B='Trẻ em nhà trẻ bán trú' | C='=SUM(C31:C32)' | D='=SUM(D31:D32)'
+r 31: B='- Hỗ trợ tiền ăn' | C="=MAX('1e-sgd-xp'!F11,'1e-sgd-xp'!Q11)" | D="='1e-sgd-xp'!I11+'1e-sgd-xp'!T11"
+r 32: B='- Hỗ trợ tiền mua đồ dung cá nhân cho cơ sở giáo dục mầm non' | C=0.0 | D="='1e-sgd-xp'!AA11"
+r 33: A='1.5' | B='Kinh phí hỗ trợ chi phí học tập đối với sinh viên là người DTTS theo Quyết định số 66/2013/QĐ-TTg ngày 11/11/2013 của Thủ tướng Chính phủ' | C="=MAX('1f-sgd-xp-sdt'!C9,'1f-sgd-xp-sdt'!E9)" | D="='1f-sgd-xp-sdt'!G9" | E='070 - 081, 093' | G='Chi tiết theo phụ lục số 01f'
+r 34: A='1.6' | B='Kinh phí hỗ trợ chính sách nội trú đối với học sinh, sinh viên học cao đẳng, trung cấp theo Quyết định số 53/2015/QĐ-TTg ngày 20/10/2015 của Thủ tướng Chính phủ.' | C='=C35+C39' | D='=D35+D39' | E='070 - 092, 093' | G='Chi tiết theo phụ lục số 01g'
+r 35: A='-' | B='Hỗ trợ học bổng chính sách:' | C='=SUM(C36:C38)' | D='=SUM(D36:D38)'
+r 36: B='- 100% lương cơ sở/tháng' | C="=MAX('1g-cd-tc-svh'!F11,'1g-cd-tc-svh'!I11)" | D="='1g-cd-tc-svh'!H11+'1g-cd-tc-svh'!K11"
+r 37: B='- 80% lương cơ sở/tháng' | C="=MAX('1g-cd-tc-svh'!F14,'1g-cd-tc-svh'!I14)" | D="='1g-cd-tc-svh'!H14+'1g-cd-tc-svh'!K14"
+r 38: B='- 60% lương cơ sở/tháng' | C="=MAX('1g-cd-tc-svh'!F17,'1g-cd-tc-svh'!I17)" | D="='1g-cd-tc-svh'!H17+'1g-cd-tc-svh'!K17"
+r 39: A='-' | B='Hỗ trợ 1 lần (1 triệu đồng/khóa mua đồ dùng cá nhân; tiền đi lại 200 nghìn, đối với HS vùng ĐBKK 300 nghìn/năm; 150 nghìn nếu Tết ở lại).  ' | C=31.0 | D="='1g-cd-tc-svh'!P10"
+r 40: A='1.7' | B='Kinh phí hỗ trợ học bổng học sinh dân tộc nội trú theo Nghị định số 84/2020/NĐ-CP ngày 17/7/2020 của Chính phủ' | C="=MAX('1h-sgd-xp'!C10,'1h-sgd-xp'!E10)" | D="='1h-sgd-xp'!G10" | E='070 - 072, 073, 074' | G='Chi tiết theo phụ lục số 01h'
+r 41: A='1.8' | B='Kinh phí hỗ trợ ưu tiên tuyển sinh và hỗ trợ học tập đối với trẻ mẫu giáo, học sinh, sinh viên dân tộc thiểu số rất ít người theo Nghị định số 57/2017/NĐ-CP ngày 05/5/2017' | C="=MAX('1i-sgd-xp-dhcdtc'!C10,'1i-sgd-xp-dhcdtc'!G10)" | D='=SUM(D42:D45)' | E='070 - 071, 072, 073, 074, 081, 093' | G='Chi tiết theo phụ lục số 01i'
+r 42: A='-' | B='Trẻ mẫu giáo DTTS rất ít người' | C="=MAX('1i-sgd-xp-dhcdtc'!C11,'1i-sgd-xp-dhcdtc'!G11)" | D="='1i-sgd-xp-dhcdtc'!K11"
+r 43: A='-' | B='Học sinh DTTS rất ít người trường tiểu học, THCS, THPT' | C="=MAX('1i-sgd-xp-dhcdtc'!C12,'1i-sgd-xp-dhcdtc'!G12)" | D="='1i-sgd-xp-dhcdtc'!K12"
+r 44: A='-' | B='Học sinh DTTS rất ít người trường phổ thông dân tộc bán trú hoặc học sinh bán trú học tại trường phổ thông công lập có học sinh bán trú ' | C="=MAX('1i-sgd-xp-dhcdtc'!C13,'1i-sgd-xp-dhcdtc'!G13)" | D=47.0
+r 45: A='-' | B='Học sinh DTTS rất ít người trường phổ thông dân tộc nội trú, các trường, khoa dự bị đại học, các cơ sở giáo dục đại học, cơ sở giáo dục nghề nghiệp' | C="=MAX('1i-sgd-xp-dhcdtc'!C10,'1i-sgd-xp-dhcdtc'!G10)" | D=47.0
+r 46: A='1.9' | B='Kinh phí hỗ trợ sinh hoạt phí và học phí cho sinh viên sư phạm theo Nghị định số 116/2020/NĐ-CP ngày 25/09/2020 và số 60/2025/NĐ-CP ngày 03/3/2025 của Chính phủ' | C='=SUM(C47:C48)' | D='=SUM(D47:D48)' | E='070 - 081, 093' | G='Chi tiết theo phụ lục số 01j'
+r 47: A='-' | B='Hỗ trợ học phí' | C="='1j-dhdn-cdbp'!C10" | D="='1j-dhdn-cdbp'!G10"
+r 48: A='-' | B='Hỗ trợ sinh hoạt phí' | C="='1j-dhdn-cdbp'!C10" | D="='1j-dhdn-cdbp'!H10"
+r 49: A='1.10' | B='Kinh phí phổ cập giáo dục mầm non theo Nghị định số 277/2025/NĐ-CP ' | C='=SUM(C50:C53)' | D='=SUM(D50:D53)' | E='070 - 071' | G='Chi tiết theo phụ lục số 01k\n(*)'
+==========================================================================================
+SHEET: '1a-sgd-xp-dhcdtc'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | F='Phụ lục số 01a'
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN HỖ TRỢ CHI PHÍ HỌC TẬP VÀ CẤP BÙ HỌC PHÍ THEO NGHỊ ĐỊNH SỐ 238/2025/NĐ-CP NĂM 2025'
+r  4: F='Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Chỉ tiêu' | C='Tổng kinh phí thực hiện chính sách' | D='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | F='Kết quả thực hiện Kỳ I năm học 2025-2026' | H='Ghi chú'
+r  7: D='Số đối tượng' | E='Kinh phí' | F='Số đối tượng' | G='Kinh phí'
+r  8: A='A' | B='B' | C='1=3+5' | D=2.0 | E=3.0 | F=4.0 | G=5.0 | H=6.0
+r  9: B='Hỗ trợ chi phí học tập và miễn giảm học phí theo quy định tại Nghị định số 238/2025/NĐ-CP' | C='=E9+G9' | D='=D10+D12' | E='=E10+E12' | F='=F10+F12' | G='=G10+G12' | H=0.0 | I='Check lại đầu ĐV thực hiện BC ntn?'
+r 10: A='A' | B='Hỗ trợ chi phí học tập' | C='=C11' | D='=D11' | E='=E11' | F='=F11' | G='=G11' | H=0.0
+r 11: B='Hỗ trợ chi phí học tập' | C='=E11+G11' | D=11999.0 | E=13853.0 | F=14846.0 | G=11898.0 | H=0.0
+r 12: A='B' | B='Miễn học phí, giảm học phí' | C='=C13+C24' | D='=D13+D24' | E='=E13+E24' | F='=F13+F24' | G='=G13+G24' | H=0.0
+r 13: A='I' | B='Miễn học phí' | C='=SUM(C14:C23)' | D='=SUM(D14:D23)' | E='=SUM(E14:E23)' | F='=SUM(F14:F23)' | G='=SUM(G14:G23)' | H=0.0
+r 14: A=1.0 | B='Người tốt nghiệp THCS học tiếp lên trình độ trung cấp' | C='=E14+G14' | D=6899.0 | E=26562.0 | F=7567.0 | G=32820.0 | H=0.0 | I='=SUM(C10,C12)'
+r 15: A=2.0 | B='Các đối tượng theo quy định tại Pháp lệnh Ưu đãi người có công với cách mạng nếu đang theo học tại các cơ sở giáo dục thuộc hệ thống giáo dục quốc dân.' | C='=E15+G15' | D=46.0 | E=66.0 | F=41.0 | G=62.0 | H=0.0
+r 16: A=3.0 | B='Học sinh, sinh viên mồ côi cả cha lẫn mẹ' | C='=E16+G16' | D=93.0 | E=54.0 | F=50.0 | G=39.0 | H=0.0
+r 17: A=4.0 | B='Học sinh, sinh viên là người dân tộc thiểu số thuộc hộ nghèo hoặc cận nghèo theo quy định của Chính phủ' | C='=E17+G17' | D=658.0 | E=220.0 | F=477.0 | G=205.0 | H=0.0
+r 18: A=5.0 | B='Học sinh, sinh viên khuyết tật' | C='=E18+G18' | D=933.0 | E=416.0 | F=1714.0 | G=486.0 | H=0.0
+r 19: A=7.0 | B='Miễn học phí chính quy' | C='=E19+G19' | D=1892.0 | E=6834.0 | F=5289.0 | G=1743.0 | H=0.0
+r 20: A=8.0 | B='Đối tượng  thuộc Sở GD&ĐT' | C='=E20+G20' | D=0.0 | E=0.0 | F=0.0 | G=0.0 | H=0.0
+r 21: A=9.0 | B='Đối tượng thuộc các xã, phường ' | C='=E21+G21' | D=34950.0 | E=35417.0 | F=47477.0 | G=36465.0 | H=0.0
+r 22: A=10.0 | B='Hỗ trợ đóng học phí cho học sinh ( Ngoài công lập ) khối trực thuộc Sở GD ' | C='=E22+G22' | D=0.0 | E=0.0 | F=1165.0 | G=212.0 | H=0.0
+r 23: A=11.0 | B='Hỗ trợ đóng học phí cho học sinh ( Ngoài công lập ) khối trực thuộc xã, phường' | C='=E23+G23' | D=816.0 | E=839.0 | F=2115.0 | G=783.0 | H=0.0
+r 24: A='II' | B='Giảm học phí' | C='=C25+C29' | D='=D25+D29' | E='=E25+E29' | F='=F25+F29' | G='=G25+G29' | H=0.0
+r 25: A=1.0 | B='- Giảm 70% học phí' | C='=SUM(C26:C28)' | D='=SUM(D26:D28)' | E='=SUM(E26:E28)' | F='=SUM(F26:F28)' | G='=SUM(G26:G28)' | H=0.0
+r 26: A='-' | B='Học sinh, sinh viên học một số nghề học nặng nhọc, độc hại, nguy hiểm đối với giáo dục nghề nghiệp ' | C='=E26+G26' | D=4869.0 | E=14759.0 | F=3569.0 | G=12433.0 | H=0.0
+r 27: A='-' | B='Học sinh, sinh viên học các ngành nghệ thuật truyền thống và đặc thù trong các cơ sở giáo dục nghề nghiệp, cơ sở giáo dục đại học công lập, tư thục có đào tạo về văn hóa - nghệ thuật bao gồm: Nhạc công kịch hát dân tộc, nhạc công truyền thống Huế, đờn ca tài tử Nam Bộ, diễn viên sân khấu kịch hát, nghệ thuật biểu diễn dân ca, nghệ thuật ca trù, nghệ thuật bài chòi, biểu diễn nhạc cụ truyền thống;' | C='=E27+G27' | D=37.0 | E=251.0 | F=0.0 | G=0.0 | H=0.0
+r 28: A='-' | B='Trẻ em học mẫu giáo và học sinh, sinh viên là người dân tộc thiểu số (ngoài đối tượng dân tộc thiểu số rất ít người) ở thôn/bản đặc biệt khó khăn, xã khu vực III vùng dân tộc và miền núi, xã đặc biệt khó khăn vùng bãi ngang ven biển hải đảo theo quy định của cơ quan có thẩm quyền' | C='=E28+G28' | D=83.0 | E=96.0 | F=0.0 | G=0.0 | H=0.0
+r 29: A=2.0 | B='- Giảm 50% học phí' | C='=SUM(C30:C31)' | D='=SUM(D30:D31)' | E='=SUM(E30:E31)' | F='=SUM(F30:F31)' | G='=SUM(G30:G31)' | H=0.0
+r 30: A='-' | B='Trẻ em học mẫu giáo và học sinh, sinh viên là con cán bộ, công chức, viên chức, công nhân mà cha hoặc mẹ bị tai nạn lao động hoặc mắc bệnh nghề nghiệp được hưởng trợ cấp thường xuyên;' | C='=E30+G30' | D=160.0 | E=41.0 | F=155.0 | G=34.0 | H=0.0
+r 31: B='Trẻ em học mẫu giáo và học sinh phổ thông, học viên học tại cơ sở giáo dục thường xuyên theo chương trình giáo dục phổ thông có cha hoặc mẹ hoặc cả cha và mẹ hoặc ông bà (trong trường hợp ở với ông bà) thuộc diện hộ cận nghèo theo quy định của Thủ tướng Chính phủ.' | C='=E31+G31' | D=1491.0 | E=310.0 | F=1101.0 | G=174.0 | H=0.0
+==========================================================================================
+SHEET: '1b-sgd-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | M='Phụ lục số 01b'
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH PHÁT TRIỂN GIÁO DỤC MẦM NON THEO NGHỊ ĐỊNH SỐ 105/2020/NĐ-CP NĂM 2025'
+r  4: M=' Đơn vị: Triệu đồng'
+r  5: A='TT' | B='Tên huyện, thành phố' | C='Hỗ trợ tiền ăn trưa' | K='Hỗ trợ nấu ăn' | M='Hỗ trợ giáo viên lớp ghép \n(Chi tiết theo Phụ lục số 01c)' | N='Tổng kinh phí thực hiện chính sách\n' | O='Ghi chú'
+r  6: C='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | G='\nKết quả thực hiện Kỳ I năm học 2025-2026\n'
+r  7: C='Đối tượng' | D='Mức hỗ trợ\n' | E='Thời gian hỗ trợ' | F='Kinh phí\n' | G='Đối tượng' | H='Mức hỗ trợ\n' | I='Thời gian hỗ trợ' | J='Kinh phí' | K='Số định suất nấu ăn' | L='Kinh phí\n(2,4trđ/45TE/tháng)\n(*)'
+r  8: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F='4=1*2*3' | G=5.0 | H=6.0 | I=7.0 | J='8=5*6*7' | K=9.0 | L=10.0 | M=11.0 | N='12=4+8+10+11' | O=13.0
+r  9: B='Tổng cộng (I+II)' | C='=SUM(C10+C13)' | D=0.16 | E='=SUM(E10+E13)' | F='=SUM(F10+F13)' | G='=SUM(G10+G13)' | H=0.16 | I='=SUM(I10+I13)' | J='=SUM(J10+J13)' | K='=SUM(K10+K13)' | L='=SUM(L10+L13)' | M='=SUM(M10+M13)' | N='=SUM(N10+N13)' | O='=SUM(O10+O13)'
+r 10: A='I.' | B='Khối tỉnh' | C='=C11' | D=0.16 | E='=E11' | F='=F11' | G='=G11' | H=0.16 | I='=I11' | J='=J11' | K='=K11' | L='=L11' | M='=M11' | N='=N11' | O='=O11'
+r 11: A='-' | B='Sở Giáo dục và Đào tạo' | C=0.0 | D=0.16 | E=5.0 | F='=C11*D11*E11' | G=0.0 | H=0.16 | I=4.0 | J='=G11*H11*I11' | K=0.0 | L=0.0 | M=0.0 | N='=ROUND(F11+J11+L11+M11,0)' | O=0.0
+r 13: A='II.' | B='Khối Xã/Phường/Đặc khu' | C=12010.0 | D=0.16 | E=4.0 | F=7676.0 | G=13362.0 | H=0.16 | I=3.0 | J=6414.0 | K=55.0 | L=182.0 | M=0.0 | N=14272.0 | O=0.0
+r 14: A='-' | B='Xã An Lộc' | C=12010.0 | D=0.16 | E=4.0 | F=7676.0 | G=13362.0 | H=0.16 | I=3.0 | J='=ROUND(G14*H14*I14,0)' | K=55.0 | L=182.0 | M="='1c-sgd-xp'!F9" | N='=ROUND(F14+J14+L14+M14,0)' | O=0.0
+r 15: A='-' | B='…' | O=0.0
+r 17: A='(*)' | B='2,4 triệu đồng/01 tháng/45 trẻ em, dư trên 20 trẻ em được thêm 01 lần, nhưng không quá 5 lần/tháng, không quá 9 tháng/năm'
+==========================================================================================
+SHEET: '1c-sgd-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | F='Phụ lục số 01c'
+r  2: A='TỔNG HỢP KINH PHÍ  THỰC HIỆN CHẾ ĐỘ GIÁO VIÊN MẦM NON THEO NGHỊ ĐỊNH SỐ 105/2020/NĐ-CP NĂM 2025'
+r  4: F='Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Đơn vị' | C='Số giáo viên hưởng chính sách' | D='Mức hỗ trợ ' | E='Thời gian hưởng' | F='Tổng kinh phí thực hiện chính sách'
+r  8: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F='4=1*2*3'
+r  9: B='Tổng cộng' | C='=SUM(C10,C13)' | D='=SUM(D10,D13)' | E='=SUM(E10,E13)' | F='=SUM(F10,F13)'
+r 10: A='I.' | B='Khối tỉnh' | C='=C11' | D='=D11' | E='=E11' | F='=F11'
+r 11: A='-' | B='Sở Giáo dục và Đào tạo' | C=0.0 | D=0.8 | E=6.0 | F='=ROUND(E11*C11*D11,0)'
+r 13: A='II.' | B='Khối Xã/Phường/Đặc khu' | C=861.0 | D=0.8 | E=6.08595 | F='=ROUND(E13*C13*D13,0)'
+r 14: A='-' | B='Xã An Lộc' | C=861.0 | D=0.8 | E=6.08595 | F='=ROUND(E14*C14*D14,0)'
+r 15: A='-' | B='..'
+==========================================================================================
+SHEET: '1d-sgd-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | L='Phụ lục số 01d' | O='Tiền lương' | P=2.34 | Q=2.34
+r  3: A='TỔNG HỢP KINH PHÍ THỰC HIỆN HỖ TRỢ HỌC SINH KHUYẾT TẬT THEO THÔNG TƯ LIÊN TỊCH 42/2013/TTLT-BGDĐT-BLĐTBXH-BTC NĂM 2025'
+r  4: M=' Đơn vị: Triệu đồng'
+r  5: A='TT' | B='Đơn vị thực hiện' | C='Kết quả thực hiện Kỳ II năm học 2024-2025' | H='\nKết quả thực hiện Kỳ I năm học 2025-2026\n' | M='Tổng kinh phí thực hiện chính sách'
+r  6: C='Số đối tượng' | D='Số tháng hỗ trợ' | E='Kinh phí         ' | H='Số đối tượng' | I='Số tháng hỗ trợ' | J='Kinh phí         '
+r  7: E='Tổng cộng' | F='Học bổng\n(*)' | G='Mua sắm phương tiện, đồ dùng học tập (**)' | J='Tổng cộng' | K='Học bổng' | L='Mua sắm phương tiện, đồ dùng học tập'
+r  8: A='A' | B='B' | C=1.0 | D=2.0 | E='3=4+5' | F=4.0 | G=5.0 | H=6.0 | I=7.0 | J='8=9+10' | K=9.0 | L=10.0 | M='11=3+8'
+r  9: B='Tổng cộng' | C='=SUM(C10,C12)' | D='=SUM(D10,D12)' | E='=SUM(E10,E12)' | F='=SUM(F10,F12)' | G='=SUM(G10,G12)' | H='=SUM(H10,H12)' | I='=SUM(I10,I12)' | J='=SUM(J10,J12)' | K='=SUM(K10,K12)' | L='=SUM(L10,L12)' | M='=SUM(M10,M12)'
+r 10: A='I.' | B='Khối tỉnh' | C='=SUM(C11)' | D='=SUM(D11)' | E='=SUM(E11)' | F='=SUM(F11)' | G='=SUM(G11)' | H='=SUM(H11)' | I='=SUM(I11)' | J='=SUM(J11)' | K='=SUM(K11)' | L='=SUM(L11)' | M='=SUM(M11)'
+r 11: A='-' | B='Sở Giáo dục và Đào tạo' | C=38.0 | D=5.0 | E='=SUM(F11:G11)' | F=217.0 | G=1.0 | H=34.0 | I=4.0 | J='=SUM(K11:L11)' | K=262.0 | L=0.0 | M='=E11+J11'
+r 12: A='II.' | B='Khối Xã/Phường/Đặc khu' | C=237.0 | D=5.0 | E='=SUM(F12:G12)' | F=800.0 | G=93.0 | H=241.0 | I=4.0 | J='=SUM(K12:L12)' | K=760.0 | L=92.0 | M='=E12+J12'
+r 13: A='-' | B='Xã An Lộc'
+r 14: A='-' | B='..'
+r 15: B='Hỗ trợ học bổng cơ sở giáo dục mầm non, cơ sở giáo dục phổ thông, trung tâm giáo dục thường xuyên, trường chuyên biệt, trung tâm hỗ trợ phát triển giáo dục hòa nhập: 9 tháng/năm học'
+r 16: A='(**)' | B='Hỗ trợ 1 triệu/năm học và vào đầu năm học'
+r 18: B='"Học bổng\n(*)"'
+r 19: B='Mua sắm phương tiện, đồ dùng học tập (**)'
+r 39: A='TỔNG HỢP KINH PHÍ THỰC HIỆN HỖ TRỢ HỌC SINH KHUYẾT TẬT THEO THÔNG TƯ LIÊN TỊCH 42/2013/TTLT-BGDĐT-BLĐTBXH-BTC NĂM 2026'
+r 41: M=' Đơn vị: Triệu đồng'
+r 42: A='TT' | B='Đơn vị thực hiện' | C='Kết quả (nhu cầu) thực hiện Kỳ II năm học ...\n' | H='Nhu cầu thực hiện Kỳ I năm học ...\n' | M='Tổng kinh phí thực hiện chính sách'
+r 43: C='Số đối tượng' | D='Số tháng hỗ trợ' | E='Kinh phí         ' | H='Số đối tượng' | I='Số tháng hỗ trợ' | J='Kinh phí         '
+r 44: E='Tổng cộng' | F='Học bổng\n(*)' | G='Mua sắm phương tiện, đồ dùng học tập (**)' | J='Tổng cộng' | K='Học bổng' | L='Mua sắm phương tiện, đồ dùng học tập'
+r 45: A='A' | B='B' | C=1.0 | D=2.0 | E='3=4+5' | F=4.0 | G=5.0 | H=6.0 | I=7.0 | J='8=9+10' | K=9.0 | L=10.0 | M='11=3+8'
+r 46: B='Tổng cộng' | E='=F46+G46' | F='=$C$46*$D$46*$P$1*0.8' | J='=K46+L46' | K='=H46*I46*$Q$1*0.8' | L='=H46*1' | M='=E46+J46'
+r 47: A='I.' | B='Khối tỉnh'
+r 48: B='Sở Giáo dục và Đào tạo'
+r 49: B='…'
+==========================================================================================
+SHEET: '1e-sgd-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)'
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ HỌC SINH VÀ TRƯỜNG PTDT BÁN TRÚ THEO NGHỊ ĐỊNH SỐ 66/2025/NĐ-CP NĂM 2025'
+r  4: A='STT' | B='Đơn vị thực hiện' | C='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | N='Kết quả thực hiện Kỳ I năm học 2025-2026'
+r  5: C='Hỗ trợ tiền ăn và nhà ở' | K='Phục vụ nấu ăn \ncho học sinh' | M='Tổng cộng kinh phí thực hiện' | N='Hỗ trợ tiền ăn và nhà ở'
+r  6: C='Đối tượng' | G='Kinh phí' | H='Gồm' | K='Định mức nấu ăn\n(*)' | L='Kinh phí' | N='Số học sinh ' | R='Kinh phí' | S='Gồm'
+r  7: C='Tổng số' | D='Trong đó' | H='Hỗ trợ tiền ăn' | J='Hỗ trợ tiền nhà ở học sinh, học viên bán trú' | N='Tổng số' | O='Trong đó' | S='Hỗ trợ tiền ăn'
+r  8: D='Học sinh, học viên bán trú' | E='Trong đó' | F='Trẻ em nhà trẻ' | H='Học sinh, học viên bán trú' | I='Trẻ em nhà trẻ' | O='Học sinh, học viên bán trú' | P='Trong đó' | Q='Trẻ em nhà trẻ' | S='Học sinh, học viên bán trú'
+r  9: E='Học sinh, học viên được hỗ trợ thêm tiền nghỉ trọ' | P='Học sinh, học viên được hỗ trợ thêm tiền nghỉ trọ'
+r 10: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F=4.0 | G='5=6+7+8' | H=6.0 | I=7.0 | J=8.0 | K=9.0 | L=10.0 | M='11=5+10' | N=12.0 | O=13.0 | P=14.0 | Q=15.0 | R='16=17+18+19' | S=17.0
+r 11: B='Tổng cộng' | C='=SUM(C12+C15)' | D='=SUM(D12+D15)' | E='=SUM(E12+E15)' | F='=SUM(F12+F15)' | G='=SUM(G12+G15)' | H='=SUM(H12+H15)' | I='=SUM(I12+I15)' | J='=SUM(J12+J15)' | K='=SUM(K12+K15)' | L='=SUM(L12+L15)' | M='=SUM(M12+M15)' | N='=SUM(N12+N15)' | O='=SUM(O12+O15)' | P='=SUM(P12+P15)' | Q='=SUM(Q12+Q15)' | R='=SUM(R12+R15)' | S='=SUM(S12+S15)'
+r 12: A='I.' | B='Khối tỉnh' | C='=SUM(C13)' | D='=SUM(D13)' | E='=SUM(E13)' | F='=SUM(F13)' | G='=SUM(G13)' | H='=SUM(H13)' | I='=SUM(I13)' | J='=SUM(J13)' | K='=SUM(K13)' | L='=SUM(L13)' | M='=SUM(M13)' | N='=SUM(N13)' | O='=SUM(O13)' | P='=SUM(P13)' | Q='=SUM(Q13)' | R='=SUM(R13)' | S='=SUM(S13)'
+r 13: A=1.0 | B='Sở Giáo dục và Đào tạo' | C='=D13+F13' | D=85.0 | E=0.0 | F=0.0 | G='=+L13' | H=483.0 | M='=E13+J13' | R='=SUM(S13:U13)'
+r 14: A=2.0 | B='…'
+r 15: A='II.' | B='Khối Xã/Phường/Đặc khu' | C='=SUM(C17)' | D='=SUM(D17)' | E='=SUM(E17)' | F='=SUM(F17)' | G='=SUM(G17)' | H='=SUM(H17)' | I='=SUM(I17)' | J='=SUM(J17)' | K='=SUM(K17)' | L='=SUM(L17)' | M='=SUM(M17)' | N='=SUM(N17)' | O='=SUM(O17)' | P='=SUM(P17)' | Q='=SUM(Q17)' | R='=SUM(R17)' | S='=SUM(S17)'
+r 16: A=1.0 | B='Xã An Lộc' | C='=D16+F16' | D=1133.0 | E=619.0 | F=60.0 | G='=SUM(H16:J16)' | H=5043.0 | I=92.0 | J=1167.0 | K=0.0 | L=226.0 | M='=E16+J16' | N='=O16+Q16' | O=1090.0 | P=619.0 | Q=0.0 | R='=SUM(S16:U16)' | S=3362.0
+r 17: A=2.0 | B='…' | C='=D17+F17' | D=1133.0 | E=619.0 | F=60.0 | G='=SUM(H17:J17)' | H=5043.0 | I=92.0 | J=1167.0 | K=0.0 | L=226.0 | M='=E17+J17' | N='=O17+Q17' | O=1090.0 | P=619.0 | Q=0.0 | R='=SUM(S17:U17)' | S=3362.0
+r 18: C='Đối tượng' | D='Định mức nấu ăn' | E='Kinh phí'
+r 19: A='I' | B='Hỗ trợ tiền ăn và nhà ở' | C='=C20+C22' | E='=E20+E21+E22' | K='Học sinh bán trú, học sinh dân tộc nội trú và học sinh dự bị đại học'
+r 20: A=1.0 | B='Học sinh, học viên bán trú' | C='=O17' | D='x' | E='=S17' | K='- Hỗ trợ tiền ăn'
+r 21: A=1.1 | B='Học sinh, học viên được hỗ trợ thêm tiền nghỉ trọ' | C='=P17' | D='x' | E='=U17' | K='- Hỗ trợ tiền nhà ở'
+r 22: A=2.0 | B='Trẻ em nhà trẻ' | C='=Q17' | D='x' | E='=T17' | K='- Hỗ trợ Trường PTDT bán trú mua sắm dụng cụ, tủ thuốc dùng chung'
+r 23: A='II' | B='Phục vụ nấu ăn ' | C='x' | D='=Y17' | E='=Z17' | K='- Hỗ trợ kinh phí tổ chức nấu ăn cho trường'
+r 24: A='III' | B='Hỗ trợ học sinh bán trú tại trường PTDTBT và trường phổ thông có tổ chức nấu ăn' | C='x' | D='x' | E='=E25+E26' | K='Trẻ em nhà trẻ bán trú'
+r 25: A=1.0 | B='Mua sắm dụng cụ văn hóa, TDTT' | C='x' | D='x' | E='=W17' | K='- Hỗ trợ tiền ăn'
+r 26: A=2.0 | B='Lập tủ thuốc dùng chung' | C='x' | D='x' | E='=X17' | K='- Hỗ trợ tiền mua đồ dung cá nhân cho cơ sở giáo dục mầm non'
+r 27: A='IV' | B='Hỗ trợ tiền mua đồ dùng cá nhân cho trẻ em nhà trẻ bán trú cơ sở giáo dục mầm non' | C='x' | D='x' | E='=AA17'
+r 28: B='Tổng kinh phí' | E='=E19+E23+E24+E27'
+==========================================================================================
+SHEET: '1f-sgd-xp-sdt'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | G='Phụ lục số 01f' | I='Tiền lương' | J=2.34 | K=2.34
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN HỖ TRỢ CHI PHÍ HỌC TẬP ĐỐI VỚI SINH VIÊN LÀ NGƯỜI DTTS THEO QUYẾT ĐỊNH SỐ 66/2013/QĐ-TTG NĂM 2025'
+r  4: G=' Đơn vị: Triệu đồng'
+r  5: A='TT' | B='Đơn vị thực hiện' | C='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | E='Kết quả thực hiện Kỳ I năm học 2025-2026' | G='Tổng kinh phí thực hiện chính sách'
+r  6: C='Số đối tượng' | D='Kinh phí hỗ trợ chi phí học tập       ' | E='Số đối tượng' | F='Kinh phí hỗ trợ chi phí học tập       '
+r  8: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F=4.0 | G=5.0
+r  9: B='Tổng cộng' | C='=SUM(C10+C13)' | D='=SUM(D10+D13)' | E='=SUM(E10+E13)' | F='=SUM(F10+F13)' | G='=SUM(G10+G13)'
+r 10: A='I.' | B='Khối tỉnh' | C='=SUM(C11)' | D='=SUM(D11)' | E='=SUM(E11)' | F='=SUM(F11)' | G='=SUM(G11)'
+r 11: A='-' | B='Sở Dân tộc và Tôn giáo' | C=183.0 | D=1985.0 | E=0.0 | F=0.0 | G='=SUM(D11,F11)'
+r 12: A='-' | B='…'
+r 13: A='II.' | B='Khối Xã/Phường/Đặc khu' | C='=C15' | D='=SUM(D15)' | E='=SUM(E15)' | F='=SUM(F15)' | G='=SUM(G15)'
+r 14: A='-' | B='Xã An Lộc' | C=582.0 | D=9662.0 | E=485.0 | F=4142.0 | G='=SUM(D14,F14)'
+r 15: A='-' | B='…' | C=582.0 | D=9662.0 | E=485.0 | F=4142.0 | G='=SUM(D15,F15)'
+r 16: C='=C6' | D='=D6'
+r 17: A='(*)' | B='Không quá 10 tháng/năm học/sinh viên'
+r 19: A='TỔNG HỢP KINH PHÍ THỰC HIỆN HỖ TRỢ CHI PHÍ HỌC TẬP ĐỐI VỚI SINH VIÊN LÀ NGƯỜI DTTS THEO QUYẾT ĐỊNH SỐ 66/2013/QĐ-TTG NĂM 2026'
+r 21: G=' Đơn vị: Triệu đồng'
+r 22: A='TT' | B='Đơn vị thực hiện' | C='\nKết quả (nhu cầu) thực hiện Kỳ II năm học ...\n' | E='\nNhu cầu thực hiện Kỳ I năm học ...\n' | G='Tổng kinh phí thực hiện chính sách'
+r 23: C='Số đối tượng' | D='Kinh phí hỗ trợ chi phí học tập       ' | E='Số đối tượng' | F='Kinh phí hỗ trợ chi phí học tập       '
+r 25: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F=4.0 | G=5.0
+r 26: B='Tổng cộng' | D='=C26*0.6*5*$J$1' | F='=E26*0.6*5*$K$1' | G='=D26+F26'
+r 27: A='I.' | B='Khối tỉnh'
+r 28: B='Sở Giáo dục và Đào tạo'
+r 29: B='…'
+r 30: A='II.' | B='Khối Xã/Phường/Đặc khu'
+r 31: A=1.0 | B='Xã, Phường, Đặc khu A'
+r 32: B='…'
+r 33: A=2.0 | B='Xã, Phường, Đặc khu B'
+r 34: B='…'
+r 36: B='hỗ trợ chi phí học tập đối với sinh viên là người DTTS' | C='=C15' | D='=D15'
+r 37: B='Tổng kinh phí' | D='=D36'
+==========================================================================================
+SHEET: '1g-cd-tc-svh'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | P='Phụ lục số 01g' | S='Tiền lương'
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH NỘI TRÚ ĐỐI VỚI HỌC SINH, SINH VIÊN TRƯỜNG CAO ĐẲNG, TRUNG CẤP \nTHEO QUYẾT ĐỊNH SỐ 53/2015/QĐ-TTG NĂM 2025'
+r  4: Q=' Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Đối tượng' | C='Mức hỗ trợ học bổng ' | D='Hỗ trợ mua đồ dùng cá nhân' | E='Hỗ trợ ở lại trưởng trong dịp tết' | F='Hỗ trợ học bổng chính sách' | L='Hỗ trợ khác' | Q='Tổng kinh phí thực hiện chính sách'
+r  6: F='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | I='Kết quả thực hiện Kỳ I năm học 2025-2026' | L='Đối tượng' | P='Kinh phí thực hiện'
+r  7: F='Đối tượng hỗ trợ học bổng' | G='Thời gian hỗ trợ' | H='Kinh phí thực hiện' | I='Đối tượng ' | J='Thời gian hỗ trợ' | K='Kinh phí thực hiện' | L='Hỗ trợ mua đồ dùng cá nhân' | M='Hỗ trợ tiền đi lại' | O='Hỗ trợ ở lại trường trong dịp tết'
+r  8: M='Mức 0,2' | N='Mức 0,3'
+r  9: A='A' | B='B' | C=1.0 | D='=C9+1' | E=3.0 | F=4.0 | G=5.0 | H=6.0 | I=7.0 | J=8.0 | K=9.0 | L='=K9+1' | M='=L9+1' | N='=M9+1' | O='=N9+1' | P='14=10+11+12+13' | Q='15=6+9+14'
+r 10: B='Tổng số' | F='=F11+F14+F17' | G='=G11+G14+G17' | H='=H11+H14+H17' | I='=I11+I14+I17' | J='=J11+J14+J17' | K='=K11+K14+K17' | L='=L11+L14+L17' | M='=M11+M14+M17' | N='=N11+N14+N17' | O='=O11+O14+O17' | P='=P11+P14+P17' | Q='=ROUND(H10+K10+P10,0)'
+r 11: A='I' | B='Học sinh, sinh viên người dân tộc thiểu số thuộc hộ nghèo, hộ cận nghèo, người khuyết tật' | C=1.0 | D=1.0 | E=0.15 | F='=SUM(F12:F13)' | G='=SUM(G12:G13)' | H='=ROUND(SUM(H12:H13),0)' | I='=SUM(I12:I13)' | J='=SUM(J12:J13)' | K='=ROUND(SUM(K12:K13),0)' | L='=SUM(L12:L13)' | M='=SUM(M12:M13)' | N='=SUM(N12:N13)' | O='=SUM(O12:O13)' | P='=SUM(P12:P13)' | Q='=SUM(Q12:Q13)'
+r 12: A=1.0 | B='Trường Cao đẳng Bình Phước' | C=1.0 | D=1.0 | E=0.15 | F=2.0 | G=5.0 | H='=ROUND($C$12*F12*G12*$T$1,0)' | I=2.0 | J=4.5 | K='=C12*I12*J12*$T$1' | L=2.0 | M=0.0 | N=0.0 | O=0.0 | P='=SUM(L12:O12)' | Q=42.0
+r 13: A=2.0 | B='Trường Cao đẳng Y tế' | C=1.0 | D=1.0 | E=0.15 | F=0.0 | G=0.0 | H='=C13*F13*G13*$T$1' | I=6.0 | J=4.0 | K='=C13*I13*J13*$T$1-2' | L=1.0 | P='=SUM(L13:O13)' | Q='=H13+K13+P13'
+r 14: A='II' | B='Học sinh, sinh viên tốt nghiệp trường phổ thông dân tộc nội trú; học sinh, sinh viên người dân tộc Kinh là người khuyết tật có hộ khẩu thường trú tại vùng có điều kiện kinh tế - xã hội đặc biệt khó khăn, vùng dân tộc thiểu số, biên giới, hải đảo' | C=0.8 | D=1.0 | E=0.15 | F='=SUM(F15:F16)' | G='=SUM(G15:G16)' | H='=ROUND(SUM(H15:H16),0)' | I='=SUM(I15:I16)' | J='=SUM(J15:J16)' | K='=ROUND(SUM(K15:K16),0)' | L='=SUM(L15:L16)' | M='=SUM(M15:M16)' | N='=SUM(N15:N16)' | O='=SUM(O15:O16)' | P='=SUM(L14:O14)' | Q='=SUM(Q15:Q16)'
+r 15: A=1.0 | B='Trường Cao đẳng Bình Phước' | C=0.8 | D=1.0 | E=0.15 | F=12.0 | G=6.0 | H='=C15*F15*G15*$T$1+24' | I=15.0 | J=6.0 | K='=C15*I15*J15*$T$1' | L=5.0 | P='=SUM(L15:O15)' | Q='=H15+K15+P15'
+r 16: A=2.0 | B='Trường Cao đẳng Y tế' | C=0.8 | D=1.0 | E=0.15 | F=5.0 | G=6.0 | H='=C16*F16*G16*$T$1' | I=12.0 | J=6.0 | K='=C16*I16*J16*$T$1' | L=1.0 | P='=SUM(L16:O16)' | Q='=H16+K16+P16'
+r 17: A='III' | B='Học sinh, sinh viên người dân tộc Kinh thuộc hộ nghèo, hộ cận nghèo có hộ khẩu thường trú tại vùng có điều kiện kinh tế - xã hội đặc biệt khó khăn, vùng dân tộc thiểu số, biên giới, hải đảo' | C=0.6 | D=1.0 | E=0.15 | F='=SUM(F18)' | G='=SUM(G18)' | H='=ROUND(SUM(H18),0)' | I='=SUM(I18)' | J='=SUM(J18)' | K='=SUM(K18)' | L='=ROUND(SUM(L18),0)' | M='=SUM(M18)' | N='=SUM(N18)' | O='=SUM(O18)' | P='=SUM(L17:O17)' | Q='=SUM(Q18)'
+r 18: A=1.0 | B='Trường Cao đẳng Bình Phước' | C=0.6 | D=1.0 | E=0.15 | F=1.0 | G=6.0 | H='=ROUND(C18*F18*G18*$T$1,0)+3' | I=2.0 | J=6.0 | K='=ROUND(C18*I18*J18*$T$1,0)' | L=1.0 | P='=SUM(L18:O18)' | Q='=H18+K18+P18'
+r 19: H='=C19*F19*G19*$T$1'
+r 21: A='(*)' | B='Hỗ trợ học bổng chính sách tối đa 12 tháng/năm học' | F='=F5'
+==========================================================================================
+SHEET: '1h-sgd-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | F='Phụ lục số 01h' | I='Tiền lương' | J=2.34 | K=2.34
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ HỌC BỔNG HỌC SINH DÂN TỘC NỘI TRÚ THEO NGHỊ ĐỊNH SỐ 84/2020/NĐ-CP NGÀY 17/7/2020 CỦA CHÍNH PHỦ NĂM 2025'
+r  5: A='STT' | B='Đơn vị tuyển sinh' | C='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | E='\nKết quả thực hiện Kỳ I năm học 2025-2026' | G='Tổng kinh phí thực hiện chính sách'
+r  6: C='Đối tượng ' | D='Kinh phí thực hiện' | E='Đối tượng ' | F='Kinh phí thực hiện'
+r  9: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F=4.0 | G='5=2+4'
+r 10: B='Hỗ trợ 80% học bổng' | C='=SUM(C11+C14)' | D='=SUM(D11+D14)' | E='=SUM(E11+E14)' | F='=SUM(F11+F14)' | G='=SUM(G11+G14)'
+r 11: A='I' | B='Khối tỉnh' | C='=SUM(C12:C13)' | D='=SUM(D12:D13)' | E='=SUM(E12:E13)' | F='=SUM(F12:F13)' | G='=SUM(G12:G13)'
+r 12: A=1.0 | B='Sở Giáo dục và Đào tạo' | C=1578.0 | D=19139.0 | E=1641.0 | F=14613.0 | G='=D12+F12'
+r 13: A=2.0 | B='Sở Văn hóa - Thể thao và Du lịch (Trường trung cấp Văn hóa Nghệ thuật Đồng Nai)' | C=30.0 | D=421.0 | E=36.0 | F=337.0 | G='=D13+F13'
+r 14: A='II' | B='Khối Xã, Phường, Đặc khu' | C='=C16' | D='=D16' | E='=E16' | F='=F16' | G='=G16'
+r 15: A='-' | B='Xã An Lộc' | C=2504.0 | D=31098.0 | E=2433.0 | F=20732.0 | G='=D15+F15'
+r 16: A='-' | B='…' | C=2504.0 | D=31098.0 | E=2433.0 | F=20732.0 | G='=D16+F16'
+r 17: A='(*)' | B='Học bổng chính sách được cấp đủ 12 tháng/năm'
+==========================================================================================
+SHEET: '1i-sgd-xp-dhcdtc'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | J='Phụ lục số 01i' | M='Tiền lương' | N=2.34 | O=2.34
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ ƯU TIÊN TUYỂN SINH VÀ HỖ TRỢ HỌC TẬP ĐỐI VỚI TRẺ MẪU GIÁO, HỌC SINH, SINH VIÊN DÂN TỘC THIỂU SỐ RẤT ÍT NGƯỜI THEO NGHỊ ĐỊNH SỐ 57/2017/NĐ-CP NGÀY 05/5/2017 CỦA CHÍNH PHỦ NĂM 2025'
+r  4: I=' Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Đơn vị tuyển sinh' | C='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | G='Kết quả thực hiện Kỳ I năm học 2025-2026' | K='Tổng kinh phí thực hiện chính sách'
+r  6: C='Đối tượng ' | D='Mức hỗ trợ' | E='Số tháng hỗ trợ' | F='Kinh phí thực hiện' | G='Đối tượng ' | H='Mức hỗ trợ' | I='Số tháng hỗ trợ' | J='Kinh phí thực hiện'
+r  9: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F='4=1*2*3' | G=5.0 | H=6.0 | I=7.0 | J='8=5*6*7' | K='9=4+8'
+r 10: B='Tổng cộng' | C='=SUM(C16,C19)' | E='=SUM(E11:E15)' | F='=SUM(F16,F19)' | G='=SUM(G16,G19)' | I='=SUM(I11:I15)' | J='=SUM(J16,J19)' | K='=K16+K19'
+r 11: A='-' | B='Trẻ mẫu giáo DTTS rất ít người' | D=0.3 | F='=C11*D11*E11*$N$1' | H=0.3 | J='=G11*H11*I11*$O$1' | K='=F12+J12'
+r 12: A='-' | B='Học sinh DTTS rất ít người trường tiểu học, THCS, THPT' | D=0.4 | F='=C12*D12*E12*$N$1' | H=0.4 | J='=G12*H12*I12*$O$1' | K='=F13+J13'
+r 13: A='-' | B='Học sinh DTTS rất ít người trường phổ thông dân tộc bán trú hoặc học sinh bán trú học tại trường phổ thông công lập có học sinh bán trú ' | D=0.6 | F='=C13*D13*E13*$N$1' | H=0.6 | J='=G13*H13*I13*$O$1' | K=0.0
+r 14: A='-' | B='Học sinh DTTS rất ít người trường phổ thông dân tộc nội trú' | C=1.0 | D=1.0 | F='=C14*D14*E14*$N$1' | H=1.0 | J='=G14*H14*I14*$O$1' | K='=F14+J14'
+r 15: A='-' | B='Học sinh sinh viên DTTS rất ít người tại các trường, khoa dự bị đại học, các cơ sở giáo dục đại học, cơ sở giáo dục nghề nghiệp' | C='=C21' | D=1.0 | F='=C15*D15*E15*$N$1' | H=1.0 | J='=G15*H15*I15*$O$1' | K='=F15+J15'
+r 16: A='I' | B='Khối tỉnh' | C='=SUM(C17)' | D='=SUM(D17)' | E='=SUM(E17)' | F='=SUM(F17)' | G='=SUM(G17)' | H='=SUM(H17)' | I='=SUM(I17)' | J='=SUM(J17)' | K='=F17+J17'
+r 17: A=1.0 | B='Sở Giáo dục và Đào tạo' | C=1.0 | D=2.0 | E=6.0 | F='=C17*D17*E17*$N$1' | G=1.0 | H=1.8 | I=6.0 | J='=G17*H17*I17*$N$1-1' | K='=F17+J17'
+r 18: A=2.0 | B='…'
+r 19: A='II' | B='Khối Xã/Phường/Đặc khu' | C='=SUM(C21)' | D='=SUM(D21)' | E='=SUM(E21)' | F='=SUM(F21)' | G='=SUM(G21)' | H='=SUM(H21)' | I='=SUM(I21)' | J='=SUM(J21)' | K='=F19+J19'
+r 20: A='=ROW()-18' | B='UBND xã An Lộc' | C=1.0 | D=2.0 | E=6.0 | F='=C20*D20*E20*$N$1' | G=1.0 | H=1.8 | I=6.0 | J='=G20*H20*I20+3' | K='=F20+J20'
+r 21: A='=ROW()-18' | B='….' | C=1.0 | D=2.0 | E=6.0 | F='=C21*D21*E21*$N$1' | G=1.0 | H=1.8 | I=6.0 | J='=G21*H21*I21+3' | K='=F21+J21'
+r 23: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ ƯU TIÊN TUYỂN SINH VÀ HỖ TRỢ HỌC TẬP ĐỐI VỚI TRẺ MẪU GIÁO, HỌC SINH, SINH VIÊN DÂN TỘC THIỂU SỐ RẤT ÍT NGƯỜI THEO NGHỊ ĐỊNH SỐ 57/2017/NĐ-CP NGÀY 05/5/2017 CỦA CHÍNH PHỦ NĂM 2026'
+r 26: A='STT' | B='Đơn vị tuyển sinh' | C='\nKết quả (nhu cầu) thực hiện Kỳ II năm học ...\n' | G='Nhu cầu thực hiện Kỳ I năm học …' | K='Tổng kinh phí thực hiện chính sách'
+r 27: C='Đối tượng ' | D='Mức hỗ trợ' | E='Số tháng hỗ trợ' | F='Kinh phí thực hiện' | G='Đối tượng ' | H='Mức hỗ trợ' | I='Số tháng hỗ trợ' | J='Kinh phí thực hiện'
+r 30: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F='4=1*2*3' | G=5.0 | H=6.0 | I=7.0 | J='8=5*6*7' | K=9.0
+r 31: B='Tổng cộng' | C='=SUM(C32:C36)' | F='=SUM(F32:F36)' | G='=SUM(G32:G36)' | J='=SUM(J32:J36)' | K='=J31+F31'
+r 32: A='-' | B='Trẻ mẫu giáo DTTS rất ít người' | D=0.3 | F='=C32*D32*E32*$N$1' | H=0.3 | J='=G32*H32*I32*$O$1'
+r 33: A='-' | B='Học sinh DTTS rất ít người trường tiểu học, THCS, THPT' | D=0.4 | F='=C33*D33*E33*$N$1' | H=0.4 | J='=G33*H33*I33*$O$1'
+r 34: A='-' | B='Học sinh DTTS rất ít người trường phổ thông dân tộc bán trú hoặc học sinh bán trú học tại trường phổ thông công lập có học sinh bán trú ' | D=0.6 | F='=C34*D34*E34*$N$1' | H=0.6 | J='=G34*H34*I34*$O$1'
+r 35: A='-' | B='Học sinh DTTS rất ít người trường phổ thông dân tộc nội trú' | D=1.0 | F='=C35*D35*E35*$N$1' | H=1.0 | J='=G35*H35*I35*$O$1'
+r 36: A='-' | B='Học sinh sinh viên DTTS rất ít người tại các trường, khoa dự bị đại học, các cơ sở giáo dục đại học, cơ sở giáo dục nghề nghiệp' | D=1.0 | F='=C36*D36*E36*$N$1' | H=1.0 | J='=G36*H36*I36*$O$1'
+r 37: A='I' | B='Khối tỉnh'
+r 38: B='Sở Giáo dục và Đào tạo'
+r 39: B='…'
+r 40: A='II' | B='Khối Xã/Phường/Đặc khu'
+r 41: A=1.0 | B='Xã, Phường, Đặc khu A'
+r 42: B='…'
+r 43: A=2.0 | B='Xã, Phường, Đặc khu B'
+r 44: B='…'
+==========================================================================================
+SHEET: '1j-dhdn-cdbp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | G='Phụ lục số 01j'
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ TIỀN ĐÓNG HỌC PHÍ, CHI PHÍ SINH HOẠT ĐỐI VỚI SINH VIÊN SƯ PHẠM THEO NGHỊ ĐỊNH SỐ 116/2020/NĐ-CP VÀ NGHỊ ĐỊNH SỐ 60/2025/NĐ-CP NĂM 2025'
+r  4: G='Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Đơn vị tuyển sinh' | C='Năm học 2025 (Học kỳ II năm 2024-2025 và Học kỳ I năm học 2025-2026)'
+r  6: C='Đối tượng ' | D='Mức thu học phí' | E='Số tháng hỗ  trợ\n(*)' | F='Kinh phí thực hiện' | G='Gồm'
+r  7: G='Hỗ trợ học phí' | H='Hỗ trợ sinh hoạt phí'
+r  9: A='A' | B='B' | C=1.0 | D=2.0 | E='=D9+1' | F='4=5+6' | G=5.0 | H='=G9+1'
+r 10: B='Tổng số' | C='=C11+C13' | D='=D11+D13' | E='=E11+E13' | F='=F11+F13' | G='=G11+G13' | H='=H11+H13'
+r 11: A='I' | B='Đối tượng sinh viên sư phạm đào tạo theo hình hình thức giao nhiệm vụ, đặt hàng' | C='=SUM(C12)' | D='=SUM(D12)' | E='=SUM(E12)' | F='=SUM(F12)' | G='=SUM(G12)' | H='=SUM(H12)' | J='Nếu có nhiều trường với nhiều mức học phí khác nhau, điền chi tiết thành phần ở các cơ sở đào tạo A, B'
+r 12: A=1.0 | B='Trường Cao đẳng Bình Phước' | C=1085.0 | D=0.0 | E=7.0 | F='=SUM(G12:H12)' | G=7158.0 | H=2233.0
+r 13: A='II' | B='Đối tượng sinh viên sư phạm đào tạo theo nhu cầu xã hội tại các cơ sở giáo dục tại địa phương' | C='=SUM(C14)' | D='=SUM(D14)' | E='=SUM(E14)' | F='=SUM(F14)' | G='=SUM(G14)' | H='=SUM(H14)' | J='Nếu có nhiều trường với nhiều mức học phí khác nhau, điền chi tiết thành phần ở các cơ sở đào tạo A, B'
+r 14: A=1.0 | B='Trường Đại học Đồng Nai' | C=5365.0 | D=0.0 | E=6.0 | F=24295.0 | G=35395.0 | H=11041.0
+r 17: A='(*)' | B='Tổng tối đa 10 tháng/năm học' | I=') Sinh viên sư phạm được nhà nước hỗ trợ 3,63 triệu đồng/tháng để chi trả chi phí sinh hoạt trong thời gian học tập tại trường.'
+==========================================================================================
+SHEET: '1k-sgd-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | R='Phụ lục số 01k'
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN PHỔ CẬP GIÁO DỤC MẦM NON CHO TRẺ EM TỪ 3 ĐẾN 5 TUỔI THEO NGHỊ ĐỊNH SỐ 277/2025/NĐ-CP NĂM 2025'
+r  3: S=' Đơn vị: Triệu đồng'
+r  4: A='STT' | B='Đơn vị thực hiện' | C='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | J='\nKết quả thực hiện Kỳ I năm học 2025-2026\n' | Q='Hỗ trợ tuyển dụng một lần' | S='Tổng kinh phí thực hiện chính sách'
+r  5: C='Đối tượng' | F='Kinh phí' | G='Gồm' | J='Đối tượng' | M='Kinh phí' | N='Gồm' | Q='Đối tượng theo điểm a khoản 3 Điều 5' | R='Kinh phí'
+r  6: C='Đối tượng tham gia thực hiện phổ cập giáo dục mầm non theo điểm a khoản 4 Điều 5' | D='Đối tượng theo điểm a khoản 2 Điều 6' | E='Trong đó' | G='Hỗ trợ phổ cập giáo dục' | H='Hỗ trợ ăn trưa' | I='Hỗ trợ chi phí học tập' | J='Đối tượng tham gia thực hiện phổ cập giáo dục mầm non theo điểm a khoản 4 Điều 5' | K='Đối tượng theo điểm a khoản 2 Điều 6' | L='Trong đó' | N='Hỗ trợ phổ cập giáo dục' | O='Hỗ trợ ăn trưa' | P='Hỗ trợ chi phí học tập'
+r  7: E='Đối tượng theo điểm a khoản 1 Điều 6' | L='Đối tượng theo điểm a khoản 1 Điều 6'
+r  9: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F='4=5+6+7' | G=5.0 | H=6.0 | I=7.0 | J=8.0 | K=9.0 | L=10.0 | M='11=12+13+14' | N=12.0 | O=13.0 | P=14.0 | Q=15.0 | R=16.0 | S='17=4+11+16'
+r 10: B='Tổng cộng' | C='=SUM(C11+C13)' | D='=SUM(D11+D13)' | E='=SUM(E11+E13)' | F='=SUM(F11+F13)' | G='=SUM(G11+G13)' | H='=SUM(H11+H13)' | I='=SUM(I11+I13)' | J='=SUM(J11+J13)' | K='=SUM(K11+K13)' | L='=SUM(L11+L13)' | M='=SUM(M11+M13)' | N='=SUM(N11+N13)' | O='=SUM(O11+O13)' | P='=SUM(P11+P13)' | Q='=SUM(Q11+Q13)' | R='=SUM(R11+R13)' | S='=SUM(S11+S13)'
+r 11: A='I.' | B='Khối tỉnh' | C='=SUM(C12)' | D='=SUM(D12)' | E='=SUM(E12)' | F='=SUM(F12)' | G='=SUM(G12)' | H='=SUM(H12)' | I='=SUM(I12)' | J='=SUM(J12)' | K='=SUM(K12)' | L='=SUM(L12)' | M='=SUM(M12)' | N='=SUM(N12)' | O='=SUM(O12)' | P='=SUM(P12)' | Q='=SUM(Q12)' | R='=SUM(R12)' | S='=SUM(S12)'
+r 12: B='Sở Giáo dục và Đào tạo' | C=0.0 | D=0.0 | E=0.0 | F=0.0 | G=0.0 | H=0.0 | I=0.0 | J=0.0 | K=0.0 | L=0.0 | M=0.0 | N=0.0 | O=0.0 | P=0.0 | Q=0.0 | R=0.0 | S=0.0
+r 13: A='II.' | B='Khối Xã/Phường/Đặc khu' | C='=SUM(C15)' | D='=SUM(D15)' | E='=SUM(E15)' | F='=SUM(F15)' | G='=SUM(G15)' | H='=SUM(H15)' | I='=SUM(I15)' | J='=SUM(J15)' | K='=SUM(K15)' | L='=SUM(L15)' | M='=SUM(M15)' | N='=SUM(N15)' | O='=SUM(O15)' | P='=SUM(P15)' | Q='=SUM(Q15)' | R='=SUM(R15)' | S='=SUM(S15)'
+r 14: A=1.0 | B='Xã An Lộc' | C=0.0 | D=250.0 | F='=SUM(G14:I14)' | H=191.0 | I=37.0 | M='=SUM(N14:P14)' | S='=F14+M14+R14'
+r 15: A=2.0 | B='…' | C=0.0 | D=250.0 | F='=SUM(G15:I15)' | H=191.0 | I=37.0 | M='=SUM(N15:P15)' | S='=F15+M15+R15'
+r 19: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ HỌC SINH VÀ TRƯỜNG PTDT BÁN TRÚ THEO NGHỊ ĐỊNH SỐ 66/2025/NĐ-CP NĂM 2026'
+r 20: S=' Đơn vị: Triệu đồng'
+r 21: A='STT' | B='Đơn vị thực hiện' | C='\nKết quả thực hiện Kỳ II năm học 2024-2025\n' | S='Tổng kinh phí thực hiện chính sách'
+r 22: C='Hỗ trợ tiền ăn và nhà ở' | Q='Hỗ trợ tiền mua đồ dùng cá nhân cho trẻ em nhà trẻ bán trú cơ sở giáo dục mầm non' | R='Tổng cộng kinh phí thực hiện'
+r 23: C='Đối tượng' | F='Kinh phí' | G='Gồm'
+r 24: C='Tổng số' | G='Hỗ trợ tiền ăn' | I='Hỗ trợ tiền nhà ở học sinh, học viên bán trú'
+r 25: G='Học sinh, học viên bán trú'
+r 27: A='A' | B='B' | C=1.0 | F='5=6+7+8' | G=6.0 | I=8.0 | Q=25.0 | R='26=16+20+24+25' | S='27=11+26'
+r 28: B='Tổng cộng' | F='=G28+I28+#REF!' | G='=#REF!*5*0.936' | I='=#REF!*5*0.36' | Q='=1.35*#REF!' | R='=#REF!+#REF!+#REF!+Q28' | S='=#REF!+R28'
+r 29: A='I.' | B='Khối tỉnh'
+r 30: B='Sở Giáo dục và Đào tạo'
+r 31: B='…'
+r 32: A='II.' | B='Khối Xã/Phường/Đặc khu'
+r 33: A=1.0 | B='Xã, Phường, Đặc khu A'
+r 34: B='…'
+r 35: A=2.0 | B='Xã, Phường, Đặc khu B'
+r 36: B='…'
+r 40: B='=C6' | C='=G6' | J='Kinh phí phổ cập giáo dục mầm non theo Nghị định số 277/2025/NĐ-CP '
+r 41: B='=D6' | C='=I6' | J='Hỗ trợ ăn trưa'
+r 42: B='=E7' | C='=H6' | J='Hỗ trợ chi phí học tập'
+r 43: B='=Q5' | C='=Q4' | J='Hỗ trợ phổ cập giáo dục'
+r 44: J='Hỗ trợ tuyển dụng một lần'
+==========================================================================================
+SHEET: '1l-bhxh-syt-snn-sgd-sdt'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | D='Phụ lục số 01l' | E='Tiền lương' | F=2.34 | G=2.34
+r  2: A='TỔNG HỢP KINH PHÍ NSNN ĐÓNG VÀ HỖ TRỢ ĐÓNG BHYT CHO CÁC ĐỐI TƯỢNG TRÊN ĐỊA BÀN NĂM 2025'
+r  4: D='Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Nhóm đối tượng' | C='Năm 2025'
+r  7: C='Số đối tượng thực hiện' | D='Kinh phí \nthực hiện'
+r  9: A='A' | B='B' | C='1' | D='2'
+r 10: B='Tổng cộng' | C='=C11+C28' | D='=D11+D28'
+r 11: A='I' | B='Nhóm NSNN đóng BHYT' | C='=SUM(C12:C13,C16:C27)' | D='=SUM(D12:D13,D16:D27)'
+r 12: A='1' | B='Hộ gia đình nghèo; người dân tộc thiểu số đang sinh sống tại vùng có điều kiện KT-XH khó khăn; người sinh sống tại vùng có điều kiện KT-XH đặc biệt khó khăn, xã đảo, huyện đảo; người DTTS thuộc gia đình cận nghèo đang cư trú tại xã, thôn thuộc vùng đồng bào DTTS và miền núi' | C=41437.0 | D=47174.0
+r 13: A='2' | B='Đối tượng trẻ em dưới 6 tuổi' | C='=SUM(C14:C15)' | D='=SUM(D14:D15)'
+r 14: B=' - Kinh phí theo mệnh giá thẻ BHYT' | C=338283.0 | D=458118.0
+r 15: B=' - Kinh phí truy lĩnh đối với các thẻ phát sinh sau theo quy định tại Luật sửa đổi, bổ sung một số điều của Luật BHYT ngày 13 tháng 6 năm 2014' | C=0.0 | D=0.0
+r 16: A='3' | B='Người có công với cách mạng, cựu chiến binh' | C='=12136+13761' | D='=15488+17540'
+r 17: A='4' | B='Đối tượng BTXH, người đang hưởng trợ cấp nuôi dưỡng hằng tháng theo quy định của pháp luật có liên quan, người đang hưởng trợ cấp tuất hằng tháng mà thuộc đối tượng hưởng trợ cấp xã hội' | C=48179.0 | D=85656.0
+r 18: A='5' | B='Đối tượng người hiến tạng' | C=161.0 | D=192.0
+r 19: A='6' | B='Người 75 tuổi trở lên đang hưởng trợ cấp tuất hằng tháng; người từ đủ 70 tuổi đến dưới 75 tuổi thuộc hộ cận nghèo đang hưởng trợ cấp tuất hằng tháng' | C=1180.0 | D=1376.0
+r 20: A='7' | B=' Người dân các xã ATK, vùng ATK cách mạng đang thường trú tại các xã ATK cách mạng đã được cập nhật trong CSDLQG về dân cư, CSDL về cư trú' | C=57324.0 | D=58391.0
+r 21: A='8' | B='Người đang hưởng trợ cấp nuôi dưỡng hằng tháng theo quy định của pháp luật có liên quan, người đang hưởng trợ cấp tuất hằng tháng mà thuộc đối tượng hưởng trợ cấp xã hội' | C=0.0 | D=0.0
+r 22: A='9' | B='Người đang hưởng trợ cấp hưu trí xã hội hằng tháng' | C=63737.0 | D=35779.0
+r 23: A='10' | B='Người lao động không đủ điều kiện hưởng lương hưu và chưa đủ tuổi hưởng trợ cấp hưu trí xã hội đang trong thời gian hưởng trợ cấp hằng tháng theo quy định của pháp luật về bảo hiểm xã hội' | C=0.0 | D=0.0
+r 24: A='11' | B='Đại biểu Quốc hội, đại biểu Hội đồng nhân dân các cấp đương nhiệm' | C=1661.0 | D=2040.0
+r 25: A='12' | B='Cán bộ xã, phường, thị trấn đã nghỉ việc đang hưởng trợ cấp hằng tháng từ ngân sách nhà nước' | C=5.0 | D=8.0
+r 26: A='13' | B='Người tham gia kháng chiến, bảo vệ Tổ quốc, làm nghĩa vụ quốc tế ' | C=16423.0 | D=20923.0
+r 27: A='14' | B='Thân nhân của người có công với cách mạng là cha đẻ, mẹ đẻ, vợ hoặc chồng, con của liệt sỹ; người có công nuôi dưỡng liệt sỹ và cá nhân có liên quan theo quy định của Pháp lệnh ưu đãi người có công với cách mạng' | C=9695.0 | D=12300.0
+r 28: A='II' | B='Nhóm NSNN hỗ trợ mức đóng' | C='=SUM(C29,C32:C41)' | D='=SUM(D29,D32:D41)'
+r 29: A='1' | B='Hộ cận nghèo' | C='=SUM(C30:C31)' | D='=SUM(D30:D31)'
+r 30: B=' - Hộ cận nghèo được hỗ trợ 100%' | C=15673.0 | D=19864.0
+r 31: B=' - Hộ cận nghèo được hỗ trợ 70%' | C=1921.0 | D=1838.0
+r 32: A='2' | B='Học sinh, sinh viên' | C=726200.0 | D=283033.0
+r 33: A='3' | B='Người thuộc hộ gia đình làm nông, lâm nghiệp có mức sống trung bình' | C=147833.0 | D=136862.0
+r 34: A='4' | B='Người dân tộc thiểu số đang sinh sống tại địa bàn các xã khu vực II, khu vực III, thôn đặc biệt khó khăn thuộc vùng đồng bào dân tộc thiểu số và miền núi giai đoạn 2016-2020 (theo Nghị định số 75/2023/NĐ-CP)' | C=59453.0 | D=72827.0
+r 35: A='5' | B='Người DTTS đang sinh sống tại các xã được xác định không còn thuộc vùng có điều kiện kinh tế - xã hội khó khăn, đặc biệt khó khăn (tối đa 36 tháng)' | C=0.0 | D=0.0
+r 36: A='6' | B='Người tham gia lực lượng tham gia bảo vệ an ninh, trật tự cơ sở' | C=4685.0 | D=4135.0
+r 37: A='7' | B='Nhân viên y tế thôn, bản; cô đỡ thôn, bản' | C=0.0 | D='=C37*0.045*$G$1*6*0.5'
+r 38: A='8' | B='Người hoạt động không chuyên trách ở thôn, tổ dân phố' | C=1373.0 | D=374.0
+r 39: A='9' | B='Nạn nhân theo quy định của Luật Phòng, chống mua bán người' | D=0.0
+r 40: A='10' | B='Hỗ trợ mức đóng BHYT các đối tượng theo Nghị quyết số 10/2022/NQ-HĐND (người DTTS có nơi thường trú, tạm trú tại các xã khu vực I ĐN theo quy định của Thủ tướng; Người mắc bệnh hiểm nghèo theo quy định của Chính phủ.; học sinh, sinh viên khuyết tật học hòa nhập tại các cơ sở giáo dục trên địa bàn tỉnh và học sinh tại Trung tâm Nuôi dạy trẻ khuyết tật...)' | C=0.0 | D=0.0
+r 42: A='(*)' | B='Đề nghị có xác nhận của BHXH tỉnh/thành phố'
+r 43: B='Nghị định số 188/2025/NĐ-CP ngày 01 tháng 7 năm 2025 của Chính phủ'
+==========================================================================================
+SHEET: '1m-syt-sgddt-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | H='Phụ lục số 01m' | O='Phụ lục số 01m'
+r  3: A='TỔNG HỢP KINH PHÍ TRỢ GIÚP CÁC ĐỐI TƯỢNG BẢO TRỢ XÃ HỘI THEO NGHỊ ĐỊNH SỐ \n20/2021/NĐ-CP VÀ NGHỊ ĐỊNH SỐ 76/2024/NĐ-CP NĂM 2025'
+r  4: L='Trường hợp đối tượng 6 tháng đầu năm bằng 6 tháng cuối năm' | R='x'
+r  5: H='Đơn vị: Triệu đồng'
+r  6: A='STT' | B='Loại đối tượng' | C='Hệ\nsố' | D='Mức chuẩn TW quy định' | E='Số tiền trợ cấp cơ bản hàng tháng' | F='6 tháng đầu\nnăm 2025' | H='6 tháng cuối \nnăm 2025' | J='Tổng kinh phí thực hiện chính sách' | K='Ghi chú'
+r  7: F='Đối tượng' | G='Kinh phí' | H='Đối tượng' | I='Kinh phí'
+r 10: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F=4.0 | G=5.0 | H=6.0 | I=7.0 | J='8=5+7'
+r 11: B='TỔNG SỐ (A+B)' | F='=F12+F87' | G='=G12+G87' | H='=H12+H87' | I='=I12+I87' | J='=J12+J87'
+r 12: B='A. TRỢ CẤP THƯỜNG XUYÊN' | F='=F13+F47+F72' | G='=G13+G47+G72' | H='=H13+H47+H72' | I='=I13+I47+I72' | J='=J13+J47+J72'
+r 13: A='I' | B='TRỢ CẤP XÃ HỘI HÀNG THÁNG' | F='=F14+F17+F19+F23+F30+F37+F46' | G='=G14+G17+G19+G23+G30+G37+G46' | H='=H14+H17+H19+H23+H30+H37+H46' | I='=I14+I17+I19+I23+I30+I37+I46' | J='=J14+J17+J19+J23+J30+J37+J46'
+r 14: A=1.0 | B='Trẻ em dưới 16 tuổi không có nguồn nuôi dưỡng' | F='=SUM(F15:F16)' | G='=SUM(G15:G16)' | H='=SUM(H15:H16)' | I='=SUM(I15:I16)' | J='=SUM(J15:J16)' | L='Khoản 1 Điều 5'
+r 15: B='Dưới 4 tuổi' | C=2.5 | D=0.5 | E='=C15*D15' | F=9.0 | G=67.0 | H=21.0 | I=105.0 | J='=G15+I15'
+r 16: B='Từ đủ 4 tuổi trở lên đến dưới 16 tuổi' | C=1.5 | D=0.5 | E='=C16*D16' | F=404.0 | G=2488.0 | H=528.0 | I=2286.0 | J='=G16+I16'
+r 17: A=2.0 | B=' Người từ 16 tuổi đến 22 tuổi thuộc một trong các trường hợp quy định tại khoản 1 Điều 5 Nghị định 136/2013/NĐ-CP không có nguồn nuôi dưỡng đang học phổ thông, học nghề, trung học chuyên nghiệp' | C=1.5 | D=0.5 | E='=C17*D17' | F='=F18' | G='=G18' | H='=H18' | I='=I18' | J='=J18' | L='Khoản 2 Điều 5'
+r 18: B=' Người từ 16 tuổi đến 22 tuổi ' | C=1.5 | D=0.5 | F=179.0 | G=773.0 | H=206.0 | I=945.0 | J='=G18+I18'
+r 19: A=3.0 | B='Trẻ em bị nhiễm HIV thuộc hộ nghèo; người bị nhiễm HIV thuộc hộ nghèo không còn khả năng lao động mà không có lương hưu, trợ cấp bảo hiểm xã hội hàng tháng, trợ cấp ưu đãi người có công hàng tháng, ' | F='=SUM(F20:F22)' | G='=SUM(G20:G22)' | H='=SUM(H20:H22)' | I='=SUM(I20:I22)' | J='=SUM(J20:J22)' | L='Khoản 3 Điều 5'
+r 20: B='Dưới 4 tuổi' | C=2.5 | D=0.5 | E='=C20*D20' | F=0.0 | G=0.0 | H=0.0 | I=0.0 | J='=G20+I20'
+r 21: B='Từ 4 đến dưới 16 tuổi' | C=2.0 | D=0.5 | E='=C21*D21' | F=1.0 | G=4.0 | H=1.0 | I=6.0 | J='=G21+I21'
+r 22: B='Từ 16 tuổi trở lên' | C=1.5 | D=0.5 | E='=C22*D22' | F=18.0 | G=80.0 | H=23.0 | I=74.0 | J='=G22+I22' | L='Khoản 8 Điều 5'
+r 23: A=4.0 | B=' Người thuộc hộ nghèo, cận nghèo không có chồng hoặc không có vợ; có chồng hoặc vợ đã chết; có chồng hoặc vợ mất tích theo quy định của pháp luật và đang nuôi con dưới 16 tuổi hoặc đang nuôi con từ 16 tuổi đến 22 tuổi' | F=350.0 | G=2138.0 | H='=SUM(H24:H29)' | I='=SUM(I24:I29)' | J='=SUM(J24:J29)' | L='Khoản 4 Điều 5' | M='Hệ số 1,0 đối với mỗi một con đang nuôi'
+r 24: B='Đang nuôi 1 con' | C=1.0 | D=0.5 | E='=C24*D24' | F=0.0 | G=0.0 | H=102.0 | I=315.0
+r 25: B='Đang nuôi 2 con ' | C=2.0 | D=0.5 | E='=C25*D25' | F=0.0 | G=0.0 | H=138.0 | I=806.0
+r 26: B='Đang nuôi 3 con ' | C=3.0 | D=0.5 | E='=C26*D26' | F=0.0 | G=0.0 | H=87.0 | I=763.0
+r 27: B='Đang nuôi 4 con ' | H=18.0 | I=170.0
+r 28: B='Đang nuôi 5 con ' | H=4.0 | I=66.0
+r 29: B='Đang nuôi 6 con ' | F=0.0 | G=0.0 | H=3.0 | I=18.0
+r 30: A=5.0 | B='Người cao tuổi' | F='=F31+F34+F35+F36' | G='=G31+G34+G35+G36' | H='=H31+H34+H35+H36' | I='=I31+I34+I35+I36' | J='=J31+J34+J35+J36' | L='Khoản 5 Điều 5'
+r 31: A='5.1' | B='Người cao tuổi thuộc hộ nghèo không có người có nghĩa vụ và quyền phụng dưỡng hoặc có người có nghĩa vụ và quyền phụng dưỡng nhưng người này đang hưởng chế độ trợ cấp xã hội hàng tháng' | F='=SUM(F32:F33)' | G='=SUM(G32:G33)' | H='=SUM(H32:H33)' | I='=SUM(I32:I33)' | J='=SUM(J32:J33)' | L='Điểm a khoản 5 Điều 5'
+r 32: B='Từ đủ 60 tuổi đến dưới 80 tuổi' | C=1.5 | D=0.5 | E='=C32*D32' | F=698.0 | G=3317.0 | H=933.0 | I=3444.0 | J='=G32+I32' | L=' '
+r 33: B='Từ đủ 80 tuổi trở lên' | C=2.0 | D=0.5 | E='=C33*D33' | F=159.0 | G=968.0 | H=388.0 | I=1191.0 | J='=G33+I33'
+r 34: A='5.2' | B='Người từ đủ 75 tuổi đến 80 tuổi thuộc hộ nghèo, hộ cận nghèo không được quy định tại mục 5.1 đang sống tại địa bàn ác xã, thôn vùng dân tộc thiểu số và miền núi đặc biệt khó khăn' | C=1.0 | D=0.5 | E='=C34*D34' | F=10.0 | G=38.0 | J='=G34+I34'
+r 35: A='5.3' | B='Người từ đủ 80 tuổi trở lên không được quy định tại mục 5.1 mà không có lương hưu, trợ cấp bảo hiểm xã hội hàng tháng, trợ cấp xã hội hàng tháng' | C=1.0 | D=0.5 | E='=C35*D35' | F=43199.0 | G=147848.0 | J='=G35+I35'
+r 36: A='5.4' | B='Người cao tuổi thuộc hộ nghèo không có người có nghĩa vụ và quyền phụng dưỡng, không có điều kiện sống ở cộng đồng, đủ điều kiện tiếp nhận vào cơ sở bảo trợ xã hội, nhà xã hội nhưng có người nhận chăm sóc tại cộng đồng' | C=3.0 | D=0.5 | E='=C36*D36' | F=4.0 | G=36.0 | H=9.0 | I=26.0 | J='=G36+I36'
+r 37: A=6.0 | B='Người khuyết tật nặng, người khuyết tật đặc biệt nặng theo quy định của Luật Người khuyết tật' | F='=F38+F42' | G='=G38+G42' | H='=H38+H42' | I='=I38+I42' | J='=J38+J42' | L='Khoản 6 Điều 5'
+r 38: A='6.1' | B='Người khuyết tật đặc biệt nặng' | F='=SUM(F39:F41)' | G='=SUM(G39:G41)' | H='=SUM(H39:H41)' | I='=SUM(I39:I41)' | J='=SUM(J39:J41)'
+r 39: B='Dưới 16 tuổi' | C=2.5 | D=0.5 | E='=C39*D39' | F=2073.0 | G=14575.0 | H=2108.0 | I=15214.0 | J='=G39+I39'
+r 40: B='Từ 16 đến 60 tuổi' | C=2.0 | D=0.5 | E='=C40*D40' | F=8687.0 | G=50003.0 | H=9191.0 | I=52721.0 | J='=G40+I40'
+r 41: B='Từ đủ 60 tuổi trở lên' | C=2.5 | D=0.5 | E='=C41*D41' | F=6888.0 | G=49017.0 | H=7247.0 | I=51446.0 | J='=G41+I41'
+r 42: A='6.2' | B='Người khuyết tật nặng' | F='=SUM(F43:F45)' | G='=SUM(G43:G45)' | H='=SUM(H43:H45)' | I='=SUM(I43:I45)' | J='=SUM(J43:J45)'
+r 43: B='Dưới 16 tuổi' | C=2.0 | D=0.5 | E='=C43*D43' | F=3234.0 | G=18222.0 | H=3522.0 | I=20358.0 | J='=G43+I43'
+r 44: B='Từ 16 đến 60 tuổi' | C=1.5 | D=0.5 | E='=C44*D44' | F=16796.0 | G=76250.0 | H=17667.0 | I=76245.0 | J='=G44+I44'
+r 45: B='Từ đủ 60 tuổi trở lên' | C=2.0 | D=0.5 | E='=C45*D45' | F=10221.0 | G=58157.0 | H=11024.0 | I=62322.0 | J='=G45+I45'
+r 46: A='7.0' | B='Trẻ em dưới 03 tuổi thuộc hộ nghèo, cận nghèo sống tại xã, thôn vùng đồng bào dân tộc thiểu số và vùng núi ĐBKK (không được quy định tại khoản 1, 3, 6)' | C=1.5 | D=0.5 | E='=C46*D46' | F=0.0 | G=0.0 | H=0.0 | I=0.0 | J='=G46+I46' | L='Khoản 7 Điều 5'
+r 47: A='II' | B='NHẬN NUÔI DƯỠNG, CHĂM SÓC TẠI CỘNG ĐỒNG ' | F='=F48+F54+F55' | G='=G48+G54+G55' | H='=H48+H54+H55' | I='=I48+I54+I55' | J='=J48+J54+J55'
+r 48: A=1.0 | B='Nhận chăm sóc, nuôi dưỡng trẻ em dưới 16 tuổi không có nguồn nuôi dưỡng là đối tượng quy định tại Khoản 1 Điều 5 Nghị định số 20/2021/NĐ-CP' | F='=F49+F50' | G='=G49+G50' | H='=H49+H50' | I='=I49+I50' | J='=J49+J50' | L='Khoản 1 Điều 20'
+r 49: A='1.1' | B='Nhận chăm sóc, nuôi dưỡng trẻ em dưới 04 tuổi ' | C=2.5 | D=0.5 | E='=C49*D49' | F=8.0 | G=26.0 | H=19.0 | I=83.0 | J='=G49+I49'
+==========================================================================================
+SHEET: '1n-xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | H='Phụ lục số 01n'
+r  2: A='TỔNG HỢP KINH PHÍ TRỢ CẤP HƯU TRÍ XÃ HỘI THEO NGHỊ ĐỊNH SỐ 176/2025/NĐ-CP NĂM 2025'
+r  4: A='STT' | B='Loại đối tượng' | C='Hệ\nsố' | D='Mức chuẩn TW quy định' | E='Số tiền trợ cấp cơ bản hàng tháng' | F='Năm 2025 (*)' | H='Tổng kinh phí thực hiện chính sách'
+r  5: F='Đối tượng' | G='Kinh phí'
+r  8: A='A' | B='B' | C=1.0 | D=2.0 | E=3.0 | F=4.0 | G=5.0 | H=6.0
+r  9: B='TỔNG SỐ (A+B)' | F='=F10+F13' | G='=G10+G13' | H='=H10+H13'
+r 10: A='A' | B='TRỢ CẤP HƯU TRÍ XÃ HỘI HÀNG THÁNG' | F='=SUM(F11:F12)' | G='=SUM(G11:G12)' | H='=SUM(H11:H12)'
+r 11: A=1.0 | B='Trợ cấp hưu trí xã hội hàng tháng' | C=1.0 | D=0.5 | E='=D11*C11' | F=73432.0 | G=188858.0 | H='=G11'
+r 12: A=2.0 | B='Đối tượng từ đủ 70 đến dưới 75 tuổi thuộc hộ nghèo, hộ cận nghèo' | C=1.0 | D=0.5 | E='=D12*C12' | F=247.0 | G=819.0 | H='=G12'
+r 13: A='B' | B='HỖ TRỢ CHI PHÍ MAI TÁNG' | C=20.0 | D=0.5 | E='=C13*D13' | F=1970.0 | G=19700.0 | H='=G13'
+r 16: A='(*)' | B='Nghị định có hiệu lực từ 01/7/2025'
+==========================================================================================
+SHEET: '1o-snnmt-95xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | M='Phụ lục số 01o'
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ TIỀN ĐIỆN CHO HỘ NGHÈO VÀ HỘ CHÍNH SÁCH XÃ HỘI NĂM 2025'
+r  4: H='Đơn vị: triệu đồn'
+r  5: A='STT' | B='Tên huyện' | C='Tổng số hộ' | D='Số hộ nghèo ' | E='Số hộ chính sách xã hội' | H='Mức  hỗ trợ (61.333 đồng)' | I='Số tháng hỗ trợ ' | J='Mức  hỗ trợ (64.282 đồng)' | K='Số tháng hỗ trợ ' | L='Tổng kinh phí thực hiện chính sách' | M='Trong đó'
+r  6: E='Tổng cộng' | F='Hộ có thành viên đang hưởng trợ cấp xã hội hằng tháng không thuộc diện hộ nghèo theo quy định của pháp luật và có lượng điện sử dụng cho mục đích sinh hoạt trong tháng không quá 50 KWh ở vùng có điện lưới' | G='Hộ có thành viên đang hưởng trợ cấp xã hội theo quy định của pháp luật; hộ dân tộc thiểu số sống ở vùng chưa có điện lưới' | M='Số hộ nghèo' | N='Số hộ chính sách xã hội'
+r  7: A='A' | B='B' | C='1=2+3' | D=2.0 | E='3=4+5' | F=4.0 | G=5.0 | H=6.0 | I=7.0 | J=8.0 | K=9.0 | L='10=11+12' | M=11.0 | N=12.0
+r  8: B='Tổng cộng' | C='=SUM(C9)' | D='=SUM(D9)' | E='=SUM(E9)' | F='=SUM(F9)' | G='=SUM(G9)' | H='=SUM(H9)' | I='=SUM(I9)' | J='=SUM(J9)' | K='=SUM(K9)' | L='=SUM(L9)' | M='=SUM(M9)' | N='=SUM(N9)'
+r  9: A='=ROW()-8' | B='Xã An Lộc' | C='=SUM(D9:E9)' | D=2900.0 | E='=SUM(F9:G9)' | F='=175+1748-G9' | G='=19+756' | H='=1893*1.08*30/1000000' | I=4.0 | J='=1984*30*1.08/1000000' | K=8.0 | L='=SUM(M9:N9)' | M='=(D9*$H$9*$I$9)+(D9*$J$9*$K$9)' | N='=(E9*$H$9*$I$9)+(E9*$J$9*$K$9)'
+r 10: A=2.0 | B='…'
+r 11: B='Chính sách hỗ trợ tiền điện cho hộ nghèo, hộ chính sách xã hội theo quy định tại Quyết định số 28/2014/QĐ-TTg ngày 07/4/2014 của Thủ tướng Chính phủ'
+r 12: B='Quyết định số 28/2014/QĐ-TTG ngày 07/4/2014 - biểu giá bán lẻ điện và hỗ trợ hộ nghèo, cận nghèo, chính sách'
+r 13: A='(*)' | B='Quyết định số 1279/QĐ-BTC ngày 09/5/2025: 1.984'
+r 14: B='Quyết định số 2699/QĐ-BTC ngày 11/10/2024: 1.893'
+r 15: B='Nghị định số 174/2025/NĐ-CP ngày 30/6/2025 của Chính phủ, giảm thuế VAT từ 10% xuống 8% từ 01/7/2025 đến 31/12/2026'
+r 16: B='Nghị định số 180/2024/NĐ-CP ngày 31/12/2024 của Chính phủ'
+r 21: A='TỔNG HỢP KINH PHÍ THỰC HIỆN CHÍNH SÁCH HỖ TRỢ TIỀN ĐIỆN CHO HỘ NGHÈO VÀ HỘ CHÍNH SÁCH XÃ HỘI NĂM 2026'
+r 23: H='Đơn vị: Triệu đồng'
+r 24: A='STT' | B='Tên huyện' | C='Tổng số hộ' | D='Số hộ nghèo ' | E='Số hộ chính sách xã hội' | H='Mức \nhỗ trợ\n' | I='Số tháng hỗ trợ ' | J='Tổng kinh phí thực hiện chính sách' | K='Trong đó' | M='Kinh phí đã bố trí trong dự toán chi cân đối NSĐP năm …' | N='Kinh phí còn thừa/thiếu'
+r 25: E='Tổng cộng' | F='Hộ có thành viên đang hưởng trợ cấp xã hội hằng tháng không thuộc diện hộ nghèo theo quy định của pháp luật và có lượng điện sử dụng cho mục đích sinh hoạt trong tháng không quá 50 KWh ở vùng có điện lưới' | G='Hộ có thành viên đang hưởng trợ cấp xã hội theo quy định của pháp luật; hộ dân tộc thiểu số sống ở vùng chưa có điện lưới' | K='Số hộ nghèo' | L='Số hộ chính sách xã hội'
+r 26: A='A' | B='B' | C='1=2+3' | D=2.0 | E='3=4+5' | F=4.0 | G=5.0 | H=6.0 | I=7.0 | J='8=9+10' | K=9.0 | L=10.0 | M=11.0 | N='12=8-11'
+r 27: B='Tổng cộng' | C='=D27+E27' | E='=F27+G27' | H='=1984*30*1.08/1000000' | I=12.0 | J='=K27+L27' | K='=$H$27*$I$27*D27' | L='=$H$27*$I$27*E27' | M='=VLOOKUP(#REF!,#REF!,24,0)' | N='=J27-M27'
+r 28: A=1.0 | B='Xã/Phường/Đặc khu A'
+r 29: A=2.0 | B='Xã/Phường/Đặc khu B'
+r 30: B='…'
+r 34: F='Số hộ' | G='=H5' | H='Số tháng hỗ trợ theo mức 61.333đồng' | I='=J5' | J='Số tháng hỗ trợ theo mức 64.282đồng' | K='Kinh phí'
+r 36: B='Hộ nghèo' | C='=D5' | F='=D9' | G='=H9' | H='=I9' | I='=J9' | J='=K9' | K='=(F36*$G$36*$H$36)+(F36*$I$36*$J$36)'
+r 37: B='Hộ CSXH' | C='=F6' | F='=F9' | G='=H9' | H='=I9' | I='=J9' | J='=K9' | K='=(F37*$G$36*$H$36)+(F37*$I$36*$J$36)'
+r 38: B='Hộ đồng bào DTTS sống ở vùng chưa có điện lưới (không thuộc hộ nghèo)' | C='=G6' | F='=G9' | G='=H9' | H='=I9' | I='=J9' | J='=K9' | K='=(F38*$G$36*$H$36)+(F38*$I$36*$J$36)'
+==========================================================================================
+SHEET: '1p-bhxh'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | F='Phụ lục số 01p'
+r  2: A='TỔNG HỢP KINH PHÍ NSNN HỖ TRỢ ĐÓNG BHXH TỰ NGUYỆN CHO CÁC ĐỐI TƯỢNG THEO NGHỊ ĐỊNH SỐ 159/2025/NĐ-CP NĂM 2025'
+r  4: E='Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Nhóm đối tượng' | C='6 tháng đầu năm 2025' | E='6 tháng cuối năm 2025 (*)'
+r  7: C='Số đối tượng' | D='Kinh phí thực hiện' | E='Số đối tượng' | F='Kinh phí thực hiện'
+r  9: A='A' | B='B' | C='1' | D='2' | E='3' | F='4'
+r 10: B='Tổng cộng' | C='=SUM(C11:C14)' | D='=SUM(D11:D14)' | E='=SUM(E11:E14)' | F='=SUM(F11:F14)'
+r 11: A='1' | B='Hộ nghèo (50%)' | C=18.0 | D=8.0 | E=18.0 | F=16.0
+r 12: A='2' | B='Hộ cận nghèo (40%)' | C=40.0 | D=19.0 | E=28.0 | F=29.0
+r 13: A='3' | B='Người dân tộc thiểu số (30%)' | C=0.0 | D=0.0 | E=542.0 | F=429.0
+r 14: A='4' | B='Các đối tượng khác (20%)' | C=28402.0 | D=10997.0 | E=28771.0 | F=15005.0
+r 16: A='(*)' | B='Nghị định 159/2025/NĐ-CP có hiệu lực từ ngày 01/7/2025'
+==========================================================================================
+SHEET: '1q-sdttg-95xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | Q='Phụ lục số 01q'
+r  2: A='TỔNG HỢP KINH PHÍ NSNN THỰC HIỆN CHÍNH SÁCH ĐỐI VỚI NGƯỜI CÓ UY TÍN TRONG ĐỒNG BÀO DÂN TỘC THIỂU SỐ THEO QUYẾT ĐỊNH SỐ 12/2018/QĐ-TTg VÀ SỐ 28/2023/QĐ-TTg CỦA THỦ TƯỚNG CHÍNH PHỦ NĂM 2025'
+r  4: P='Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Nhóm đối tượng' | C='1. Thăm hỏi, tặng quà dịp Tết Nguyên đán, Tết hoặc Lễ hội truyền thống' | F='2. Thăm hỏi, hỗ trợ người có uy tín ốm đau đi điều trị bệnh' | I='3. Hỗ trợ gia đình người có uy tín gặp khó khăn (thiên tai, hỏa hoạn)' | L='4. Thăm viếng, động viên khi người có uy tín qua đời' | O='5. Chế độ cung cấp thông tin'
+r  7: C='Số đối tượng' | D='Mức' | E='Kinh phí thực hiện\n(*)' | F='Số đối tượng' | G='Mức' | H='Kinh phí thực hiện' | I='Số đối tượng' | J='Mức' | K='Kinh phí thực hiện' | L='Số đối tượng' | M='Mức' | N='Kinh phí thực hiện' | O='Số đối tượng' | P='Mức' | Q='Kinh phí thực hiện'
+r  9: A='A' | B='B' | C='1' | D='2' | E='3=(1*2)*2 lần' | F='4' | G='5' | H='6=4*5' | I='7' | J='8' | K='9=7*8' | L='10' | M='11' | N='12=10*11' | O='13' | P='14' | Q='15=13*14'
+r 10: B='Tổng cộng' | C='=C11+C19' | D='=D11+D19' | E='=E11+E19' | F='=F11+F19' | G='=G11+G19' | H='=H11+H19' | I='=I11+I19' | J='=J11+J19' | K='=K11+K19' | L='=L11+L19' | M='=M11+M19' | N='=N11+N19' | O='=O11+O19' | P='=P11+P19' | Q='=Q11+Q19' | R='=B11'
+r 11: A='A' | B='Chế độ cung cấp thông tin' | C='=SUM(C12:C18)' | D='=SUM(D12:D18)' | E='=SUM(E12:E18)' | F='=SUM(F12:F18)' | G='=SUM(G12:G18)' | H='=SUM(H12:H18)' | I='=SUM(I12:I18)' | J='=SUM(J12:J18)' | K='=SUM(K12:K18)' | L='=SUM(L12:L18)' | M='=SUM(M12:M18)' | N='=SUM(N12:N18)' | O='=SUM(O12:O18)' | P='=SUM(P12:P18)' | Q='=SUM(Q12:Q18)' | R='=O5'
+r 12: B='Báo Dân tộc và phát triển' | O=484.0 | P=1.0 | Q=302.0 | R='=B19'
+r 13: B='Báo Đồng Nai' | O=154.0 | P=0.5 | Q=42.0 | R='=C5'
+r 14: B='Báo Bình Phước' | O=330.0 | P=1.0 | Q=264.0 | R='=F5'
+r 15: B='Bản tin Dân tộc thiểu số và miền núi của Sở DTTG' | O=484.0 | P=1.0 | Q=242.0 | R='=I5'
+r 16: B='Họp mặt, cung cấp thông tin' | O=484.0 | P=0.0 | Q=370.0 | R='=L5'
+r 17: B='Tập huấn, bồi dưỡng kiến thức' | O=470.0 | P=0.0 | Q=550.0
+r 18: B='Học tập, trao đổi kinh nghiệm' | O=75.0 | P=0.0 | Q='=880+90'
+r 19: A='B' | B='Hỗ trợ vật chất, động viên tinh thần' | C='=SUM(C20:C23)' | D=0.0 | E='=SUM(E20:E23)' | F='=SUM(F20:F23)' | G=0.0 | H='=SUM(H20:H23)' | I='=SUM(I20:I23)' | J=0.0 | K='=SUM(K20:K23)' | L='=SUM(L20:L23)' | M=0.0 | N='=SUM(N20:N23)' | O='=SUM(O20:O23)' | P='=SUM(P20:P23)' | Q='=SUM(Q20:Q23)'
+r 20: A='I' | B='Cơ quan tỉnh' | C=330.0 | D=0.5 | E='=C20*D20*2' | F=20.0 | G=1.5 | H='=F20*G20' | J=2.0 | K='=I20*J20' | L=2.0 | M=1.0 | N='=L20*M20' | Q='=O20*P20'
+r 21: A='1' | B='Sở Dân tộc và Tôn giáo'
+r 22: A='2' | B='…'
+r 23: A='II' | B='Cơ quan xã' | C=503.0 | D=0.5 | E='=C23*D23*2' | F=23.0 | G=0.5 | H='=F23*G23' | I='=SUM(I24:I118)' | J=2.0 | K='=SUM(K24:K118)' | L=3.0 | M=0.5 | N='=L23*M23' | O='=SUM(O24:O118)' | P=0.0 | Q='=SUM(Q24:Q118)'
+r 24: A='=ROW()-16' | B='UBND phường An Lộc' | D=0.5 | E='=C24*D24*2' | G=0.5 | H='=F24*G24' | J=2.0 | K='=I24*J24' | M=0.0 | N='=L24*M24' | Q='=O24*P24'
+r 25: A='=ROW()-16' | B='UBND phường Bảo Vinh' | D=0.5 | E='=C25*D25*2' | G=0.5 | H='=F25*G25' | J=2.0 | K='=I25*J25' | M=0.0 | N='=L25*M25' | Q='=O25*P25'
+r 26: A='=ROW()-16' | B='UBND phường Biên Hòa' | D=0.5 | E='=C26*D26*2' | G=0.5 | H='=F26*G26' | J=2.0 | K='=I26*J26' | M=0.0 | N='=L26*M26' | Q='=O26*P26'
+r 27: A='=ROW()-16' | B='UBND phường Bình Lộc' | D=0.5 | E='=C27*D27*2' | G=0.5 | H='=F27*G27' | J=2.0 | K='=I27*J27' | M=0.0 | N='=L27*M27' | Q='=O27*P27'
+r 28: A='=ROW()-16' | B='UBND phường Bình Long' | D=0.5 | E='=C28*D28*2' | G=0.5 | H='=F28*G28' | J=2.0 | K='=I28*J28' | M=0.0 | N='=L28*M28' | Q='=O28*P28'
+r 29: A='=ROW()-16' | B='UBND phường Bình Phước' | D=0.5 | E='=C29*D29*2' | G=0.5 | H='=F29*G29' | J=2.0 | K='=I29*J29' | M=0.0 | N='=L29*M29' | Q='=O29*P29'
+r 30: A='=ROW()-16' | B='UBND phường Chơn Thành' | D=0.5 | E='=C30*D30*2' | G=0.5 | H='=F30*G30' | J=2.0 | K='=I30*J30' | M=0.0 | N='=L30*M30' | Q='=O30*P30'
+r 31: A='=ROW()-16' | B='UBND phường Đồng Xoài' | D=0.5 | E='=C31*D31*2' | G=0.5 | H='=F31*G31' | J=2.0 | K='=I31*J31' | M=0.0 | N='=L31*M31' | Q='=O31*P31'
+r 32: A='=ROW()-16' | B='UBND phường Hàng Gòn' | D=0.5 | E='=C32*D32*2' | G=0.5 | H='=F32*G32' | J=2.0 | K='=I32*J32' | M=0.0 | N='=L32*M32' | Q='=O32*P32'
+r 33: A='=ROW()-16' | B='UBND phường Hố Nai' | D=0.5 | E='=C33*D33*2' | G=0.5 | H='=F33*G33' | J=2.0 | K='=I33*J33' | M=0.0 | N='=L33*M33' | Q='=O33*P33'
+r 34: A='=ROW()-16' | B='UBND phường Long Bình' | D=0.5 | E='=C34*D34*2' | G=0.5 | H='=F34*G34' | J=2.0 | K='=I34*J34' | M=0.0 | N='=L34*M34' | Q='=O34*P34'
+r 35: A='=ROW()-16' | B='UBND phường Long Hưng' | D=0.5 | E='=C35*D35*2' | G=0.5 | H='=F35*G35' | J=2.0 | K='=I35*J35' | M=0.0 | N='=L35*M35' | Q='=O35*P35'
+r 36: A='=ROW()-16' | B='UBND phường Long Khánh' | D=0.5 | E='=C36*D36*2' | G=0.5 | H='=F36*G36' | J=2.0 | K='=I36*J36' | M=0.0 | N='=L36*M36' | O=5.0 | P=0.8 | Q='=O36*P36'
+r 37: A='=ROW()-16' | B='UBND phường Minh Hưng' | D=0.5 | E='=C37*D37*2' | G=0.5 | H='=F37*G37' | J=2.0 | K='=I37*J37' | M=0.0 | N='=L37*M37' | Q='=O37*P37'
+r 38: A='=ROW()-16' | B='UBND phường Phước Bình' | D=0.5 | E='=C38*D38*2' | G=0.5 | H='=F38*G38' | J=2.0 | K='=I38*J38' | M=0.0 | N='=L38*M38' | Q='=O38*P38'
+r 39: A='=ROW()-16' | B='UBND phường Phước Long' | D=0.5 | E='=C39*D39*2' | G=0.5 | H='=F39*G39' | J=2.0 | K='=I39*J39' | M=0.0 | N='=L39*M39' | Q='=O39*P39'
+r 40: A='=ROW()-16' | B='UBND phường Phước Tân' | D=0.5 | E='=C40*D40*2' | G=0.5 | H='=F40*G40' | J=2.0 | K='=I40*J40' | M=0.0 | N='=L40*M40' | Q='=O40*P40'
+r 41: A='=ROW()-16' | B='UBND phường Tam Hiệp' | D=0.5 | E='=C41*D41*2' | G=0.5 | H='=F41*G41' | J=2.0 | K='=I41*J41' | M=0.0 | N='=L41*M41' | Q='=O41*P41'
+r 42: A='=ROW()-16' | B='UBND phường Tam Phước' | D=0.5 | E='=C42*D42*2' | G=0.5 | H='=F42*G42' | J=2.0 | K='=I42*J42' | M=0.0 | N='=L42*M42' | Q='=O42*P42'
+r 43: A='=ROW()-16' | B='UBND phường Tân Triều' | D=0.5 | E='=C43*D43*2' | G=0.5 | H='=F43*G43' | J=2.0 | K='=I43*J43' | M=0.0 | N='=L43*M43' | Q='=O43*P43'
+r 44: A='=ROW()-16' | B='UBND phường Trấn Biên' | D=0.5 | E='=C44*D44*2' | G=0.5 | H='=F44*G44' | J=2.0 | K='=I44*J44' | M=0.0 | N='=L44*M44' | Q='=O44*P44'
+r 45: A='=ROW()-16' | B='UBND phường Trảng Dài' | D=0.5 | E='=C45*D45*2' | G=0.5 | H='=F45*G45' | J=2.0 | K='=I45*J45' | M=0.0 | N='=L45*M45' | Q='=O45*P45'
+r 46: A='=ROW()-16' | B='UBND phường Xuân Lập' | D=0.5 | E='=C46*D46*2' | G=0.5 | H='=F46*G46' | J=2.0 | K='=I46*J46' | M=0.0 | N='=L46*M46' | Q='=O46*P46'
+r 47: A='=ROW()-16' | B='UBND xã An Phước' | D=0.5 | E='=C47*D47*2' | G=0.5 | H='=F47*G47' | J=2.0 | K='=I47*J47' | M=0.0 | N='=L47*M47' | Q='=O47*P47'
+r 48: A='=ROW()-16' | B='UBND xã An Viễn' | D=0.5 | E='=C48*D48*2' | G=0.5 | H='=F48*G48' | J=2.0 | K='=I48*J48' | M=0.0 | N='=L48*M48' | Q='=O48*P48'
+r 49: A='=ROW()-16' | B='UBND xã Bàu Hàm' | D=0.5 | E='=C49*D49*2' | G=0.5 | H='=F49*G49' | J=2.0 | K='=I49*J49' | M=0.0 | N='=L49*M49' | Q='=O49*P49'
+==========================================================================================
+SHEET: '1r-snnmt'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | R='biểu này Đồng Nai không biển nên không có dữ liệu báo cáo, dữ liệu hiển thị ở biểu 01 = 0, ghi chú: không có nội dung này' | S='Phụ lục số 01r'
+r  2: A='TỔNG HỢP KINH PHÍ KHUYẾN KHÍCH, HỖ TRỢ NGƯ DÂN KHAI THÁC, NUÔI TRỒNG HẢI SẢN TRÊN VÙNG BIỂN XA THEO QUYẾT ĐỊNH SỐ 48/2010/QĐ-TTG NĂM 2025'
+r  3: S='Đơn vị: Triệu đồng'
+r  4: A='STT' | B='ĐƠN VỊ THỰC HIỆN' | C='Dự kiến nhu cầu kinh phí năm 2020'
+r  5: C='I. Hỗ trợ khai thác và dịch vụ khai thác hải sản' | O='II. Kinh phí hỗ trợ nuôi trồng hải sản' | R='III. Kinh phí hỗ trợ khắc phục hậu quả đối với thuyền viên và tàu bị bắt giữ, hư hỏng' | S='Tổng kinh phí thực hiện chính sách'
+r  6: C='1. Hỗ trợ chi phí nhiên liệu' | I='2. Bảo hiểm thân tàu' | K='3. Bảo hiểm tai nạn thuyền viên' | M='4. Mua máy liên lạc tầm xa'
+r  7: C='Số tàu' | H='Tổng kinh phí' | I='Số lượng tàu' | J='Kinh phí' | K='Số lượng thuyền viên' | L='Kinh phí' | M='Số lượng máy' | N='Kinh phí' | O='Số đối tượng hỗ trợ chi phí lồng nuôi' | P='Số đối tượng hỗ trợ tiền mua giống hải sản' | Q='Tổng kinh phí'
+r  8: C='90-150 CV' | D='150-250 CV' | E='250-400 CV' | F='400-700 CV' | G='Trên 700 CV'
+r  9: A='A' | B='B' | C=1.0 | D='=+C9+1' | E='=+D9+1' | F='=+E9+1' | G='=+F9+1' | H='=+G9+1' | I='=+H9+1' | J='=+I9+1' | K='=+J9+1' | L='=+K9+1' | M='=+L9+1' | N='=+M9+1' | O='=+N9+1' | P='=+O9+1' | Q='=+P9+1' | R='=+Q9+1' | S='=+R9+1'
+r 10: B='Tổng cộng' | C=0.0 | D=0.0 | E=0.0 | F=0.0 | G=0.0 | H='=SUMPRODUCT(C10:G10,C18:G18)' | I=0.0 | J=0.0 | K=0.0 | L=0.0 | M=0.0 | N=0.0 | O=0.0 | P=0.0 | Q=0.0 | R=0.0 | S=0.0
+r 11: A=1.0 | B='Thành phố Đồng Nai' | C=0.0 | D=0.0 | E=0.0 | F=0.0 | G=0.0 | H=0.0 | I=0.0 | J=0.0 | K=0.0 | L=0.0 | M=0.0 | N=0.0 | O=0.0 | P=0.0 | Q=0.0 | R=0.0 | S=0.0
+r 12: B='…'
+r 13: A=2.0 | B='Xã/Phường/Đặc khu B'
+r 14: B='…'
+r 17: A='(*)' | B='Hỗ trợ chi phí nhiên liệu tối đa 4 chuyến/tàu/năm'
+r 18: C=22.0 | D=30.0 | E=55.0 | F=75.0 | G=100.0
+r 19: D='Số lượng' | E='Kinh phí'
+r 20: B='=C5' | D='=D21+D27+D28+D29' | E='=E21+E27+E28+E29'
+r 21: B='=C6' | D='=sum(D22:D26)' | E='=H11'
+r 22: B='=C8' | D='=C11' | E='x'
+r 23: B='=D8' | D='=D11' | E='x'
+r 24: B='=E8' | D='=E11' | E='x'
+r 25: B='=F8' | D='=F11' | E='x'
+r 26: B='=G8' | D='=G11' | E='x'
+r 27: B='=I6' | D='=I11' | E='=J11'
+r 28: B='=K6' | D='=K11' | E='=L11'
+r 29: B='=M6' | D='=M11' | E='=N11'
+r 30: B='=O5' | D='=sum(D31:D32)' | E='=Q11'
+r 31: B='Hỗ trợ chi phí lồng nuôi' | D='=O11' | E='x'
+r 32: B='Hỗ trợ tiền mua giống hải sản' | D='=P11' | E='x'
+r 33: B='=R5' | D='x' | E='=R11'
+r 35: B='Tổng kinh phí thực hiện' | E='=E20+E30+E33'
+==========================================================================================
+SHEET: '1s-snnmt-95xp'
+r  1: A='ĐƠN VỊ (Xã/ phường/ Sở ngành/ Trường ĐH-CDĐ/…)' | I='Phụ lục số 01s' | J='LƯU Ý: BIỂU NÀY KHÔNG ĐỐI CHIẾU VỚI KHO BẠC; SỞ NNMT VÀ 95 XÃ PHƯỜNG BÁO CÁO VỀ STC GHI NHẬN '
+r  2: A='TỔNG HỢP KINH PHÍ THỰC HIỆN HỖ TRỢ ĐẤT TRỒNG LÚA THEO NGHỊ ĐỊNH SỐ 112/2024/NĐ-CP NĂM 2025'
+r  4: F=1.5 | H=0.75 | I='Đơn vị: Triệu đồng'
+r  5: A='STT' | B='Nhóm đối tượng' | C='Diện tích (ha)' | F='Kinh phí' | I='Tổng kinh phí thực hiện chính sách'
+r  6: C='Đất chuyên trồng lúa' | D='Trong đó' | E='Đất trồng lúa còn lại' | F='Đất chuyên trồng lúa' | G='Trong đó' | H='Đất trồng lúa còn lại'
+r  7: D='Vùng quy hoạch trồng lúa có năng suất, chất lượng cao (*)' | G='Vùng quy hoạch trồng lúa có năng suất, chất lượng cao'
+r  9: A='A' | B='B' | C='1' | D='2' | E='3' | F='4=1x1,5 trđ' | G='5=2x1,5 trđ' | H='6=3x0,75trđ' | I='7=4+5+6'
+r 10: B='Tổng cộng' | C='=C11' | D='=D11' | E='=E11' | F='=F11' | G='=G11' | H='=H11' | I='=I11'
+r 11: A='=ROW()-10' | B='Xã An Lộc' | C=17009.0 | D=4715.32 | E=11338.0 | F='=C11*$F$4' | G='=D11*$F$4' | H='=E11*$H$4' | I='=SUM(F11:H11)'
+r 12: A=2.0 | B=0.0
+r 14: A='(*)' | B='Kèm theo Quyết định/Văn bản của UBND tỉnh về phê duyệt vùng quy hoạch trồng lúa có năng suất, chất lượng cao'
+r 17: D='Mức' | E='=C5' | F='=F5'
+r 18: B='=C6' | D=1.5 | E='=C11' | F='=E18*D18'
+r 19: B='=D7' | D=1.5 | E='=D11' | F='=E19*D19'
+r 20: B='=E6' | D=0.75 | E='=E11' | F='=E20*D20'

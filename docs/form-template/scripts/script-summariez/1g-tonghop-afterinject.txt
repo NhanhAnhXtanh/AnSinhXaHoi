@@ -1,0 +1,122 @@
+// Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1g"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1g (1g-cd-tc-svh)  —  hook afterInject
+//  Nội trú CĐ/TC. 3 KHỐI LOẠI cố định I/II/III; trong MỖI loại, MỖI ĐƠN VỊ 1 DÒNG (clone động).
+//  1 đơn vị có thể xuất hiện ở nhiều loại (nộp số cho loại đó). Loại xác định theo tiền tố mã
+//  1G.I / 1G.II / 1G.III.
+//
+//  ĐỔ mỗi dòng đơn vị:
+//   - HỌC BỔNG (HOC_BONG.DOI_TUONG): 2 KỲ — kỳ II (T1–6) → F, kỳ I (T7–12) → I.
+//   - Đồ dùng/đi lại/Tết (CẢ NĂM): DO_DUNG→L, DI_LAI.M02→M, DI_LAI.M03→N, O_LAI_TET→O.
+//   - HO_TRO_KHAC.KINH_PHI: KHÔNG đổ (P=SUM(L:O) tự tính).
+//  SET lại mức/thời gian (C mức HB, D đồ dùng, E Tết, G/J thời gian) từ DÒNG MẪU của loại — vì clone
+//  KHÔNG copy value. Kinh phí H/K (=C×F×G×lương), P, Q + tiểu tổng loại + tổng r10 là CÔNG THỨC tự tính.
+//  CONSUMER: mã ghép qua CK. Lương $T$1 (kỳ II) / $U$1 (kỳ I) ở template.
+// ============================================================================
+
+const SHEET = '1g-cd-tc-svh';
+const CK = 'indi' + 'catorCode';
+
+// 3 khối loại: tiền tố mã + dòng tiểu tổng + dòng mẫu (0-based). r11 tổng I/r12 mẫu; r14/r15; r17/r18.
+const KHOI = [
+  { loai: '1G.I', totRow: 10, sampleRow: 11 },
+  { loai: '1G.II', totRow: 13, sampleRow: 14 },
+  { loai: '1G.III', totRow: 16, sampleRow: 17 },
+];
+
+// Cột 0-based: C=2 mức HB, D=3 đồ dùng, E=4 Tết, F=5 ĐT HB kỳ II, G=6 thời gian II,
+//              I=8 ĐT HB kỳ I, J=9 thời gian I, L=11 đồ dùng, M=12 đi lại 0,2, N=13 đi lại 0,3, O=14 Tết.
+const C_MUC = 2, C_DODUNG = 3, C_TET = 4, C_HB_II = 5, C_TG_II = 6, C_HB_I = 8, C_TG_I = 9;
+const C_L = 11, C_M = 12, C_N = 13, C_O = 14;
+const B = 1;
+// Chỉ tiêu (đã bỏ tiền tố loại) -> cột (đồ dùng/đi lại/Tết, cả năm).
+const NAM_COL = { 'DO_DUNG.DOI_TUONG': C_L, 'DI_LAI.M02': C_M, 'DI_LAI.M03': C_N, 'O_LAI_TET.DOI_TUONG': C_O };
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+function setText(ctx, r, c, v) { if (v == null || v === '') return; try { ctx.cell.set(SHEET, r, c, v); } catch (e) { /* bỏ qua */ } }
+// Tách mã: 1G.I.HOC_BONG.DOI_TUONG -> {loai:'1G.I', chi:'HOC_BONG.DOI_TUONG'}
+function parseCode(code) {
+  const m = /^(1G\.(?:III|II|I))\.(.+)$/.exec(String(code || ''));
+  return m ? { loai: m[1], chi: m[2] } : null;
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    async function apiGet(path) { try { return (await ctx.api.get(path)) || []; } catch (e) { ctx.ui.message('Lỗi 1g: ' + e.message); return []; } }
+
+    const nameUnits = await apiGet('/rest/qt/master/organization-units');
+    const nameOf = {}; for (const u of nameUnits) nameOf[u.code] = u.name || u.code;
+
+    // data[loai][orgCode] = { hbII, hbI, L, M, N, O }
+    const data = { '1G.I': {}, '1G.II': {}, '1G.III': {} };
+    function slot(loai, code) {
+      if (!data[loai]) return null;
+      return data[loai][code] || (data[loai][code] = {});
+    }
+    // HỌC BỔNG kỳ II (T1–6) → hbII ; kỳ I (T7–12) → hbI.
+    async function collectHB(range, key) {
+      for (const r of await apiGet('/rest/qt/summary/data?from=' + range.from + '&to=' + range.to + '&groupByOrg=true' + src)) {
+        const p = parseCode(r[CK]); if (!p || p.chi !== 'HOC_BONG.DOI_TUONG') continue;
+        const s = slot(p.loai, r.organizationCode); if (s) s[key] = (num(s[key]) || 0) + (num(r.quantity) || 0);
+      }
+    }
+    await collectHB({ from: a + '-01-01', to: a + '-06-30' }, 'hbII'); // Kỳ II = HK2 (T1–6 năm Y+1)
+    await collectHB({ from: a + '-07-01', to: a + '-12-31' }, 'hbI');              // Kỳ I  = HK1 (T7–12 năm Y)
+    // Đồ dùng/đi lại/Tết CẢ NĂM HỌC (T9 năm Y → T5 năm Y+1, bỏ hè).
+    for (const r of await apiGet('/rest/qt/summary/data?from=' + a + '-01-01&to=' + a + '-12-31&groupByOrg=true' + src)) {
+      const p = parseCode(r[CK]); if (!p) continue;
+      const col = NAM_COL[p.chi]; if (col == null) continue;
+      const s = slot(p.loai, r.organizationCode); if (s) s['c' + col] = (num(s['c' + col]) || 0) + (num(r.quantity) || 0);
+    }
+
+    // Danh sách đơn vị mỗi loại (có data), sắp ổn định theo code.
+    const orgsByLoai = {};
+    for (const k of KHOI) orgsByLoai[k.loai] = Object.keys(data[k.loai]).sort();
+
+    // Clone TOP-DOWN với shift tích luỹ (clone khối trên đẩy khối dưới xuống).
+    let shift = 0;
+    const placed = [];
+    for (const k of KHOI) {
+      const orgs = orgsByLoai[k.loai];
+      const sampleRow = k.sampleRow + shift;
+      if (orgs.length > 1) ctx.rows.clone(SHEET, sampleRow, orgs.length - 1);
+      // Mức/thời gian đọc từ dòng mẫu (SAU khi dời theo shift, TRƯỚC khi clone ghi đè value).
+      placed.push({ loai: k.loai, orgs, sampleRow });
+      if (orgs.length > 1) shift += orgs.length - 1;
+    }
+
+    // Đổ từng đơn vị. Mức/thời gian đọc từ dòng mẫu (dòng đầu mỗi loại) rồi set cho mọi dòng.
+    for (const blk of placed) {
+      const s0 = blk.sampleRow;
+      const muc = ctx.cell.get(SHEET, s0, C_MUC), dodung = ctx.cell.get(SHEET, s0, C_DODUNG), tet = ctx.cell.get(SHEET, s0, C_TET);
+      const tgII = ctx.cell.get(SHEET, s0, C_TG_II), tgI = ctx.cell.get(SHEET, s0, C_TG_I);
+      blk.orgs.forEach((code, i) => {
+        const r0 = s0 + i;
+        const d = data[blk.loai][code] || {};
+        setText(ctx, r0, B, nameOf[code] || code);
+        // mức/thời gian (clone không copy value)
+        setText(ctx, r0, C_MUC, muc); setText(ctx, r0, C_DODUNG, dodung); setText(ctx, r0, C_TET, tet);
+        // học bổng 2 kỳ
+        if (d.hbII != null) { put(ctx, r0, C_HB_II, d.hbII); setText(ctx, r0, C_TG_II, tgII); }
+        if (d.hbI != null) { put(ctx, r0, C_HB_I, d.hbI); setText(ctx, r0, C_TG_I, tgI); }
+        // đồ dùng/đi lại/Tết
+        put(ctx, r0, C_L, num(d['c' + C_L])); put(ctx, r0, C_M, num(d['c' + C_M]));
+        put(ctx, r0, C_N, num(d['c' + C_N])); put(ctx, r0, C_O, num(d['c' + C_O]));
+      });
+    }
+
+    const totalOrgs = KHOI.reduce((a, k) => a + orgsByLoai[k.loai].length, 0);
+    ctx.ui.message('Đã đổ 1g: ' + totalOrgs + ' dòng đơn vị (3 loại). Kinh phí + tiểu tổng + tổng tự tính.');
+  },
+});

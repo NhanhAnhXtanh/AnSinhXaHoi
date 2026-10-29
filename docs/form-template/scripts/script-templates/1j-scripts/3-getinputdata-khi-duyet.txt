@@ -1,0 +1,49 @@
+// Nguon: DB qt_template_script — bieu 1j, phien ban PB-000024, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1j · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1j".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// CƠ CHẾ SỔ CÁI = SỔ ĐỐI CHIẾU: quantity = Số đối tượng (C); amount = Kinh phí thực hiện
+//   (F = hỗ trợ học phí + SHP, ô công thức — LƯU value đã tính). Mức thu học phí (D), số tháng
+//   (E=10), mức SHP (C12) gắn template khoá → không lưu.
+
+const SHEET = '1j';
+const R = 7;
+
+const BINDINGS = [
+  { indicatorCode: '1J.HP_SHP.SO_DOI_TUONG', indicatorName: 'Hỗ trợ học phí & sinh hoạt phí › Số đối tượng', qty: 2, amt: 5 },
+];
+const NOTE_COL = 8;
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function cellVal(ctx, col) { return col == null ? null : num(ctx.cell.get(SHEET, R, col)); }
+
+return defineScript({
+  getInputData(ctx) {
+    const note = optionalNote(ctx.cell.get(SHEET, R, NOTE_COL));
+    return BINDINGS
+      .map((b, i) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: cellVal(ctx, b.qty),
+        amount: cellVal(ctx, b.amt),
+        note: i === 0 ? note : null,
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});

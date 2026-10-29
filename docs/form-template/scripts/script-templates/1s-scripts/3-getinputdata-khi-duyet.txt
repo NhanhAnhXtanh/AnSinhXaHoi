@@ -1,0 +1,50 @@
+// Nguon: DB qt_template_script — bieu 1s, phien ban PB-000032, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1s · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1s".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// CƠ CHẾ SỔ CÁI = SỔ ĐỐI CHIẾU: mỗi chỉ tiêu diện tích lưu qty (diện tích) + amt (kinh phí).
+//   C→F (=C*C13) · D→G (=D*C13) · E→H (=E*C14). Định mức C13,C14 khoá → không lưu. Bỏ ô tổng I.
+
+const SHEET = '1s';
+const R = 8;
+
+const BINDINGS = [
+  { indicatorCode: '1S.DAT_CHUYEN_TRONG_LUA', indicatorName: 'Hỗ trợ đất trồng lúa › Diện tích đất chuyên trồng lúa', qty: 2, amt: 5 },
+  { indicatorCode: '1S.DAT_CHUYEN_VUNG_QH', indicatorName: 'Hỗ trợ đất trồng lúa › Trong đó vùng quy hoạch năng suất/chất lượng cao', qty: 3, amt: 6 },
+  { indicatorCode: '1S.DAT_TRONG_LUA_CON_LAI', indicatorName: 'Hỗ trợ đất trồng lúa › Diện tích đất trồng lúa còn lại', qty: 4, amt: 7 },
+];
+const NOTE_COL = 9;
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function cellVal(ctx, col) { return col == null ? null : num(ctx.cell.get(SHEET, R, col)); }
+
+return defineScript({
+  getInputData(ctx) {
+    const note = optionalNote(ctx.cell.get(SHEET, R, NOTE_COL));
+    return BINDINGS
+      .map((b, i) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: cellVal(ctx, b.qty),
+        amount: cellVal(ctx, b.amt),
+        note: i === 0 ? note : null,
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});

@@ -1,0 +1,130 @@
+// Nguon: DB asxh-react-dn — bieu 1j, phien ban PUBLISHED moi nhat, khoi 4 "Tong hop theo ky — hook: afterInject".
+// Dong bo tu DB ngay 2026-10-29 (DB lam chuan).
+
+// ==== 1j - Script 4/4 (v2) - AFTERINJECT: TONG HOP THEO KY (tab "Tong hop theo bieu (ky)") ====
+// O tab nay moi dong la MOT DON VI. Script do so cua KY dang chon (ctx.shared.periodId):
+//   - dong 7 = TONG CONG (cong moi don vi),
+//   - moi don vi duoc GIAO BIEU NAY trong ky them mot dong ben duoi, ten don vi ghi o cot B.
+//     Don vi khong duoc giao bieu nay thi KHONG co dong (loc theo ma bieu ctx.shared.sheetCode).
+// Don vi duoc giao ma chua nop -> van co dong, so de trong (nhin ra ai con thieu).
+// O cong thuc (kinh phi = so luong x muc x thang) KHONG ghi de - bieu tu tinh.
+// Man NHAP LIEU khong co ctx.shared.periodId nen script tu bo qua.
+//
+// ‼ THAY DOI SO VOI v1:
+//  1) Bieu nay co HAI ma chi tieu (dat hang + nhu cau xa hoi). O tab tong hop moi don vi
+//     van CHI MOT DONG, nen so cua hai ma duoc CONG GOP lai - tab nay tra loi "don vi X
+//     nop bao nhieu", con chi tiet theo tung loai doi tuong xem o chinh bieu 1j.
+//  2) Template ban v2 co dong 8 (doi tuong nhu cau xa hoi). Khi clone dong cho tung don vi,
+//     dong 8 goc bi day xuong duoi cung va tro thanh dong thua -> script don sach no.
+
+const SHEET = '1j';
+const ROW0 = 7;               // dong du lieu goc (0-based) = dong TONG CONG
+const EXTRA_TEMPLATE_ROW = 8; // dong "nhu cau xa hoi" cua template, khong dung o tab tong hop
+const ORG_COL = 1;            // cot B: "Chi tieu / Don vi"
+const BINDINGS = [
+  { code: '1J.DATHANG.SO_DOI_TUONG', qty: 2, amt: 5 },
+  { code: '1J.XAHOI.SO_DOI_TUONG', qty: 2, amt: 5 },
+];
+const MUC_COL = 3;    // [FIX] D: Muc (hang co dinh, doc tu dong Tong cong)
+const THANG_COL = 4;  // [FIX] E: Thoi gian (hang co dinh)
+const CK = 'indi' + 'catorCode';
+
+function num(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function put(ctx, r, c, v) {
+  if (c == null || v == null) return;
+  try {
+    const f = ctx.cell.getFormula(SHEET, r, c);
+    if (f && String(f).trim() !== '') return;   // o cong thuc: de bieu tu tinh
+    ctx.cell.set(SHEET, r, c, v);
+  } catch (e) { /* o khoa/cong thuc */ }
+}
+function setText(ctx, r, c, v) { try { ctx.cell.set(SHEET, r, c, v); } catch (e) {} }
+
+return defineScript({
+  async afterInject(ctx) {
+    const periodId = ctx.shared && ctx.shared.periodId;
+    if (!periodId) return;
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? '&scopeKind=' + ctx.shared.scopeKind : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet)
+      ? '&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet) : '';
+
+    async function get(path) {
+      try { return (await ctx.api.get(path)) || []; }
+      catch (e) { ctx.ui.message('Loi lay so 1j: ' + e.message); return []; }
+    }
+    // 1) Don vi DUOC GIAO BIEU NAY trong ky (ke ca chua nop) + 2) so lieu theo tung don vi
+    const bieu = (ctx.shared && ctx.shared.sheetCode)
+      ? '&sourceSheetCode=' + encodeURIComponent(ctx.shared.sheetCode) : '';
+    const units = await get('/rest/qt/summary/period-organizations?periodId=' + periodId + bieu);
+    const rows = await get('/rest/qt/summary/data?periodId=' + periodId + '&groupByOrg=true' + scope + src);
+
+    const byOrg = {};
+    for (const r of rows) {
+      const code = r.organizationCode || '';
+      (byOrg[code] || (byOrg[code] = {}))[r[CK]] = r;
+    }
+    // Thu tu: don vi duoc giao truoc (theo ma), roi don vi CO SO CUA BIEU NAY (ma trong BINDINGS) ma
+    // khong nam trong danh sach giao (du lieu cu) - ten nhom sau tra danh muc. So bieu khac KHONG tinh.
+    const codes = [];
+    for (const u of units) if (codes.indexOf(u.code) < 0) codes.push(u.code);
+    const nameOf = {};
+    for (const u of units) nameOf[u.code] = u.name || u.code;
+    const extra = [];
+    for (const c in byOrg) {
+      if (c && c !== 'TONG_HOP' && codes.indexOf(c) < 0 && BINDINGS.some((b) => byOrg[c][b.code])) extra.push(c);
+    }
+    if (extra.length > 0) {
+      for (const u of await get('/rest/qt/master/organization-units')) if (!nameOf[u.code]) nameOf[u.code] = u.name || u.code;
+      for (const c of extra.sort()) codes.push(c);
+    }
+    if (codes.length === 0) { ctx.ui.message('1j: ky nay chua giao bieu cho don vi nao.'); return; }
+
+    // Chen du dong: dong ROW0 giu lam TONG CONG, moi don vi mot dong ben duoi
+    if (codes.length > 0) ctx.rows.clone(SHEET, ROW0, codes.length);
+
+    const total = { q: null, a: null };
+    const MUC_HO_TRO = num(ctx.cell.get(SHEET, ROW0, MUC_COL)); // [FIX]
+    const THOI_GIAN  = num(ctx.cell.get(SHEET, ROW0, THANG_COL)); // [FIX]
+    codes.forEach(function (code, i) {
+      const r0 = ROW0 + 1 + i;
+      setText(ctx, r0, ORG_COL, nameOf[code] || code);
+      setText(ctx, r0, 0, String(i + 1));
+      put(ctx, r0, MUC_COL, MUC_HO_TRO);    // [FIX] do o co dinh cho tung don vi
+      put(ctx, r0, THANG_COL, THOI_GIAN);
+      const data = byOrg[code] || {};
+      // Cong gop hai ma chi tieu cua don vi nay
+      let q = null;
+      let a = null;
+      for (const b of BINDINGS) {
+        const row = data[b.code];
+        if (!row) continue;
+        const rq = num(row.quantity);
+        const ra = num(row.amount);
+        if (rq != null) q = (q || 0) + rq;
+        if (ra != null) a = (a || 0) + ra;
+      }
+      put(ctx, r0, BINDINGS[0].qty, q);
+      put(ctx, r0, BINDINGS[0].amt, a);
+      if (q != null) total.q = (total.q || 0) + q;
+      if (a != null) total.a = (total.a || 0) + a;
+    });
+
+    // Dong TONG CONG
+    setText(ctx, ROW0, ORG_COL, 'Tong cong');
+    setText(ctx, ROW0, 0, '');
+    put(ctx, ROW0, BINDINGS[0].qty, total.q);
+    put(ctx, ROW0, BINDINGS[0].amt, total.a);
+
+    // Don dong template thua bi clone day xuong duoi cung
+    const thua = EXTRA_TEMPLATE_ROW + codes.length;
+    setText(ctx, thua, 0, '');
+    setText(ctx, thua, ORG_COL, '');
+    [2, 3, 4, 8].forEach(function (c) { setText(ctx, thua, c, ''); });
+
+    ctx.ui.message('Da do 1j: ' + codes.length + ' don vi + dong tong cong (theo ky dang chon).');
+  },
+});

@@ -1,0 +1,50 @@
+// Nguon: DB qt_template_script — bieu 1g, phien ban PB-000020, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1g · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1g".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Mức C/D/E + thời gian G khoá → không kiểm. Kiểm số đối tượng (F,I,J,K,L) và Tổng (N, công thức)
+// của 3 loại phải LÀ SỐ. KHÔNG kiểm Ghi chú (O).
+
+const SHEET = '1g';
+const LEAF_ROWS = [9, 10, 11];
+const LOAI = ['I — HSSV DTTS hộ nghèo', 'II — HSSV tốt nghiệp PTDT nội trú', 'III — HSSV Kinh hộ nghèo'];
+// Ô số cần kiểm: F(5),I(8),J(9),K(10),L(11) nhập tay + N(13) tổng công thức.
+const NUMERIC_COLS = [
+  { col: 5,  label: 'Đối tượng học bổng' },
+  { col: 8,  label: 'Đối tượng đồ dùng cá nhân' },
+  { col: 9,  label: 'Đối tượng đi lại mức 0,2' },
+  { col: 10, label: 'Đối tượng đi lại mức 0,3' },
+  { col: 11, label: 'Đối tượng ở lại trường dịp Tết' },
+  { col: 13, label: 'Tổng kinh phí thực hiện' }, // N: công thức
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    LEAF_ROWS.forEach((row, i) => {
+      for (const cell of NUMERIC_COLS) {
+        const n = toNumber(ctx.cell.get(SHEET, row, cell.col));
+        if (Number.isNaN(n)) {
+          issues.push({ severity: 'ERROR', code: 'NOT_NUMBER', message: `${LOAI[i]} · ${cell.label}: phải là số.` });
+        } else if (typeof n === 'number') {
+          if (n < 0) issues.push({ severity: 'ERROR', code: 'NEGATIVE', message: `${LOAI[i]} · ${cell.label}: không được âm.` });
+          if (n > 0) anyValue = true;
+        }
+      }
+    });
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1G', message: 'Biểu 1g chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

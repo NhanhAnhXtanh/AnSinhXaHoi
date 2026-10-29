@@ -1,0 +1,49 @@
+// Nguon: DB qt_template_script — bieu 1i, phien ban PB-000023, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1i · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1i".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Mức (D) và số tháng (E) khoá cố định → không kiểm. Kiểm Số đối tượng (C) và Kinh phí (F,
+// ô công thức) của 5 dòng phải LÀ SỐ. KHÔNG kiểm Ghi chú (H).
+
+const SHEET = '1i';
+const LEAF_ROWS = [7, 8, 9, 10, 11];
+const NAMES = [
+  'Trẻ mẫu giáo DTTS rất ít người',
+  'Học sinh DTTS rất ít người (tiểu học, THCS, THPT)',
+  'Học sinh DTTS rất ít người trường PTDT bán trú',
+  'Học sinh DTTS rất ít người trường PTDT nội trú',
+  'HSSV DTTS rất ít người tại các trường',
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    LEAF_ROWS.forEach((row, i) => {
+      const qty = toNumber(ctx.cell.get(SHEET, row, 2));   // C: số đối tượng
+      const amt = toNumber(ctx.cell.get(SHEET, row, 5));   // F: kinh phí (công thức)
+      if (Number.isNaN(qty)) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NOT_NUMBER', message: `${NAMES[i]}: số đối tượng phải là số.` });
+      } else if (typeof qty === 'number' && qty < 0) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NEGATIVE', message: `${NAMES[i]}: số đối tượng không được âm.` });
+      }
+      if (Number.isNaN(amt)) {
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_NOT_NUMBER', message: `${NAMES[i]}: kinh phí phải là số (kiểm tra mức/số tháng đã điền chưa).` });
+      }
+      if ((typeof qty === 'number' && qty > 0) || (typeof amt === 'number' && amt > 0)) anyValue = true;
+    });
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1I', message: 'Biểu 1i chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

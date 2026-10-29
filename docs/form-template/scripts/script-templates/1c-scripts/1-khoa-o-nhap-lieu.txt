@@ -1,0 +1,61 @@
+// Nguon: DB qt_template_script — bieu 1c, phien ban PB-000003, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1c · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1c".
+// Nguồn: form-template/1c_DATA.xlsx (sheet '1c', A1:Z10). Tọa độ 0-based.
+//
+// Biểu 1c (Phụ lục 01c — chế độ giáo viên mầm non) — BẢNG NGANG một dòng (row 7):
+//   C(c2)=Số giáo viên hưởng chính sách | D(c3)=Mức hỗ trợ | E(c4)=Thời gian hưởng
+//   F(c5)=Tổng kinh phí =ROUND(C*D*E,0)  ← CÔNG THỨC | G(c6)=Ghi chú
+// Mức (D) và thời gian (E) là HẰNG SỐ CHÍNH SÁCH → KHOÁ. Đơn vị chỉ nhập C (số GV) + G (ghi chú).
+
+const SHEET = '1c';
+const DATA_ROW = 7;
+const INPUT_COLS = [2, 6];
+
+function isEditable(row, col) {
+  if (row === 0 && col === 0) return true;  // A1 đơn vị (gộp A1:B1)
+  if (row === 2 && col === 1) return true;  // B3 tháng/năm
+  return row === DATA_ROW && INPUT_COLS.indexOf(col) >= 0;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 0, 0, false);
+  ctx.cell.lock(SHEET, 2, 1, false);
+  INPUT_COLS.forEach((col) => ctx.cell.lock(SHEET, DATA_ROW, col, false));
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tên đơn vị của phiếu (app đưa vào ctx.shared.orgName): ghi vào ô "Chỉ tiêu / Đơn vị"
+    // của dòng nhập + dòng ĐƠN VỊ đầu biểu (A1), giống các biểu 1g–1s.
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) {
+      ctx.cell.set(SHEET, DATA_ROW, 1, _org);
+      ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+    }
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

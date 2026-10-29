@@ -1,0 +1,47 @@
+// Nguon: DB qt_template_script — bieu 1n, phien ban PB-000028, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1n · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1n".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Hệ số/mức chuẩn/số tháng khoá → không kiểm. Kiểm Số đối tượng (F) và Kinh phí (G, ô công thức)
+// của 3 dòng lá phải LÀ SỐ. KHÔNG kiểm Ghi chú (H).
+
+const SHEET = '1n';
+const LEAF_ROWS = [8, 9, 10];
+const NAMES = [
+  'Trợ cấp hưu trí xã hội hàng tháng',
+  'Đối tượng từ đủ 70 đến dưới 75 tuổi thuộc hộ nghèo/cận nghèo',
+  'Hỗ trợ chi phí mai táng',
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    LEAF_ROWS.forEach((row, i) => {
+      const qty = toNumber(ctx.cell.get(SHEET, row, 5));   // F: số đối tượng
+      const amt = toNumber(ctx.cell.get(SHEET, row, 6));   // G: kinh phí (công thức)
+      if (Number.isNaN(qty)) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NOT_NUMBER', message: `${NAMES[i]}: số đối tượng phải là số.` });
+      } else if (typeof qty === 'number' && qty < 0) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NEGATIVE', message: `${NAMES[i]}: số đối tượng không được âm.` });
+      }
+      if (Number.isNaN(amt)) {
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_NOT_NUMBER', message: `${NAMES[i]}: kinh phí phải là số.` });
+      }
+      if ((typeof qty === 'number' && qty > 0) || (typeof amt === 'number' && amt > 0)) anyValue = true;
+    });
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1N', message: 'Biểu 1n chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

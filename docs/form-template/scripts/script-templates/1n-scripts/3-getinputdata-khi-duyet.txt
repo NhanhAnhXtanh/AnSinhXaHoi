@@ -1,0 +1,51 @@
+// Nguon: DB qt_template_script — bieu 1n, phien ban PB-000028, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1n · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1n".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// QUY TẮC: chỉ lưu SỐ ĐỐI TƯỢNG (F) của 3 dòng lá. BỎ ô công thức E (=C*D), G (kinh phí). Hệ số C,
+//   mức chuẩn D, số tháng C16(=12) là hằng số CHÍNH SÁCH khoá → không lưu. Tổng hợp tính lại kinh
+//   phí = số ĐT × hệ số × mức chuẩn × số tháng (RIÊNG mai táng chi 1 lần, KHÔNG nhân số tháng).
+//   measureKind = NGUOI mặc định.
+
+const SHEET = '1n';
+const QTY_COL = 5, AMT_COL = 6, NOTE_COL = 7; // F đối tượng · G kinh phí (công thức) · H ghi chú
+
+const BINDINGS = [
+  { row: 8,  indicatorCode: '1N.HUU_TRI.TRO_CAP', indicatorName: 'Trợ cấp hưu trí xã hội › Trợ cấp hưu trí xã hội hàng tháng' },
+  { row: 9,  indicatorCode: '1N.HUU_TRI.70_75',   indicatorName: 'Trợ cấp hưu trí xã hội › Đối tượng 70–75 tuổi thuộc hộ nghèo/cận nghèo' },
+  { row: 10, indicatorCode: '1N.MAI_TANG',        indicatorName: 'Trợ cấp hưu trí xã hội › Hỗ trợ chi phí mai táng' },
+];
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function inputOnly(ctx, row, col) {
+  return num(ctx.cell.get(SHEET, row, col));
+}
+
+return defineScript({
+  getInputData(ctx) {
+    return BINDINGS
+      .map((b) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: inputOnly(ctx, b.row, QTY_COL),
+        amount: num(ctx.cell.get(SHEET, b.row, AMT_COL)), // kinh phí (value công thức) — lưu để đối chiếu
+        note: optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL)),
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0) || r.note != null);
+  },
+});
+

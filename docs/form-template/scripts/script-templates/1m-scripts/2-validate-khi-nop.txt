@@ -1,0 +1,49 @@
+// Nguon: DB qt_template_script — bieu 1m, phien ban PB-000027, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1m · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1m".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Hệ số/mức chuẩn/số tháng khoá → không kiểm. Kiểm Số đối tượng (F) và Kinh phí (G, ô công thức)
+// của các dòng lá phải LÀ SỐ. KHÔNG kiểm Ghi chú (H).
+
+const SHEET = '1m';
+const LEAF_ROWS = [
+  11, 12, 14, 16, 17, 18, 20, 21, 22, 23, 24, 25,
+  28, 29, 30, 31, 32, 35, 36, 37, 39, 40, 41, 42,
+  45, 47, 48, 49, 50, 53, 54, 56, 57, 58, 59, 61, 62, 63, 64,
+  68, 69, 71, 72, 73, 75, 76, 78, 79,
+  80,
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    for (const row of LEAF_ROWS) {
+      const qty = toNumber(ctx.cell.get(SHEET, row, 5));   // F: số đối tượng
+      const amt = toNumber(ctx.cell.get(SHEET, row, 6));   // G: kinh phí (công thức)
+      const label = 'dòng ' + (row + 1);
+      if (Number.isNaN(qty)) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NOT_NUMBER', message: `Số đối tượng (${label}) phải là số.` });
+      } else if (typeof qty === 'number' && qty < 0) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NEGATIVE', message: `Số đối tượng (${label}) không được âm.` });
+      }
+      if (Number.isNaN(amt)) {
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_NOT_NUMBER', message: `Kinh phí (${label}) phải là số (kiểm tra hệ số/số tháng đã điền chưa).` });
+      }
+      if ((typeof qty === 'number' && qty > 0) || (typeof amt === 'number' && amt > 0)) anyValue = true;
+    }
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1M', message: 'Biểu 1m chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

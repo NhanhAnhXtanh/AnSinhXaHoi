@@ -1,0 +1,57 @@
+// ==== 1j · Script 2/4 (v2): VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1j".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+//
+// ‼ THAY ĐỔI SO VỚI v1: kiểm CẢ HAI dòng dữ liệu (row 7 và row 8), không chỉ row 7.
+// Nhãn dòng đi kèm thông báo để đơn vị biết lỗi nằm ở dòng nào.
+// Mức thu học phí (D) + số tháng (E) khoá theo template → không kiểm. Không kiểm Ghi chú (I).
+
+const SHEET = '1j';
+
+const DATA_ROWS = [
+  { row: 7, label: 'Đặt hàng/giao nhiệm vụ' },
+  { row: 8, label: 'Nhu cầu xã hội' },
+];
+
+const NUMERIC_CELLS = [
+  { col: 2, label: 'Số đối tượng' },
+  { col: 5, label: 'Kinh phí thực hiện' },   // F: ô công thức
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    for (const line of DATA_ROWS) {
+      for (const cell of NUMERIC_CELLS) {
+        const n = toNumber(ctx.cell.get(SHEET, line.row, cell.col));
+        if (Number.isNaN(n)) {
+          issues.push({
+            severity: 'ERROR', code: 'NOT_NUMBER',
+            message: `${line.label} — ${cell.label}: phải là số.`,
+          });
+        } else if (typeof n === 'number') {
+          if (n < 0) {
+            issues.push({
+              severity: 'ERROR', code: 'NEGATIVE',
+              message: `${line.label} — ${cell.label}: không được âm.`,
+            });
+          }
+          if (n > 0) anyValue = true;
+        }
+      }
+    }
+    // Chỉ báo trống khi CẢ HAI dòng đều chưa có số: đơn vị có thể chỉ phát sinh một loại đối tượng.
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1J', message: 'Biểu 1j chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

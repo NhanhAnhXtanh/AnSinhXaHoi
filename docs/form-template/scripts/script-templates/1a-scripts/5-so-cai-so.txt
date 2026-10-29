@@ -1,0 +1,79 @@
+// Nguon: DB qt_template_script — bieu 1a, phien ban PB-000005, script "Sổ cái Sở"
+// Hook: beforeEdit,beforeCommit,beforePaste,getSummaryData. Ghi vao DB ngay 2026-10-01 (khong kem 3 dong dau nay).
+
+// Hàm cho SỔ CÁI SỞ — biểu 1a. Nằm CHUNG bộ script của biểu (displayOrder = 5), không còn bộ riêng.
+// Hook: beforeEdit, beforeCommit, beforePaste (chỉ có hiệu lực ở mode 'summary-edit'), getSummaryData
+// (máy chủ chạy mỗi lần Sở bấm Lưu sổ).
+//
+// 1a là biểu GỘP: mỗi dòng là một CHỈ TIÊU, không có dòng theo đơn vị. Script tổng hợp kỳ
+// (4-tonghop-theo-ky) đổ số đối tượng vào cột C; kinh phí cột D là công thức tự tính.
+// - Guard: Sở chỉ sửa được cột C ở dòng lá (không sửa tham số C33:C37, ghi chú, tiêu đề).
+// - getSummaryData: đọc lại cột C (số đối tượng) + cột D (kinh phí đã tính) của từng dòng lá,
+//   organizationCode = '' (dòng gộp). Máy chủ so với tổng các đơn vị trong sổ Sở; phần chênh
+//   ghi vào đơn vị Sở chọn ở hộp lý do, hoặc dòng "Sở điều chỉnh chung".
+
+const SHEET = '1a';
+const QTY_COL = 2;
+const AMOUNT_COL = 3;
+
+// Dòng lá (0-based) — trùng BINDINGS của 3-getinputdata-khi-duyet và ROW của 4-tonghop-theo-ky.
+const LEAVES = [
+  { code: '1A.HT_CPHT.CHUNG', name: 'Hỗ trợ chi phí học tập', row: 9 },
+  { code: '1A.MIEN_HP.TN_THCS_TRUNG_CAP', name: 'Miễn học phí › Tốt nghiệp THCS học lên trung cấp', row: 12 },
+  { code: '1A.MIEN_HP.NGUOI_CO_CONG', name: 'Miễn học phí › Đối tượng theo Pháp lệnh Ưu đãi người có công', row: 13 },
+  { code: '1A.MIEN_HP.MO_COI', name: 'Miễn học phí › HSSV mồ côi cả cha lẫn mẹ', row: 14 },
+  { code: '1A.MIEN_HP.DTTS_NGHEO', name: 'Miễn học phí › HSSV dân tộc thiểu số hộ nghèo/cận nghèo', row: 15 },
+  { code: '1A.MIEN_HP.KHUYET_TAT', name: 'Miễn học phí › HSSV khuyết tật', row: 16 },
+  { code: '1A.MIEN_HP.SO_GDDT', name: 'Miễn học phí › Đối tượng thuộc Sở GD&ĐT', row: 17 },
+  { code: '1A.MIEN_HP.XA_PHUONG', name: 'Miễn học phí › Đối tượng thuộc các xã, phường', row: 18 },
+  { code: '1A.MIEN_HP.NCL_SO_GD', name: 'Miễn học phí › Hỗ trợ học phí HS ngoài công lập khối Sở GD', row: 19 },
+  { code: '1A.MIEN_HP.NCL_XA_PHUONG', name: 'Miễn học phí › Hỗ trợ học phí HS ngoài công lập khối xã, phường', row: 20 },
+  { code: '1A.GIAM_HP.70.NGHE_NANG_NHOC', name: 'Giảm 70% học phí › HSSV học nghề nặng nhọc, độc hại, nguy hiểm', row: 23 },
+  { code: '1A.GIAM_HP.70.NGHE_THUAT', name: 'Giảm 70% học phí › HSSV học ngành nghệ thuật truyền thống, đặc thù', row: 24 },
+  { code: '1A.GIAM_HP.70.DTTS_VUNG_KK', name: 'Giảm 70% học phí › Trẻ MG/HSSV dân tộc thiểu số vùng đặc biệt khó khăn', row: 25 },
+  { code: '1A.GIAM_HP.50.TNLD_BNN', name: 'Giảm 50% học phí › Con cha/mẹ bị TNLĐ hoặc bệnh nghề nghiệp hưởng trợ cấp thường xuyên', row: 27 },
+  { code: '1A.GIAM_HP.50.CAN_NGHEO', name: 'Giảm 50% học phí › Hộ cận nghèo theo quy định của Thủ tướng Chính phủ', row: 28 },
+];
+const LEAF_ROWS = LEAVES.map((leaf) => leaf.row);
+
+function num(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function editable(sheetName, row, col) {
+  return sheetName === SHEET && col === QTY_COL && LEAF_ROWS.indexOf(row) >= 0;
+}
+
+return defineScript({
+  // Ngoài sổ cái Sở (màn nhập, tổng hợp) không ý kiến — guard của màn nhập ở 1-khoa-o-nhap-lieu.
+  beforeEdit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(cell.sheetName, cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(cell.sheetName, cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    if (ctx.mode !== 'summary-edit') return;
+    for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+      for (let col = range.col; col < range.col + range.colCount; col += 1) {
+        if (!editable(range.sheetName, row, col)) return false;
+      }
+    }
+    return true;
+  },
+  getSummaryData(ctx) {
+    const rows = [];
+    LEAVES.forEach(function (leaf, index) {
+      const quantity = num(ctx.cell.get(SHEET, leaf.row, QTY_COL));
+      const amount = num(ctx.cell.get(SHEET, leaf.row, AMOUNT_COL));
+      if (quantity == null && amount == null) return;
+      rows.push({ organizationCode: '', indicatorCode: leaf.code, indicatorName: leaf.name,
+        quantity: quantity, amount: amount, orderNo: index });
+    });
+    return rows;
+  },
+});

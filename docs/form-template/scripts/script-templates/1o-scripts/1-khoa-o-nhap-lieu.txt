@@ -1,0 +1,59 @@
+// Nguon: DB qt_template_script — bieu 1o, phien ban PB-000029, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1o · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1o".
+// Nguồn: form-template/1o.xlsx (sheet '1o', A1:Z25). Tọa độ 0-based. Dòng dữ liệu = row 7.
+//
+// Biểu 1o (Phụ lục 01o — hỗ trợ tiền điện hộ nghèo & hộ chính sách) — BẢNG NGANG một dòng (row 7):
+//   C(c2)=Tổng hộ =D+E ← CT | D(c3)=Số hộ nghèo | E(c4)=Số hộ CSXH =F+G ← CT
+//   F(c5)=Hộ TCXH khác | G(c6)=Hộ TCXH theo quy định
+//   H..K, L,M,N = mức/số tháng/kinh phí (CÔNG THỨC & tham số) | O(c14)=Ghi chú
+// Mức C17 và SỐ THÁNG C18 (= 12, cả năm — KHÁC các biểu giáo dục) là hằng số → KHOÁ.
+// Đơn vị nhập: D (hộ nghèo), F, G (2 loại hộ chính sách), O (ghi chú). E,C là tổng công thức.
+
+const SHEET = '1o';
+const DATA_ROW = 7;
+const INPUT_COLS = [3, 5, 6, 14]; // D số hộ nghèo, F/G hộ chính sách, O ghi chú
+
+function isEditable(row, col) {
+  if (row === 2 && col === 1) return true;
+  return row === DATA_ROW && INPUT_COLS.indexOf(col) >= 0;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 2, 1, false);
+  INPUT_COLS.forEach((col) => ctx.cell.lock(SHEET, DATA_ROW, col, false));
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tự điền tên đơn vị của phiếu vào ô ĐƠN VỊ (A1) rồi GIỮ KHOÁ (đơn vị không sửa).
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+    // + ô "Chỉ tiêu / Đơn vị" của dòng nhập (cùng tên đơn vị).
+    if (_org) ctx.cell.set(SHEET, DATA_ROW, 1, _org);
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

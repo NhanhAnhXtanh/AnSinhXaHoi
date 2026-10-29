@@ -1,0 +1,104 @@
+// Nguon: DB qt_template_script — bieu 1j, phien ban PB-000024, script "Tong hop theo ky"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+// SUA 2026-09-13: do them Muc (col D) + Thoi gian (col E) cho TUNG don vi. ctx.rows.clone chi
+//   copy style|formula|span (KHONG value) nen o hang co dinh o dong don vi bi rong -> cong thuc
+//   (G=ROUND(C*D), H=ROUND(C*$C$12*E)) ra 0. Nay doc lai 2 o do tu dong Tong cong roi do xuong.
+
+// ==== 1j - AFTERINJECT: TONG HOP THEO KY (tab "Tong hop theo bieu (ky)") ====
+// Bieu nay moi dong la MOT DON VI. Script do so cua KY dang chon (ctx.shared.periodId):
+//   - dong 8 = TONG CONG (cong moi don vi),
+//   - moi don vi duoc GIAO ky them mot dong ben duoi, ten don vi ghi o cot B.
+// Don vi duoc giao ma chua nop -> van co dong, so de trong (nhin ra ai con thieu).
+// O cong thuc (kinh phi = so luong x muc x thang) KHONG ghi de - bieu tu tinh.
+// Man NHAP LIEU khong co ctx.shared.periodId nen script tu bo qua.
+
+const SHEET = '1j';
+const ROW0 = 7;          // dong du lieu goc (0-based)
+const ORG_COL = 1;            // cot B: "Chi tieu / Don vi"
+const BINDINGS = [{"code": "1J.HP_SHP.SO_DOI_TUONG", "qty": 2, "amt": 5}];
+const MUC_COL = 3;    // D: Muc (hang co dinh, author o dong Tong cong)
+const THANG_COL = 4;  // E: Thoi gian (hang co dinh)
+const CK = 'indi' + 'catorCode';
+
+function num(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function put(ctx, r, c, v) {
+  if (c == null || v == null) return;
+  try {
+    const f = ctx.cell.getFormula(SHEET, r, c);
+    if (f && String(f).trim() !== '') return;   // o cong thuc: de bieu tu tinh
+    ctx.cell.set(SHEET, r, c, v);
+  } catch (e) { /* o khoa/cong thuc */ }
+}
+function setText(ctx, r, c, v) { try { ctx.cell.set(SHEET, r, c, v); } catch (e) {} }
+
+return defineScript({
+  async afterInject(ctx) {
+    const periodId = ctx.shared && ctx.shared.periodId;
+    if (!periodId) return;
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? '&scopeKind=' + ctx.shared.scopeKind : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet)
+      ? '&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet) : '';
+
+    async function get(path) {
+      try { return (await ctx.api.get(path)) || []; }
+      catch (e) { ctx.ui.message('Loi lay so 1j: ' + e.message); return []; }
+    }
+    // 1) Don vi DUOC GIAO ky (ke ca chua nop) + 2) so lieu theo tung don vi
+    const units = await get('/rest/qt/summary/period-organizations?periodId=' + periodId);
+    const rows = await get('/rest/qt/summary/data?periodId=' + periodId + '&groupByOrg=true' + scope + src);
+
+    const byOrg = {};
+    for (const r of rows) {
+      const code = r.organizationCode || '';
+      (byOrg[code] || (byOrg[code] = {}))[r[CK]] = r;
+    }
+    // Thu tu: don vi duoc giao truoc (theo ma), roi don vi co so ma khong nam trong danh sach
+    const codes = [];
+    for (const u of units) if (codes.indexOf(u.code) < 0) codes.push(u.code);
+    for (const c in byOrg) if (codes.indexOf(c) < 0 && c !== 'TONG_HOP') codes.push(c);
+    if (codes.length === 0) { ctx.ui.message('1j: ky nay chua giao don vi nao.'); return; }
+    const nameOf = {};
+    for (const u of units) nameOf[u.code] = u.name || u.code;
+
+    // Chen du dong: dong ROW0 giu lam TONG CONG, moi don vi mot dong ben duoi
+    if (codes.length > 0) ctx.rows.clone(SHEET, ROW0, codes.length);
+
+    const total = {};
+    // O co dinh (Muc, Thoi gian) author o dong Tong cong (ROW0); clone khong mang value sang
+    // dong don vi -> doc lai tu ROW0 roi do cho tung don vi de cong thuc kinh phi tinh dung.
+    const MUC_HO_TRO = num(ctx.cell.get(SHEET, ROW0, MUC_COL));
+    const THOI_GIAN  = num(ctx.cell.get(SHEET, ROW0, THANG_COL));
+    codes.forEach(function (code, i) {
+      const r0 = ROW0 + 1 + i;
+      setText(ctx, r0, ORG_COL, nameOf[code] || code);
+      setText(ctx, r0, 0, String(i + 1));
+      put(ctx, r0, MUC_COL, MUC_HO_TRO);    // do hang co dinh cho tung don vi
+      put(ctx, r0, THANG_COL, THOI_GIAN);
+      const data = byOrg[code] || {};
+      for (const b of BINDINGS) {
+        const row = data[b.code];
+        if (!row) continue;
+        const q = num(row.quantity), a = num(row.amount);
+        put(ctx, r0, b.qty, q);
+        put(ctx, r0, b.amt, a);
+        const t = total[b.code] || (total[b.code] = { q: null, a: null });
+        if (q != null) t.q = (t.q || 0) + q;
+        if (a != null) t.a = (t.a || 0) + a;
+      }
+    });
+    // Dong TONG CONG
+    setText(ctx, ROW0, ORG_COL, 'Tong cong');
+    setText(ctx, ROW0, 0, '');
+    for (const b of BINDINGS) {
+      const t = total[b.code];
+      if (!t) continue;
+      put(ctx, ROW0, b.qty, t.q);
+      put(ctx, ROW0, b.amt, t.a);
+    }
+    ctx.ui.message('Da do 1j: ' + codes.length + ' don vi + dong tong cong (theo ky dang chon).');
+  },
+});

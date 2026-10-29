@@ -1,0 +1,55 @@
+// Nguon: DB qt_template_script — bieu 1q, phien ban PB-000031, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1q · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1q".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Mức khoá (=0,5) → không kiểm. Kiểm SỐ ĐỐI TƯỢNG (nhập) + kinh phí (công thức) phải LÀ SỐ.
+// KHÔNG kiểm Ghi chú (R). Cấu trúc mới: khối A r8..r14 (cột O); khối B r15 (cột C/F/I/L).
+
+const SHEET = '1q';
+// [row, cột số đối tượng, cột kinh phí(công thức), nhãn]
+const CHECKS = [
+  [8,  14, 16, 'Cung cấp thông tin › Báo Dân tộc và phát triển'],
+  [9,  14, 16, 'Cung cấp thông tin › Báo Đồng Nai'],
+  [10, 14, 16, 'Cung cấp thông tin › Báo Bình Phước'],
+  [11, 14, 16, 'Cung cấp thông tin › Bản tin DTTS và miền núi'],
+  [12, 14, 16, 'Cung cấp thông tin › Họp mặt'],
+  [13, 14, 16, 'Cung cấp thông tin › Tập huấn'],
+  [14, 14, 16, 'Cung cấp thông tin › Học tập'],
+  [15, 2,  4,  'Thăm hỏi tặng quà dịp Tết'],
+  [15, 5,  7,  'Thăm hỏi hỗ trợ ốm đau'],
+  [15, 8,  10, 'Hỗ trợ gia đình gặp khó khăn'],
+  [15, 11, 13, 'Thăm viếng khi qua đời'],
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    for (const [row, qtyCol, kpCol, label] of CHECKS) {
+      const qty = toNumber(ctx.cell.get(SHEET, row, qtyCol));
+      const kp = toNumber(ctx.cell.get(SHEET, row, kpCol));
+      if (Number.isNaN(qty)) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NOT_NUMBER', message: `${label}: số đối tượng phải là số.` });
+      } else if (typeof qty === 'number' && qty < 0) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NEGATIVE', message: `${label}: số đối tượng không được âm.` });
+      }
+      if (Number.isNaN(kp)) {
+        issues.push({ severity: 'ERROR', code: 'KP_NOT_NUMBER', message: `${label}: kinh phí phải là số.` });
+      }
+      if ((typeof qty === 'number' && qty > 0) || (typeof kp === 'number' && kp > 0)) anyValue = true;
+    }
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1Q', message: 'Biểu 1q chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

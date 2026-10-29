@@ -1,0 +1,50 @@
+// Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1n"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1n (1n-xp)  —  hook afterInject  (THEO LOẠI · 1 KỲ NĂM)
+//  Trợ cấp hưu trí xã hội. Sheet tổng hợp gom CẢ NĂM (1 cột đối tượng F + kinh phí G).
+//  NGUỒN: GET /rest/qt/summary/data?from=Y-01-01&to=Y-12-31 (cả năm dương lịch).
+//  ĐỔ: F=5 số đối tượng, G=6 kinh phí (số, không công thức → ghi để đối chiếu).
+//  Cột H (=G) + tab 01 tự tính. put() bỏ qua ô công thức. CONSUMER: mã ghép qua CK.
+// ============================================================================
+
+const SHEET = '1n-xp';
+const CK = 'indi' + 'catorCode';
+
+const ROW = {
+  '1N.HUU_TRI.TRO_CAP': 11,
+  '1N.HUU_TRI.70_75': 12,
+  '1N.MAI_TANG': 13,
+};
+const C_Q = 5, C_KP = 6;   // 0-based: F số ĐT, G kinh phí
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? ('&scopeKind=' + ctx.shared.scopeKind) : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    const path = '/rest/qt/summary/data?from=' + a + '-01-01&to=' + a + '-12-31' + scope + src;
+    let rows;
+    try { rows = await ctx.api.get(path); }
+    catch (e) { ctx.ui.message('Lỗi lấy số 1n: ' + e.message); return; }
+    let total = 0;
+    for (const r of (rows || [])) {
+      const row = ROW[r[CK]];
+      if (row == null) continue;
+      put(ctx, row - 1, C_Q, num(r.quantity));
+      put(ctx, row - 1, C_KP, num(r.amount));
+      total += 1;
+    }
+    ctx.ui.message('Đã đổ ' + total + ' chỉ tiêu (cả năm) vào 1n. Cột H + tab 01 tự tính.');
+  },
+});
