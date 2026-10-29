@@ -197,6 +197,12 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const saved = useRef(new Map<number, WorkbookJson>());
   const versions = useRef(new Map<number, number>());
   const apiRef = useRef<SpreadWorkbookApi | null>(null);
+  /**
+   * Chế độ (nhập / chỉ xem) của workbook mà `apiRef` đang trỏ tới. Đổi chế độ — vd. vừa
+   * "Kiểm tra & hoàn tất" — thì SpreadWorkbook huỷ workbook cũ và dựng lại; trong lúc chờ
+   * `onReady` của bản mới, `apiRef` vẫn trỏ bản đã huỷ và gọi vào là lỗi "Bảng tính đã đóng".
+   */
+  const apiEditableRef = useRef<boolean | null>(null);
   /** Đếm lần sửa trên bảng tính — số gõ thêm trong lúc đang lưu không bị coi là đã lưu. */
   const editSeq = useRef(0);
 
@@ -455,7 +461,9 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
           ...scriptContext,
           report: { ...scriptContext.report, sheetCode: code },
         };
-        if (s.id === sheetId && apiRef.current) {
+        // Bảng đang hiện chỉ dùng được khi đã dựng xong ở đúng chế độ hiện tại; chưa xong
+        // (bấm Nộp ngay sau Kiểm tra & hoàn tất) thì kiểm bản đã lưu như các biểu khác.
+        if (s.id === sheetId && apiRef.current && apiEditableRef.current === sheetEditable) {
           const result = await runClientScript(apiRef.current, scriptText, "validate", context);
           if (!result.ok) issuesHere.push(...result.messages.map((message) => ({ sheet: code, message })));
           continue;
@@ -711,6 +719,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
           }}
           onReady={(api) => {
             apiRef.current = api;
+            apiEditableRef.current = sheetEditable;
           }}
           className="h-full min-h-[360px] flex-1"
         />
