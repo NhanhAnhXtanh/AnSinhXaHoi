@@ -1,0 +1,35 @@
+# zizmor: quét lỗi bảo mật trong chính các workflow GitHub Actions (quyền thừa, lộ token,
+# chèn biểu thức vào lệnh shell, action không ghim SHA…). Chỉ chạy khi .github/ thay đổi.
+name: Zizmor
+
+on:
+  pull_request:
+    paths:
+      - ".github/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/**"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: Zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Repo riêng tư chưa bật Code Security: in kết quả ra log và đỏ khi có phát hiện.
+      - uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
+        with:
+          advanced-security: false

@@ -1,0 +1,75 @@
+# CodeQL: quét lỗi bảo mật trong mã Java, TypeScript/JavaScript và chính các workflow.
+#
+# Repo riêng tư chưa bật GitHub Code Security nên KHÔNG gửi kết quả lên tab Security được
+# (upload: never). Thay vào đó: in danh sách phát hiện lên trang lượt chạy, lưu file SARIF làm
+# artifact, và làm đỏ job khi có phát hiện mức "error".
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 1 * * 1" # 08:00 thứ Hai giờ Việt Nam
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # CodeQL đọc thông tin lượt chạy (API workflow-runs); repo riêng tư phải cấp rõ.
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, java-kotlin, javascript-typescript]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          # Không cần biên dịch: CodeQL đọc thẳng mã nguồn.
+          build-mode: none
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:${{ matrix.language }}
+          upload: never
+          output: sarif
+      - name: Tóm tắt phát hiện, đỏ khi có mức error
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          jq -r '.runs[].results[] | [(.level // "warning"), .ruleId,
+                 ((.locations[0].physicalLocation.artifactLocation.uri // "?") + ":" +
+                  ((.locations[0].physicalLocation.region.startLine // 0) | tostring)),
+                 (.message.text | split("\n")[0] | .[0:200])] | @tsv' sarif/*.sarif > results.tsv
+          total=$(wc -l < results.tsv)
+          errors=$(awk -F'\t' '$1=="error"' results.tsv | wc -l)
+          {
+            echo "### CodeQL \`$LANGUAGE\`: $total phát hiện, $errors mức error"
+            if [ "$total" -gt 0 ]; then
+              echo
+              echo "| Mức | Quy tắc | Vị trí | Mô tả |"
+              echo "|---|---|---|---|"
+              awk -F'\t' '{printf "| %s | `%s` | `%s` | %s |\n", $1, $2, $3, $4}' results.tsv
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$errors" -eq 0 ]
+      - name: Lưu file SARIF
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-${{ matrix.language }}
+          path: sarif
+          retention-days: 14

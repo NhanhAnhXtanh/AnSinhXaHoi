@@ -1,5 +1,9 @@
-# Dependabot: mỗi tuần mở PR cập nhật thư viện vào nhánh nhatanh (main chỉ nhận qua nhatanh).
+# Dependabot mở PR cập nhật thư viện vào hai nhánh:
+# - nhatanh: thứ Hai hằng tuần;
+# - main: hằng ngày.
 # Bản vá + bản nhỏ gom chung một PR mỗi hệ sinh thái để đỡ nhiễu; bản lớn tách riêng từng PR.
+# Mỗi khối dưới đây là một (hệ sinh thái, nhánh) — Dependabot cho phép trùng thư mục khi khác
+# target-branch.
 version: 2
 updates:
   - package-ecosystem: gradle
@@ -10,6 +14,9 @@ updates:
       day: monday
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 5
+    # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore(deps)"
     groups:
@@ -24,6 +31,9 @@ updates:
       day: monday
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 5
+    # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore(deps)"
     groups:
@@ -41,6 +51,60 @@ updates:
       interval: weekly
       day: monday
       timezone: Asia/Ho_Chi_Minh
+    # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gradle
+    directory: /backend
+    target-branch: main
+    schedule:
+      interval: daily
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: main
+    schedule:
+      interval: daily
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      frontend-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Giấy phép SpreadJS gắn với bản lớn: lên bản lớn phải mua key mới, làm tay.
+      - dependency-name: "@mescius/*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: main
+    schedule:
+      interval: daily
+      timezone: Asia/Ho_Chi_Minh
+    # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore(deps)"
     groups:

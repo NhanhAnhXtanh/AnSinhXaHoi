@@ -1,16 +1,21 @@
-# E2E Playwright 4 luồng chính (ASX-159..162). Nặng (dựng cả backend lẫn frontend) nên KHÔNG chạy
-# tự động trên PR hay push — chỉ chạy khi bấm tay: Actions → E2E → Run workflow.
+# E2E Playwright 4 luồng chính (ASX-159..162). Nặng (dựng cả backend lẫn frontend) nên không chạy
+# trên PR: chạy sau khi code vào main, hoặc bấm tay (Actions → E2E → Run workflow).
 name: E2E
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/e2e.yml"
   workflow_dispatch:
 
 concurrency:
-  group: e2e-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
   NODE_VERSION: "24"
@@ -21,6 +26,8 @@ jobs:
     name: E2E — Playwright 4 luồng chính
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:16
@@ -40,13 +47,15 @@ jobs:
       E2E_API_URL: http://localhost:8090/api
       E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dth-framework
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - uses: gradle/actions/setup-gradle@v4
-      - uses: actions/setup-node@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -66,7 +75,7 @@ jobs:
           SPRING_APPLICATION_JSON: '{"app.cors.allowed-origins":"http://localhost:4180","asxh.period-status-job.run-on-startup":false}'
         run: |
           jar=$(ls build/libs/*.jar | grep -v plain | head -n1)
-          nohup java -Xmx1g -jar "$jar" > "${{ runner.temp }}/backend.log" 2>&1 &
+          nohup java -Xmx1g -jar "$jar" > "$RUNNER_TEMP/backend.log" 2>&1 &
           # /actuator/health cần đăng nhập, nên chờ tới khi API đăng nhập trả lời.
           for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
@@ -74,7 +83,7 @@ jobs:
             if [ "$code" = "200" ]; then echo "backend sẵn sàng"; exit 0; fi
             sleep 2
           done
-          echo "backend không lên"; tail -n 200 "${{ runner.temp }}/backend.log"; exit 1
+          echo "backend không lên"; tail -n 200 "$RUNNER_TEMP/backend.log"; exit 1
 
       - name: Install frontend
         working-directory: frontend
@@ -96,7 +105,7 @@ jobs:
 
       - name: Lưu báo cáo Playwright khi lỗi
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: |
@@ -105,7 +114,7 @@ jobs:
           retention-days: 7
       - name: Lưu log backend khi lỗi
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: backend-log
           path: ${{ runner.temp }}/backend.log
