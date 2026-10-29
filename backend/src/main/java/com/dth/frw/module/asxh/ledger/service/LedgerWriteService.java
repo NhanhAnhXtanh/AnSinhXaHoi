@@ -1,5 +1,6 @@
 package com.dth.frw.module.asxh.ledger.service;
 
+import com.dth.frw.domain.asxh.ledger.LedgerEntry;
 import com.dth.frw.domain.asxh.ledger.LedgerSource;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.report.InputReport;
@@ -8,6 +9,7 @@ import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.domain.asxh.report.SheetCompletion;
 import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
+import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.module.asxh.ledger.repo.LedgerEntryRepository;
 import com.dth.frw.module.asxh.script.ScriptRow;
 import com.dth.frw.module.asxh.script.ServerScriptException;
@@ -16,8 +18,11 @@ import com.dth.frw.module.asxh.script.WorkbookJsonCellReader;
 import com.dth.frw.shared.exception.ConflictException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +76,31 @@ public class LedgerWriteService {
     /** Kết quả xem trước toàn phiếu — KHÔNG ghi gì. */
     public record PreviewResult(int totalRows, List<SheetPreview> sheets, boolean hasError, boolean timeout,
                                 String errorTemplateShortName, String errorMessage) {
+    }
+
+    /**
+     * Một đơn vị có số liệu trong biểu nhập hộ.
+     *
+     * @param id    {@code null} khi mã không có trong danh mục đơn vị ({@code known = false})
+     * @param known {@code false} = phê duyệt sẽ bị từ chối vì mã đơn vị này (UC-46 4b)
+     */
+    public record DataUnit(Long id, String budgetCode, String name, boolean known) {
+    }
+
+    /** Một biểu nhập hộ của phiếu và các đơn vị có số liệu trong đó, theo thứ tự dòng. */
+    public record SheetDataUnits(Long sheetId, Long templateId, String templateShortName, List<DataUnit> units) {
+    }
+
+    /**
+     * Phiếu nhập hộ cho những đơn vị nào (UC-46) — KHÔNG ghi gì.
+     *
+     * @param recorded     {@code true} = phiếu đã duyệt, danh sách đọc từ số liệu đã lưu; {@code false} =
+     *                     đọc từ số trên biểu (các đơn vị SẼ được ghi khi duyệt)
+     * @param sheets       chỉ các biểu thật sự nhập hộ; rỗng = phiếu thường
+     * @param errorMessage biểu nhập hộ không đọc được (câu cho người dùng); khi đó {@code sheets} chỉ
+     *                     gồm các biểu đọc được trước nó
+     */
+    public record DataUnitsResult(boolean recorded, List<SheetDataUnits> sheets, String errorMessage) {
     }
 
     private enum RunStatus { SKIP, NO_HOOK, OK }
@@ -158,6 +188,86 @@ public class LedgerWriteService {
                     run.status() == RunStatus.SKIP, run.status() == RunStatus.NO_HOOK));
         }
         return new PreviewResult(total, previews, false, false, null, null);
+    }
+
+    // ------------------------------------------------------------------ nhập hộ
+
+    /**
+     * Các đơn vị mà phiếu mang số liệu ở biểu nhập hộ (UC-46) — để màn duyệt / xem phiếu nói rõ
+     * "phiếu này nhập hộ cho ai" trước và sau khi duyệt.
+     *
+     * <p>Phiếu đã duyệt: đọc số liệu đã lưu của từng biểu (đúng thứ đã ghi). Phiếu chưa duyệt: chạy
+     * CÙNG {@code getInputData} và cùng cách tra mã đơn vị như lúc duyệt, nên mã lạ hiện ra trước khi
+     * Sở bấm Phê duyệt. Biểu chỉ được tính là nhập hộ theo BR-46.1 (mẫu 1g VÀ có mã đơn vị theo dòng).
+     */
+    @Transactional(readOnly = true)
+    public DataUnitsResult dataUnits(InputReport report, List<InputReportSheet> sheets) {
+        boolean recorded = report.getStatus() == ReportStatus.APPROVED
+                || (report.getStatus() == ReportStatus.LOCKED && report.getApprovedAt() != null);
+        Long reportUnitId = report.getUnit() == null ? null : report.getUnit().getId();
+        List<SheetDataUnits> result = new ArrayList<>();
+        for (InputReportSheet sheet : sheets) {
+            Template template = sheet.getTemplate();
+            if (!isPerRowUnitTemplate(template)) {
+                continue;
+            }
+            List<DataUnit> units;
+            if (recorded) {
+                units = recordedUnits(sheet, reportUnitId);
+            } else {
+                SheetRun run;
+                try {
+                    run = runSheet(report, sheet);
+                } catch (ServerScriptException e) {
+                    return new DataUnitsResult(false, result, userMessage(sheetLabel(template), e));
+                }
+                units = run.status() == RunStatus.OK && hasAnyUnitCode(run.rows())
+                        ? scriptUnits(run.rows())
+                        : List.of();
+            }
+            if (!units.isEmpty()) {
+                result.add(new SheetDataUnits(sheet.getId(), template.getId(), template.getShortName(), units));
+            }
+        }
+        return new DataUnitsResult(recorded, result, null);
+    }
+
+    /**
+     * Đơn vị trong số liệu đã lưu của một biểu, theo thứ tự dòng. Biểu 1g ghi theo cách thường (mọi
+     * dòng thuộc đơn vị của phiếu) thì không phải nhập hộ — trả rỗng.
+     */
+    private List<DataUnit> recordedUnits(InputReportSheet sheet, Long reportUnitId) {
+        List<LedgerEntry> entries = new ArrayList<>(entryRepository.findBySheetId(sheet.getId()));
+        entries.sort(Comparator.comparing(LedgerEntry::getOrderNo, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(LedgerEntry::getId));
+        Map<Long, DataUnit> byId = new LinkedHashMap<>();
+        for (LedgerEntry entry : entries) {
+            ReportUnit unit = entry.getUnit();
+            if (unit != null) {
+                byId.putIfAbsent(unit.getId(), new DataUnit(unit.getId(), unit.getBudgetCode(), unit.getName(), true));
+            }
+        }
+        if (byId.isEmpty() || (byId.size() == 1 && byId.containsKey(reportUnitId))) {
+            return List.of();
+        }
+        return List.copyOf(byId.values());
+    }
+
+    /** Đơn vị theo mã các dòng script trả về, giữ thứ tự xuất hiện; mã lạ đánh dấu {@code known = false}. */
+    private List<DataUnit> scriptUnits(List<ScriptRow> rows) {
+        Map<String, ReportUnit> byCode = replaceService.unitsByCode(rows);
+        Map<String, DataUnit> ordered = new LinkedHashMap<>();
+        for (ScriptRow row : rows) {
+            String code = row.organizationCode() == null ? "" : row.organizationCode().trim();
+            if (code.isEmpty() || ordered.containsKey(code)) {
+                continue;
+            }
+            ReportUnit unit = byCode.get(code);
+            ordered.put(code, unit == null
+                    ? new DataUnit(null, code, null, false)
+                    : new DataUnit(unit.getId(), unit.getBudgetCode(), unit.getName(), true));
+        }
+        return List.copyOf(ordered.values());
     }
 
     // ------------------------------------------------------------------ chống cộng đôi

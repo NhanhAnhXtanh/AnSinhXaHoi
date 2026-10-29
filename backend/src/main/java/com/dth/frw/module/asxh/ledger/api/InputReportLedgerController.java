@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
  * <ul>
  *   <li>{@code POST /api/input_reports/{id}/ledger_preview} — xem trước khi duyệt: mỗi biểu đọc
  *       được bao nhiêu dòng, biểu nào lỗi (không ghi gì). Quyền duyệt phiếu.</li>
+ *   <li>{@code GET /api/input_reports/{id}/data_units} — phiếu nhập hộ (biểu 1g) mang số liệu của
+ *       những đơn vị nào: đã duyệt thì theo số liệu đã lưu, chưa duyệt thì theo số trên biểu.</li>
  *   <li>{@code POST /api/input_reports/{id}/ledger_imports} — nạp số liệu BHXH vào một biểu
  *       (UC-49, chỉ REST). Body {@code {templateId, rows: [...]}}.</li>
  *   <li>{@code GET /api/input_reports/{id}/ledger_audits} — nhật ký ghi số liệu (kể cả lần duyệt
@@ -44,6 +46,13 @@ public class InputReportLedgerController {
     @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_APPROVE + "')")
     public LedgerWriteService.PreviewResult preview(@PathVariable Long reportId) {
         return service.preview(reportId);
+    }
+
+    // Đọc được phiếu là đọc được phiếu đó nhập hộ cho ai — cả cán bộ đơn vị lẫn Sở (UC-46).
+    @GetMapping("/data_units")
+    @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_READ + "')")
+    public LedgerWriteService.DataUnitsResult dataUnits(@PathVariable Long reportId) {
+        return service.dataUnits(reportId);
     }
 
     @PostMapping("/ledger_imports")

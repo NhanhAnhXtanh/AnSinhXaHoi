@@ -173,6 +173,15 @@ public class LedgerReplaceService {
         return rounded.setScale(Math.max(rounded.scale(), 0), RoundingMode.UNNECESSARY);
     }
 
+    /**
+     * Đơn vị theo mã quan hệ ngân sách mà các dòng nhập hộ nêu — CÙNG cách tra với lúc ghi, để màn
+     * duyệt báo trước "mã nào không có trong danh mục" đúng như lúc phê duyệt sẽ từ chối. Mã không
+     * tìm thấy thì vắng trong kết quả.
+     */
+    Map<String, ReportUnit> unitsByCode(List<ScriptRow> rows) {
+        return loadUnitsByCode(rows == null ? List.of() : rows);
+    }
+
     private Map<String, ReportUnit> loadUnitsByCode(List<ScriptRow> rows) {
         Set<String> codes = new HashSet<>();
         for (ScriptRow row : rows) {

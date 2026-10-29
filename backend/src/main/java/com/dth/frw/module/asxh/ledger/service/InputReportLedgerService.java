@@ -64,6 +64,13 @@ public class InputReportLedgerService {
         return writeService.preview(report, sheetsOf(reportId));
     }
 
+    /** Phiếu nhập hộ cho những đơn vị nào (UC-46) — không ghi gì. Phiếu ngoài tầm nhìn → 404. */
+    @Transactional(readOnly = true)
+    public LedgerWriteService.DataUnitsResult dataUnits(Long reportId) {
+        InputReport report = reportService.get(reportId);
+        return writeService.dataUnits(report, sheetsOf(reportId));
+    }
+
     /**
      * Nạp số liệu BHXH vào một biểu của phiếu (UC-49): kiểm như đường duyệt rồi THAY toàn bộ số liệu
      * đã lưu của tờ biểu đó. Không đổi trạng thái phiếu; số liệu chỉ được tổng hợp khi phiếu đã duyệt.
