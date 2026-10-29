@@ -153,6 +153,24 @@ export function sheetActionUrl(id: number | string, action: "complete" | "no_dat
 
 export const SUMMARY_URL = `${API_URL}/${REPORTS_RESOURCE}/summary`;
 
+/**
+ * `GET /api/input_reports/{id}/data_units` — biểu nhập hộ (1g, UC-46) của phiếu mang số
+ * liệu của những đơn vị nào, đọc từ số đã lưu. `sheets` rỗng = phiếu thường.
+ */
+export type ReportDataUnits = {
+  recorded: boolean;
+  sheets: {
+    sheetId: number;
+    templateShortName: string;
+    units: { id: number | null; budgetCode: string; name: string | null; known: boolean }[];
+  }[];
+  errorMessage: string | null;
+};
+
+export function dataUnitsUrl(id: number | string): string {
+  return `${API_URL}/${REPORTS_RESOURCE}/${id}/data_units`;
+}
+
 export function historyUrl(id: number | string): string {
   return `${API_URL}/${REPORTS_RESOURCE}/${id}/history`;
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
+  useCustom,
   useCustomMutation,
   useDataProvider,
   useInvalidate,
@@ -41,6 +42,7 @@ import {
   type SpreadWorkbookApi,
   type WorkbookJson,
 } from "@/shared/components/spreadsheet";
+import { customResult } from "@/shared/hooks/use-custom-result";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -48,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import {
   JSON_HEADERS,
   REPORTS_RESOURCE,
+  dataUnitsUrl,
   SHEETS_RESOURCE,
   errorMessage,
   errorStatus,
@@ -56,6 +59,7 @@ import {
   sheetActionUrl,
   type InputReportRecord,
   type InputReportSheetRecord,
+  type ReportDataUnits,
 } from "./api";
 import { useExportReport } from "./export-report";
 import { STATUS_META, displayStatus, firstSheetToOpen, isEditable, isSheetDone } from "./model";
@@ -157,6 +161,23 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
     errorNotification: false,
   });
   const sheets = sheetsResult.data;
+
+  // Biểu nhập hộ (1g, UC-46): phiếu mang số liệu của những đơn vị nào — đọc từ số đã lưu.
+  const { result: dataUnitsResult, query: dataUnitsQuery } = useCustom<ReportDataUnits>({
+    url: dataUnitsUrl(report.id),
+    method: "get",
+    errorNotification: false,
+    queryOptions: { retry: false },
+  });
+  const onBehalfSheets = customResult(dataUnitsResult?.data, "sheets")?.sheets ?? [];
+  const onBehalfText = onBehalfSheets
+    .map((s) => {
+      const names = s.units.map((u) => (u.known ? (u.name ?? u.budgetCode) : `mã ${u.budgetCode}`));
+      const shown = names.slice(0, 3).join(", ");
+      const rest = names.length > 3 ? ` và ${names.length - 3} đơn vị khác` : "";
+      return `Biểu ${s.templateShortName} nhập hộ cho ${s.units.length} đơn vị: ${shown}${rest}`;
+    })
+    .join(". ");
 
   const [sheetId, setSheetId] = useState<number | undefined>(undefined);
   if (sheetId === undefined && sheets.length > 0) {
@@ -485,6 +506,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
         errorNotification: false,
       });
       setConfirmOpen(false);
+      void dataUnitsQuery.refetch();
       drafts.current.clear();
       setDirty(new Set());
       setWarnWhen(false);
@@ -602,6 +624,10 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   if (lockedReason) metaParts.push(lockedReason);
   if (blockedReason) metaParts.push(blockedReason);
   if (sheet?.completion === "NO_DATA") metaParts.push(`Biểu ${code}: không phát sinh số liệu`);
+  // Phiếu đã nộp trở đi: nhắc phiếu này nhập hộ cho bao nhiêu đơn vị (số đã chốt, không đổi nữa).
+  if (report.status === "SUBMITTED" || report.status === "APPROVED" || report.status === "LOCKED") {
+    for (const s of onBehalfSheets) metaParts.push(`Biểu ${s.templateShortName} nhập hộ cho ${s.units.length} đơn vị`);
+  }
 
   const meta = (
     <span>
@@ -732,6 +758,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
             .join(", ")}`
         : null,
     files: "Xác nhận của Kho bạc: đã đính kèm tệp và tích xác nhận",
+    onBehalf: onBehalfText || null,
   };
 
   return (
@@ -778,6 +805,8 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
         onOpenChange={setTreasuryOpen}
         onSubmit={() => {
           setTreasuryOpen(false);
+          // Số vừa lưu ở bước hoàn tất: đọc lại để hộp xác nhận nêu đúng các đơn vị được nhập hộ.
+          void dataUnitsQuery.refetch();
           setConfirmOpen(true);
         }}
       />

@@ -1,4 +1,4 @@
-import { CircleAlert, FileSpreadsheet, FileText, LoaderCircle, Paperclip } from "lucide-react";
+import { CircleAlert, FileSpreadsheet, FileText, LoaderCircle, Paperclip, UsersRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
@@ -88,7 +88,7 @@ export function SubmitConfirmDialog({
   pending = false,
 }: {
   periodName: string;
-  summary: { sheets: string; total: string | null; files: string | null };
+  summary: { sheets: string; total: string | null; files: string | null; onBehalf?: string | null };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
@@ -98,6 +98,7 @@ export function SubmitConfirmDialog({
   const lines: { icon: LucideIcon; text: string }[] = [
     { icon: FileSpreadsheet, text: summary.sheets },
     ...(summary.total ? [{ icon: FileText, text: summary.total }] : []),
+    ...(summary.onBehalf ? [{ icon: UsersRound, text: summary.onBehalf }] : []),
     ...(summary.files ? [{ icon: Paperclip, text: summary.files }] : []),
   ];
   return (
