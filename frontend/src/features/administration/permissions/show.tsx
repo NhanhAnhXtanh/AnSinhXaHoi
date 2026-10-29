@@ -3,10 +3,7 @@ import { useCan, useList, useShow } from "@refinedev/core";
 import { Link } from "react-router";
 
 import { LoadingOverlay } from "@/shared/components/layout/loading-overlay";
-import {
-  ShowView,
-  ShowViewHeader,
-} from "@/shared/components/views/show-view";
+import { ShowView } from "@/shared/components/views/show-view";
 import { Badge } from "@/shared/ui/badge";
 import {
   Card,
@@ -18,12 +15,10 @@ import {
 import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
 import type { Role } from "@/domains/role/types";
-import {
-  humanizeResource,
-  splitPermissionCode,
-  type Permission,
-} from "@/domains/permission/types";
+import { splitPermissionCode, type Permission } from "@/domains/permission/types";
 import { PERMISSION_ACTION_VARIANTS } from "@/shared/lib/status-variants";
+import { actionLabel, resourceLabel } from "../labels";
+import { AdminPageHeader, RecordHeaderActions } from "../record-actions";
 
 export const PermissionShow = () => {
   const { result: record, query } = useShow<Permission>({});
@@ -61,17 +56,29 @@ export const PermissionShow = () => {
 
   return (
     <ShowView>
-      <ShowViewHeader />
+      <AdminPageHeader
+        title={record?.name ?? "Quyền"}
+        badge={
+          record?.systemPermission ? (
+            <Badge variant="neutral" dot>
+              Quyền hệ thống
+            </Badge>
+          ) : undefined
+        }
+        description="Quyền này cho phép làm gì, và vai trò nào đang được cấp."
+        actions={
+          <RecordHeaderActions
+            resource="permissions"
+            id={record?.id}
+            editLabel={false}
+          />
+        }
+      />
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {record?.name ?? "—"}
-            {record?.systemPermission && (
-              <Badge variant="secondary">System</Badge>
-            )}
-          </CardTitle>
-          <CardDescription className="font-mono">
-            {record?.code} · Permission ID: {record?.id}
+          <CardTitle>Thông tin quyền</CardTitle>
+          <CardDescription>
+            Mã quyền: <span className="font-mono">{record?.code ?? "—"}</span>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -79,7 +86,7 @@ export const PermissionShow = () => {
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                  Description
+                  Mô tả
                 </span>
                 <p className="text-sm">{record?.description ?? "—"}</p>
               </div>
@@ -87,17 +94,17 @@ export const PermissionShow = () => {
               <div className="flex flex-wrap gap-8">
                 <div className="flex flex-col gap-1">
                   <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                    Resource
+                    Chức năng
                   </span>
-                  <span className="text-sm">{humanizeResource(resource)}</span>
+                  <span className="text-sm">{resourceLabel(resource)}</span>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                    Action
+                    Thao tác
                   </span>
                   <div>
                     <Badge variant={PERMISSION_ACTION_VARIANTS[action] ?? "outline"}>
-                      {action || "—"}
+                      {action ? actionLabel(action) : "—"}
                     </Badge>
                   </div>
                 </div>
@@ -107,7 +114,7 @@ export const PermissionShow = () => {
 
               <div className="flex flex-col gap-3">
                 <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                  Granted by
+                  Vai trò được cấp
                 </span>
 
                 {/*
@@ -117,15 +124,15 @@ export const PermissionShow = () => {
                 */}
                 {!mayReadRoles ? (
                   <p className="text-muted-foreground text-sm">
-                    You need the roles:read permission to see which roles grant
-                    this.
+                    Bạn chưa có quyền xem danh sách vai trò nên không xem được
+                    vai trò nào có quyền này.
                   </p>
                 ) : rolesLoading ? (
                   <Skeleton className="h-6 w-48" />
                 ) : grantedBy.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
-                    No role grants this permission, so nobody currently holds
-                    it.
+                    Chưa vai trò nào được cấp quyền này, nên hiện không ai có
+                    nó.
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">

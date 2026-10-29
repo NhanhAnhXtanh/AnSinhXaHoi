@@ -1,0 +1,44 @@
+// Nguon: DB qt_template_script — bieu 1p, phien ban PB-000030, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1p · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1p".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Kiểm Số đối tượng (C) và Kinh phí (D, NHẬP TAY) của 4 dòng phải LÀ SỐ. KHÔNG kiểm Ghi chú.
+
+const SHEET = '1p';
+const LEAF_ROWS = [8, 9, 10, 11];
+const NAMES = ['Hộ nghèo (50%)', 'Hộ cận nghèo (40%)', 'Người dân tộc thiểu số (30%)', 'Các đối tượng khác (20%)'];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    LEAF_ROWS.forEach((row, i) => {
+      const qty = toNumber(ctx.cell.get(SHEET, row, 2));
+      const amt = toNumber(ctx.cell.get(SHEET, row, 3));
+      if (Number.isNaN(qty)) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NOT_NUMBER', message: `${NAMES[i]}: số đối tượng phải là số.` });
+      } else if (typeof qty === 'number' && qty < 0) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NEGATIVE', message: `${NAMES[i]}: số đối tượng không được âm.` });
+      }
+      if (Number.isNaN(amt)) {
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_NOT_NUMBER', message: `${NAMES[i]}: kinh phí phải là số.` });
+      } else if (typeof amt === 'number' && amt < 0) {
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_NEGATIVE', message: `${NAMES[i]}: kinh phí không được âm.` });
+      }
+      if ((typeof qty === 'number' && qty > 0) || (typeof amt === 'number' && amt > 0)) anyValue = true;
+    });
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1P', message: 'Biểu 1p chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

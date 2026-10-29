@@ -36,6 +36,11 @@ public final class UserSpecifications {
                 case "roles.id", "roleId" -> roleSpec(criterion);
                 case "organization.id", "organizationId" -> placementSpec("organization", criterion);
                 case "department.id", "departmentId" -> placementSpec("department", criterion);
+                // Đơn vị báo cáo ASXH: ô lọc "Đơn vị" của màn Người dùng, panel Tài khoản của
+                // màn Đơn vị. Cùng khuôn LEFT join như tổ chức / phòng ban.
+                case "reportUnit.id", "reportUnitId" -> placementSpec("reportUnit", criterion);
+                // Cấp tài khoản (BR-69.1): "don_vi" = có đơn vị, "so_ubnd" = không gắn đơn vị.
+                case "accountLevel" -> accountLevelSpec(criterion);
                 default -> null;
             };
             if (spec != null) {
@@ -149,6 +154,16 @@ public final class UserSpecifications {
             return criterion.operator() == ListParams.Operator.NE
                     ? cb.or(cb.isNull(placement.get("id")), cb.notEqual(placement.get("id"), id))
                     : cb.equal(placement.get("id"), id);
+        };
+    }
+
+    /** Lọc theo cấp tài khoản suy ra từ đơn vị báo cáo; giá trị lạ không khớp dòng nào. */
+    private static Specification<User> accountLevelSpec(ListParams.Criterion criterion) {
+        String value = criterion.value() == null ? "" : criterion.value().trim().toLowerCase();
+        return switch (value) {
+            case "don_vi" -> (root, query, cb) -> cb.isNotNull(root.get("reportUnit"));
+            case "so_ubnd" -> (root, query, cb) -> cb.isNull(root.get("reportUnit"));
+            default -> (root, query, cb) -> cb.disjunction();
         };
     }
 

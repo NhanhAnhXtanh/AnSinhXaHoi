@@ -1,0 +1,166 @@
+# Thiết lập kỳ (ma trận Đơn vị x Biểu) và các đợt phát hành phiếu.
+#
+# Phụ thuộc bảng của BE1 (asxh_report_periods, asxh_report_units — 100..109) và BE2
+# (asxh_templates — 110..119), nên phải chạy SAU các changelog đó.
+#
+# Khoá ngoại RESTRICT: kỳ / đơn vị / biểu còn được thiết lập thì không xoá được — CSDL từ chối
+# thay vì slice kia phải đếm bảng của slice này (ApiExceptionHandler trả 409).
+databaseChangeLog:
+  - changeSet:
+      id: 120-create-asxh-period-setup
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_period_assignments
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_period_assignments
+              - column:
+                  name: period_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        # Một ô chỉ có một dòng. Cột đầu là period_id nên ràng buộc này cũng là chỉ mục
+        # cho "mọi ô của kỳ".
+        - addUniqueConstraint:
+            tableName: asxh_period_assignments
+            columnNames: period_id, unit_id, template_id
+            constraintName: uq_asxh_period_assignments_cell
+        - addForeignKeyConstraint:
+            baseTableName: asxh_period_assignments
+            baseColumnNames: period_id
+            constraintName: fk_asxh_period_assignments_period
+            referencedTableName: asxh_report_periods
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_period_assignments
+            baseColumnNames: unit_id
+            constraintName: fk_asxh_period_assignments_unit
+            referencedTableName: asxh_report_units
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_period_assignments
+            baseColumnNames: template_id
+            constraintName: fk_asxh_period_assignments_template
+            referencedTableName: asxh_templates
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # Kiểm chồng kỳ theo đơn vị đi từ unit_id.
+        - createIndex:
+            tableName: asxh_period_assignments
+            indexName: idx_asxh_period_assignments_unit
+            columns:
+              - column:
+                  name: unit_id
+        - createIndex:
+            tableName: asxh_period_assignments
+            indexName: idx_asxh_period_assignments_template
+            columns:
+              - column:
+                  name: template_id
+
+        - createTable:
+            tableName: asxh_publications
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_publications
+              - column:
+                  name: period_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # LAN_DAU | BO_SUNG
+              - column:
+                  name: kind
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              # PUBLISHED | CANCELLED (thu hồi cùng kỳ)
+              - column:
+                  name: status
+                  type: varchar(20)
+                  defaultValue: PUBLISHED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: publication_no
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_count
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: report_count
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sheet_count
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cancelled_at
+                  type: timestamp with time zone
+        # Thứ tự đợt duy nhất trong kỳ — cũng là chốt chặn khi hai người bấm mở đợt cùng lúc.
+        - addUniqueConstraint:
+            tableName: asxh_publications
+            columnNames: period_id, publication_no
+            constraintName: uq_asxh_publications_period_no
+        - addForeignKeyConstraint:
+            baseTableName: asxh_publications
+            baseColumnNames: period_id
+            constraintName: fk_asxh_publications_period
+            referencedTableName: asxh_report_periods
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: asxh_publications
+            indexName: idx_asxh_publications_status
+            columns:
+              - column:
+                  name: status

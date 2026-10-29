@@ -75,7 +75,7 @@ type UnsavedChangesGuardProps = React.PropsWithChildren<{
 }>;
 
 const DEFAULT_MESSAGE =
-  "You have unsaved changes on this page. If you leave now, they will be lost.";
+  "Trang này còn thay đổi chưa lưu. Nếu rời đi bây giờ, các thay đổi đó sẽ mất.";
 
 /**
  * What `@refinedev/react-router`'s `UnsavedChangesNotifier` does, asked with the
@@ -108,10 +108,10 @@ const DEFAULT_MESSAGE =
  */
 export function UnsavedChangesGuard({
   children,
-  title = "Discard unsaved changes?",
+  title = "Bỏ thay đổi chưa lưu?",
   message,
-  discardLabel = "Discard changes",
-  stayLabel = "Stay on this page",
+  discardLabel = "Bỏ thay đổi",
+  stayLabel = "Ở lại trang này",
 }: UnsavedChangesGuardProps) {
   const translate = useTranslate();
   const { pathname } = useLocation();
@@ -216,7 +216,7 @@ export function UnsavedChangesGuard({
           <AlertDialogHeader className="flex-row items-start gap-4 space-y-0 text-left sm:text-left">
             <span
               aria-hidden
-              className="bg-warning/10 text-warning flex size-10 shrink-0 items-center justify-center rounded-full"
+              className="bg-warning-subtle text-warning-text flex size-10 shrink-0 items-center justify-center rounded-full"
             >
               <TriangleAlert className="size-5" />
             </span>

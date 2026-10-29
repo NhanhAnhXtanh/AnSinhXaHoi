@@ -53,6 +53,7 @@ export function DataTableFilterDropdown<TData>({
           onClick={() => setIsOpen(true)}
           variant="ghost"
           size="icon"
+          aria-label="Lọc cột này"
           className={cn(
             "data-[state=open]:bg-accent",
             "w-5 h-5",
@@ -119,7 +120,7 @@ export function DataTableFilterDropdownActions({
         }}
       >
         <X className={cn("w-3.5", "h-3.5", "text-muted-foreground")} />
-        {t("buttons.clear", "Clear")}
+        {t("buttons.clear", "Bỏ lọc")}
       </Button>
 
       <Button
@@ -130,7 +131,7 @@ export function DataTableFilterDropdownActions({
           onApply();
         }}
       >
-        {t("buttons.apply", "Apply")}
+        {t("buttons.apply", "Áp dụng")}
       </Button>
     </div>
   );
@@ -182,7 +183,7 @@ export function DataTableFilterDropdownText<TData>({
         <Input
           type="text"
           placeholder={
-            placeholder ?? t("table.filter.text.placeholder", "Filter by...")
+            placeholder ?? t("table.filter.text.placeholder", "Lọc theo…")
           }
           value={value}
           onChange={(event) => {
@@ -221,7 +222,7 @@ export function DataTableFilterDropdownNumeric<TData>({
         <Input
           type="number"
           placeholder={
-            placeholder ?? t("table.filter.numeric.placeholder", "Filter by...")
+            placeholder ?? t("table.filter.numeric.placeholder", "Lọc theo…")
           }
           value={value}
           onChange={(event) => {
@@ -296,12 +297,12 @@ export function DataTableFilterCombobox<TData>({
         const getDisplayText = () => {
           if (currentValues.length === 0) {
             return (
-              placeholder ?? t("table.filter.combobox.placeholder", "Select...")
+              placeholder ?? t("table.filter.combobox.placeholder", "Chọn…")
             );
           }
 
           if (multiple) {
-            return `${currentValues.length} selected`;
+            return `Đã chọn ${currentValues.length}`;
           }
 
           const selectedOption = options.find(
@@ -386,7 +387,7 @@ export function DataTableFilterCombobox<TData>({
                             "px-1"
                           )}
                         >
-                          +{currentValues.length - 3} more
+                          +{currentValues.length - 3} mục khác
                         </span>
                       )}
                     </div>
@@ -413,14 +414,14 @@ export function DataTableFilterCombobox<TData>({
             <PopoverContent className={cn("w-[200px]", "p-0")} align="start">
               <Command>
                 <CommandInput
-                  placeholder={t("table.filter.combobox.search", "Search...")}
+                  placeholder={t("table.filter.combobox.search", "Tìm…")}
                 />
                 <CommandList>
                   <CommandEmpty>
                     {noResultsText ??
                       t(
                         "table.filter.combobox.noResults",
-                        "Results not found."
+                        "Không có kết quả."
                       )}
                   </CommandEmpty>
                   <CommandGroup>
@@ -777,102 +778,102 @@ export const CRUD_OPERATOR_LABELS: Record<
   Exclude<CrudOperators, "or" | "and">,
   { i18nKey: string; defaultLabel: string }
 > = {
-  eq: { i18nKey: "table.filter.operator.eq", defaultLabel: "Equals" },
-  ne: { i18nKey: "table.filter.operator.ne", defaultLabel: "Not equals" },
-  lt: { i18nKey: "table.filter.operator.lt", defaultLabel: "Less than" },
-  gt: { i18nKey: "table.filter.operator.gt", defaultLabel: "Greater than" },
+  eq: { i18nKey: "table.filter.operator.eq", defaultLabel: "Bằng" },
+  ne: { i18nKey: "table.filter.operator.ne", defaultLabel: "Khác" },
+  lt: { i18nKey: "table.filter.operator.lt", defaultLabel: "Nhỏ hơn" },
+  gt: { i18nKey: "table.filter.operator.gt", defaultLabel: "Lớn hơn" },
   lte: {
     i18nKey: "table.filter.operator.lte",
-    defaultLabel: "Less than or equal",
+    defaultLabel: "Nhỏ hơn hoặc bằng",
   },
   gte: {
     i18nKey: "table.filter.operator.gte",
-    defaultLabel: "Greater than or equal",
+    defaultLabel: "Lớn hơn hoặc bằng",
   },
   in: {
     i18nKey: "table.filter.operator.in",
-    defaultLabel: "Includes in an array",
+    defaultLabel: "Thuộc danh sách",
   },
   nin: {
     i18nKey: "table.filter.operator.nin",
-    defaultLabel: "Not includes in an array",
+    defaultLabel: "Không thuộc danh sách",
   },
   ina: {
     i18nKey: "table.filter.operator.ina",
-    defaultLabel: "Includes in an array (case sensitive)",
+    defaultLabel: "Thuộc danh sách (phân biệt hoa thường)",
   },
   nina: {
     i18nKey: "table.filter.operator.nina",
-    defaultLabel: "Not includes in an array (case sensitive)",
+    defaultLabel: "Không thuộc danh sách (phân biệt hoa thường)",
   },
   contains: {
     i18nKey: "table.filter.operator.contains",
-    defaultLabel: "Contains",
+    defaultLabel: "Có chứa",
   },
   ncontains: {
     i18nKey: "table.filter.operator.ncontains",
-    defaultLabel: "Not contains",
+    defaultLabel: "Không chứa",
   },
   containss: {
     i18nKey: "table.filter.operator.containss",
-    defaultLabel: "Contains (case sensitive)",
+    defaultLabel: "Có chứa (phân biệt hoa thường)",
   },
   ncontainss: {
     i18nKey: "table.filter.operator.ncontainss",
-    defaultLabel: "Not contains (case sensitive)",
+    defaultLabel: "Không chứa (phân biệt hoa thường)",
   },
   between: {
     i18nKey: "table.filter.operator.between",
-    defaultLabel: "Between",
+    defaultLabel: "Trong khoảng",
   },
   nbetween: {
     i18nKey: "table.filter.operator.nbetween",
-    defaultLabel: "Not between",
+    defaultLabel: "Ngoài khoảng",
   },
-  null: { i18nKey: "table.filter.operator.null", defaultLabel: "Is null" },
+  null: { i18nKey: "table.filter.operator.null", defaultLabel: "Để trống" },
   nnull: {
     i18nKey: "table.filter.operator.nnull",
-    defaultLabel: "Is not null",
+    defaultLabel: "Không để trống",
   },
   startswith: {
     i18nKey: "table.filter.operator.startswith",
-    defaultLabel: "Starts with",
+    defaultLabel: "Bắt đầu bằng",
   },
   nstartswith: {
     i18nKey: "table.filter.operator.nstartswith",
-    defaultLabel: "Not starts with",
+    defaultLabel: "Không bắt đầu bằng",
   },
   startswiths: {
     i18nKey: "table.filter.operator.startswiths",
-    defaultLabel: "Starts with (case sensitive)",
+    defaultLabel: "Bắt đầu bằng (phân biệt hoa thường)",
   },
   nstartswiths: {
     i18nKey: "table.filter.operator.nstartswiths",
-    defaultLabel: "Not starts with (case sensitive)",
+    defaultLabel: "Không bắt đầu bằng (phân biệt hoa thường)",
   },
   endswith: {
     i18nKey: "table.filter.operator.endswith",
-    defaultLabel: "Ends with",
+    defaultLabel: "Kết thúc bằng",
   },
   nendswith: {
     i18nKey: "table.filter.operator.nendswith",
-    defaultLabel: "Not ends with",
+    defaultLabel: "Không kết thúc bằng",
   },
   endswiths: {
     i18nKey: "table.filter.operator.endswiths",
-    defaultLabel: "Ends with (case sensitive)",
+    defaultLabel: "Kết thúc bằng (phân biệt hoa thường)",
   },
   nendswiths: {
     i18nKey: "table.filter.operator.nendswiths",
-    defaultLabel: "Not ends with (case sensitive)",
+    defaultLabel: "Không kết thúc bằng (phân biệt hoa thường)",
   },
   eqs: {
     i18nKey: "table.filter.operator.eqs",
-    defaultLabel: "Equals (case sensitive)",
+    defaultLabel: "Bằng (phân biệt hoa thường)",
   },
   nes: {
     i18nKey: "table.filter.operator.nes",
-    defaultLabel: "Not equals (case sensitive)",
+    defaultLabel: "Khác (phân biệt hoa thường)",
   },
 };
 
@@ -909,10 +910,10 @@ export function DataTableFilterOperatorSelect({
       .defaultLabel
   );
   const placeholderText =
-    placeholder ?? t("table.filter.operator.placeholder", "Search operator...");
+    placeholder ?? t("table.filter.operator.placeholder", "Tìm điều kiện…");
   const noResultsText = t(
     "table.filter.operator.noResults",
-    "No operator found."
+    "Không có điều kiện phù hợp."
   );
 
   return (

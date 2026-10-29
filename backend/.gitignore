@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# File đính kèm phiếu lưu lúc chạy (asxh.attachments.storage-dir mặc định ./data/attachments)
+/data/

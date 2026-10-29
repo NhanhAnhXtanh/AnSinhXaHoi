@@ -32,13 +32,15 @@ public class RowLevelViolationException extends RuntimeException {
     }
 
     private static String message(String field, String value) {
+        // Read by the person at the form, so Vietnamese (see ApiExceptionHandler).
         if (field == null) {
-            return "This change would put the record outside your data scope";
+            return "Chưa lưu được: thay đổi này đưa dữ liệu ra ngoài phạm vi bạn được làm việc.";
         }
         if (value == null) {
-            return "Cannot save: your data scope does not allow \"%s\" to be empty".formatted(field);
+            return "Chưa lưu được: phạm vi dữ liệu của bạn không cho phép để trống \"%s\".".formatted(field);
         }
-        return "Cannot save: your data scope does not allow \"%s\" to become \"%s\"".formatted(field, value);
+        return "Chưa lưu được: phạm vi dữ liệu của bạn không cho phép \"%s\" nhận giá trị \"%s\"."
+                .formatted(field, value);
     }
 
     /**

@@ -1,0 +1,68 @@
+// Nguon: DB qt_template_script — bieu 1q, phien ban PB-000031, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1q · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1q".
+// Nguồn: form-template/1q.xlsx (sheet '1q', A1:R24). Tọa độ 0-based. Cấu trúc MỚI: 2 khối dọc.
+//
+// KHỐI A — "Chế độ cung cấp thông tin" (7 dòng lá r8..r14): dùng nhóm 5 (cột O/P/Q).
+//   O(14)=Số đối tượng (NHẬP) | P(15)=Mức (KHOÁ, =0,5) | Q(16)=O*P ← CÔNG THỨC. Q8(r7)=SUM tổng.
+// KHỐI B — "Hỗ trợ vật chất, động viên tinh thần" (1 dòng r15): dùng nhóm 1–4 (cột C..N).
+//   Tết: C(2) D(3) E(4)=C*D*C19 | Ốm đau: F(5) G(6) H(7)=F*G | Khó khăn: I(8) J(9) K(10)=I*J
+//   Qua đời: L(11) M(12) N(13)=L*M.  Số đối tượng (C/F/I/L) NHẬP; Mức (D/G/J/M) KHOÁ (=0,5).
+// Mức (P; D/G/J/M) và tham số C19 (số lần/năm=2) là HẰNG SỐ CHÍNH SÁCH → KHOÁ.
+// Đơn vị chỉ nhập SỐ ĐỐI TƯỢNG + ghi chú (R=17). (Khớp ô bôi màu: xám = khoá.)
+
+const SHEET = '1q';
+const A_LEAF_ROWS = [8, 9, 10, 11, 12, 13, 14]; // khối A
+const A_QTY_COL = 14;                            // O
+const B_ROW = 15;                                // khối B
+const B_QTY_COLS = [2, 5, 8, 11];                // C, F, I, L
+const NOTE_COL = 17;                             // R
+
+function isEditable(row, col) {
+  if (row === 2 && col === 1) return true;  // B3 tháng/năm
+  if (A_LEAF_ROWS.indexOf(row) >= 0) return col === A_QTY_COL || col === NOTE_COL;
+  if (row === B_ROW) return B_QTY_COLS.indexOf(col) >= 0 || col === NOTE_COL;
+  return false;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 2, 1, false);
+  A_LEAF_ROWS.forEach((row) => {
+    ctx.cell.lock(SHEET, row, A_QTY_COL, false);
+    ctx.cell.lock(SHEET, row, NOTE_COL, false);
+  });
+  B_QTY_COLS.forEach((col) => ctx.cell.lock(SHEET, B_ROW, col, false));
+  ctx.cell.lock(SHEET, B_ROW, NOTE_COL, false);
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tự điền tên đơn vị của phiếu vào ô ĐƠN VỊ (A1) rồi GIỮ KHOÁ (đơn vị không sửa).
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

@@ -31,7 +31,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .exposedHeaders(ListResponse.TOTAL_COUNT_HEADER, AuthVersionAdvice.HEADER)
+                .exposedHeaders(ListResponse.TOTAL_COUNT_HEADER, AuthVersionAdvice.HEADER, "Content-Disposition")
                 .maxAge(3600);
     }
 }

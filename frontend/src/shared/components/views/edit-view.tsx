@@ -84,7 +84,7 @@ export const EditViewHeader = ({
         )}
       >
         <div className="flex min-w-0 items-center gap-1">
-          <Button data-print="hide" variant="ghost" size="icon" onClick={back}>
+          <Button data-print="hide" variant="ghost" size="icon" onClick={back} aria-label="Quay lại">
             <ArrowLeftIcon className="h-4 w-4" />
           </Button>
           <h1 className="min-w-0 truncate text-3xl font-bold leading-9 tracking-tight">{title}</h1>

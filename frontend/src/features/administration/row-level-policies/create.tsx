@@ -1,14 +1,17 @@
 import { useForm } from "@refinedev/react-hook-form";
 import { useNavigate } from "react-router";
 
-import {
-  CreateView,
-  CreateViewHeader,
-} from "@/shared/components/views/create-view";
+import { CreateView } from "@/shared/components/views/create-view";
 import { Button } from "@/shared/ui/button";
+import {
+  FormSectionActions,
+  SectionedFormPanel,
+} from "@/shared/components/form/form-section";
 import { PolicyForm, type PolicyFormValues } from "./policy-form";
 import { DEFAULT_POLICY, normalize } from "./policy-values";
 import { useManagedResources } from "./use-managed-resources";
+import { AdminPageHeader } from "../record-actions";
+import { errorDescription } from "../labels";
 
 export const RowLevelPolicyCreate = () => {
   const navigate = useNavigate();
@@ -18,7 +21,17 @@ export const RowLevelPolicyCreate = () => {
     refineCore: { onFinish },
     ...form
   } = useForm({
-    refineCoreProps: {},
+    refineCoreProps: {
+      successNotification: () => ({
+        type: "success",
+        message: "Đã thêm phạm vi dữ liệu",
+      }),
+      errorNotification: (error) => ({
+        type: "error",
+        message: "Không tạo được phạm vi dữ liệu",
+        description: errorDescription(error),
+      }),
+    },
     defaultValues: DEFAULT_POLICY,
   });
 
@@ -28,17 +41,22 @@ export const RowLevelPolicyCreate = () => {
 
   return (
     <CreateView>
-      <CreateViewHeader />
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <PolicyForm form={form} resources={resources} />
-        <div className="flex gap-2">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Creating..." : "Create"}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-            Cancel
-          </Button>
-        </div>
+      <AdminPageHeader
+        title="Thêm phạm vi dữ liệu"
+        description="Quy định vai trò nào được thấy những dòng dữ liệu nào, hoặc giới hạn dữ liệu cho mọi người."
+      />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="min-w-0">
+        <SectionedFormPanel>
+          <PolicyForm form={form} resources={resources} />
+          <FormSectionActions>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Đang tạo..." : "Tạo phạm vi"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+              Huỷ
+            </Button>
+          </FormSectionActions>
+        </SectionedFormPanel>
       </form>
     </CreateView>
   );

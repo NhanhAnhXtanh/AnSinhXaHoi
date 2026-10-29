@@ -33,7 +33,7 @@ export type DataTableQuickFilterProps<TData extends BaseRecord> = {
 
 export function DataTableQuickFilter<TData extends BaseRecord>({
   table,
-  placeholder = "Search by ID or title...",
+  placeholder = "Tìm kiếm…",
   searchField = "q",
   debounceMs = 400,
   className,
@@ -55,7 +55,7 @@ export function DataTableQuickFilter<TData extends BaseRecord>({
 
   const isFirstRun = useRef(true);
 
-  // Keep in sync when the filter is removed elsewhere (a chip, "Clear all").
+  // Keep in sync when the filter is removed elsewhere (a chip, "Xoá lọc").
   useEffect(() => {
     const next = activeValue != null ? String(activeValue) : "";
     setValue((prev) => (prev === next ? prev : next));
@@ -117,7 +117,7 @@ export function DataTableQuickFilter<TData extends BaseRecord>({
       {value && (
         <button
           type="button"
-          aria-label="Clear search"
+          aria-label="Xoá chữ tìm kiếm"
           onClick={() => setValue("")}
           className={cn(
             "absolute",

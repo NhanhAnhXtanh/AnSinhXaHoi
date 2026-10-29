@@ -1,0 +1,27 @@
+// Nguon: DB qt_template_script — bieu 1g, phien ban PB-000020, script "Tong hop theo ky"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// 1g - afterInject 'Tong hop theo ky': doc so cai theo ky, do so doi tuong vao o quantity.
+// SHEET + map lay tu getInputData BINDINGS (rows 9/10/11, qty col rieng moi chi tieu).
+// Chi set o quantity (o nhap); o kinh phi cong thuc bi chan (try/catch) - bo qua.
+const SHEET='1g';
+const ROW={
+  '1G.I.HOC_BONG.DOI_TUONG':{row:9,col:5},
+  '1G.I.DO_DUNG.DOI_TUONG':{row:9,col:8},
+  '1G.I.DI_LAI.M02':{row:9,col:9},
+  '1G.I.DI_LAI.M03':{row:9,col:10},
+  '1G.I.O_LAI_TET.DOI_TUONG':{row:9,col:11},
+  '1G.II.HOC_BONG.DOI_TUONG':{row:10,col:5},
+  '1G.II.DO_DUNG.DOI_TUONG':{row:10,col:8},
+  '1G.II.DI_LAI.M02':{row:10,col:9},
+  '1G.II.DI_LAI.M03':{row:10,col:10},
+  '1G.II.O_LAI_TET.DOI_TUONG':{row:10,col:11},
+  '1G.III.HOC_BONG.DOI_TUONG':{row:11,col:5},
+  '1G.III.DO_DUNG.DOI_TUONG':{row:11,col:8},
+  '1G.III.DI_LAI.M02':{row:11,col:9},
+  '1G.III.DI_LAI.M03':{row:11,col:10},
+  '1G.III.O_LAI_TET.DOI_TUONG':{row:11,col:11},
+};
+const CK='indi'+'catorCode';
+function num(v){if(v==null||v==='')return null;const n=Number(v);return Number.isFinite(n)?n:null;}
+return defineScript({ async afterInject(ctx){ const periodId=ctx.shared&&ctx.shared.periodId; if(!periodId)return; const scope=(ctx.shared&&ctx.shared.scopeKind)?'&scopeKind='+ctx.shared.scopeKind:''; const src=(ctx.shared&&ctx.shared.sourceSheet)?'&sourceSheetCode='+encodeURIComponent(ctx.shared.sourceSheet):''; let rows; try{rows=await ctx.api.get('/rest/qt/summary/data?periodId='+periodId+scope+src);}catch(e){ctx.ui.message('Loi: '+e.message);return;} let n=0; for(const r of (rows||[])){ const cell=ROW[r[CK]]; if(cell==null)continue; const q=num(r.quantity); if(q==null)continue; try{ctx.cell.set(SHEET,cell.row,cell.col,q);n++;}catch(e){} } ctx.ui.message('Da do '+n+' dong theo ky.'); } });

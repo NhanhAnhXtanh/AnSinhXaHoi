@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useCan, useList } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
-import { Plus, TriangleAlert } from "lucide-react";
+import { Pencil, Plus, TriangleAlert } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
@@ -16,7 +16,6 @@ import {
 } from "@/shared/ui/dialog";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useSidebar } from "@/shared/ui/sidebar";
-import { DeleteButton } from "@/shared/components/buttons/delete";
 import {
   SHELL_SIDEBAR_WIDTH,
   SHELL_SIDEBAR_WIDTH_ICON,
@@ -27,7 +26,9 @@ import {
   type PolicyFormValues,
 } from "@/features/administration/row-level-policies/policy-form";
 import { DEFAULT_POLICY, normalize } from "@/features/administration/row-level-policies/policy-values";
-import { readCondition } from "@/domains/row-level-policy/read-condition";
+import { readConditionVi } from "@/features/administration/row-level-policies/labels";
+import { RecordActionsMenu } from "../record-actions";
+import { actionLabel, errorDescription, resourceLabel } from "../labels";
 import { useManagedResources } from "@/features/administration/row-level-policies/use-managed-resources";
 import { EMPTY_SCOPE, type RowLevelPolicy } from "@/domains/row-level-policy/types";
 
@@ -60,6 +61,8 @@ type RoleDataScopesProps = {
   /** Absent on the create screen, where the role does not exist yet. */
   roleId: number | undefined;
   roleCode: string | undefined;
+  /** Tên vai trò, để câu chữ trong hộp phạm vi nói bằng tên chứ không bằng mã. */
+  roleName?: string | undefined;
   /** True on the show screen: the rules are listed but nothing is offered. */
   readOnly?: boolean;
 };
@@ -67,6 +70,7 @@ type RoleDataScopesProps = {
 export function RoleDataScopes({
   roleId,
   roleCode,
+  roleName,
   readOnly,
 }: RoleDataScopesProps) {
   // `row_level_policies:*` is seeded to ADMIN alone, so these are real
@@ -109,9 +113,9 @@ export function RoleDataScopes({
       <div className="p-4">
         <Alert>
           <AlertDescription>
-            A data scope belongs to a role, so there is nothing for one to
-            belong to yet. Create the role and this tab opens on the role you
-            just made.
+            Phạm vi dữ liệu phải gắn với một vai trò, mà vai trò này chưa được
+            tạo. Bấm “Tạo vai trò”, màn sửa sẽ mở sẵn tab này cho vai trò vừa
+            tạo.
           </AlertDescription>
         </Alert>
       </div>
@@ -145,11 +149,11 @@ export function RoleDataScopes({
           <span className="text-foreground font-semibold tabular-nums">
             {policies.length}
           </span>{" "}
-          {policies.length === 1 ? "scope" : "scopes"} across{" "}
+          phạm vi trên{" "}
           <span className="text-foreground font-semibold tabular-nums">
             {groups.size}
           </span>{" "}
-          {groups.size === 1 ? "resource" : "resources"}
+          loại dữ liệu
         </span>
         {mayWrite && (
           <Button
@@ -160,8 +164,8 @@ export function RoleDataScopes({
             onClick={() => setEditing({})}
             className="shrink-0 sm:ms-auto"
           >
-            <Plus className="mr-2 size-4" />
-            Add data scope
+            <Plus className="size-4" />
+            Thêm phạm vi
           </Button>
         )}
       </div>
@@ -175,12 +179,10 @@ export function RoleDataScopes({
         ) : policies.length === 0 ? (
           <Alert>
             <AlertDescription>
-              This role has no data scope of its own. What that means is each
-              resource&rsquo;s own decision: one declared <b>FULL</b> leaves an
-              unscoped role unrestricted, one declared <b>NONE</b> leaves it
-              seeing nothing. The coverage grid on the Data scopes screen
-              colours every such cell, which is what turns the gap from an
-              invisible default into something you can see.
+              Vai trò này chưa có phạm vi dữ liệu riêng. Khi đó mỗi loại dữ liệu
+              theo mặc định của nó: có loại cho thấy toàn bộ, có loại không cho
+              thấy gì. Bảng “Tổng quan phạm vi” ở màn Phạm vi dữ liệu tô màu
+              từng ô như vậy để bạn thấy được chỗ còn trống.
             </AlertDescription>
           </Alert>
         ) : (
@@ -188,7 +190,7 @@ export function RoleDataScopes({
             {[...groups.entries()].map(([resource, rows]) => (
               <div key={resource} className="flex flex-col gap-2">
                 <span className="text-overline text-muted-foreground">
-                  {resource}
+                  {resourceLabel(resource)}
                 </span>
                 <div className="divide-y rounded-md border">
                   {rows.map((policy) => (
@@ -199,10 +201,12 @@ export function RoleDataScopes({
                       <div className="flex min-w-0 flex-col gap-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{policy.name}</span>
-                          <Badge variant="outline">{policy.action}</Badge>
+                          <Badge variant="outline">
+                            {actionLabel(policy.action)}
+                          </Badge>
                           {!policy.enabled && (
-                            <Badge variant="outline" className="text-[10px]">
-                              Off
+                            <Badge variant="neutral" dot>
+                              Tạm tắt
                             </Badge>
                           )}
                           {policy.policyGroup && (
@@ -212,14 +216,14 @@ export function RoleDataScopes({
                           )}
                         </div>
                         <span className="text-muted-foreground text-sm">
-                          Reads {readCondition(policy.scope)}
+                          Thấy: {readConditionVi(policy.scope)}
                         </span>
                         {policy.action === "write" && (
                           <span className="text-muted-foreground text-sm">
-                            After the save,{" "}
+                            Sau khi lưu:{" "}
                             {policy.checkScope
-                              ? readCondition(policy.checkScope)
-                              : "the same condition — which is what stops a record being moved out of this role's own sight"}
+                              ? readConditionVi(policy.checkScope)
+                              : "vẫn theo điều kiện trên — để không ai chuyển được bản ghi ra khỏi phạm vi mình thấy"}
                             .
                           </span>
                         )}
@@ -228,28 +232,35 @@ export function RoleDataScopes({
                         {policy.invalidReason && (
                           <span className="text-destructive flex items-start gap-1 text-sm">
                             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                            Disabled at startup because it no longer compiles:{" "}
-                            {policy.invalidReason}
+                            Đã bị tắt khi khởi động vì điều kiện không còn hợp
+                            lệ: {policy.invalidReason}
                           </span>
                         )}
                       </div>
 
                       {mayWrite && (
-                        <div className="flex shrink-0 gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setEditing({ id: policy.id })}
-                          >
-                            Edit
-                          </Button>
-                          <DeleteButton
-                            type="button"
+                        <div className="flex shrink-0">
+                          <RecordActionsMenu
                             resource={POLICY_RESOURCE}
-                            recordItemId={policy.id}
-                            size="sm"
-                            accessControl={{ hideIfUnauthorized: true }}
+                            id={policy.id}
+                            editLabel={false}
+                            showLabel={false}
+                            items={[
+                              {
+                                key: "edit",
+                                label: "Sửa phạm vi",
+                                icon: Pencil,
+                                onSelect: () => setEditing({ id: policy.id }),
+                              },
+                            ]}
+                            remove={{
+                              label: "Xoá phạm vi",
+                              title: `Xoá phạm vi “${policy.name}”?`,
+                              description:
+                                "Vai trò sẽ không còn thấy phần dữ liệu mà phạm vi này mở ra. Việc xoá không lấy lại được.",
+                              successMessage: `Đã xoá phạm vi ${policy.name}`,
+                            }}
+                            onDeleted={() => void refetch()}
                           />
                         </div>
                       )}
@@ -272,6 +283,7 @@ export function RoleDataScopes({
           key={editing.id ?? "create"}
           roleId={roleId}
           roleCode={roleCode}
+          roleName={roleName}
           policyId={editing.id}
           resources={resources}
           onClose={() => setEditing(null)}
@@ -288,6 +300,7 @@ export function RoleDataScopes({
 type PolicyDialogProps = {
   roleId: number;
   roleCode: string | undefined;
+  roleName: string | undefined;
   /** Absent for a new scope. */
   policyId?: number;
   resources: string[];
@@ -311,6 +324,7 @@ type PolicyDialogProps = {
 function PolicyDialog({
   roleId,
   roleCode,
+  roleName,
   policyId,
   resources,
   onClose,
@@ -349,6 +363,15 @@ function PolicyDialog({
       // it.
       redirect: false,
       onMutationSuccess: () => onSaved(),
+      successNotification: () => ({
+        type: "success",
+        message: isEdit ? "Đã lưu phạm vi dữ liệu" : "Đã thêm phạm vi dữ liệu",
+      }),
+      errorNotification: (error) => ({
+        type: "error",
+        message: "Không lưu được phạm vi dữ liệu",
+        description: errorDescription(error),
+      }),
     },
     defaultValues: defaults,
   });
@@ -419,12 +442,12 @@ function PolicyDialog({
       >
         <DialogHeader className="border-b px-6 py-4 pr-12">
           <DialogTitle>
-            {isEdit ? "Edit data scope" : "New data scope"}
+            {isEdit ? "Sửa phạm vi dữ liệu" : "Thêm phạm vi dữ liệu"}
           </DialogTitle>
           <DialogDescription>
-            Which rows {roleCode ?? "this role"} can reach. Saved on its own, as
-            soon as you submit — the role&rsquo;s own Save button covers its
-            details and permissions and nothing here.
+            Những dòng dữ liệu {roleName ?? "vai trò này"} được thấy. Phạm vi được
+            lưu riêng ngay khi bấm lưu ở đây — nút “Lưu thay đổi” của vai trò chỉ
+            lưu thông tin và quyền.
           </DialogDescription>
         </DialogHeader>
 
@@ -435,27 +458,27 @@ function PolicyDialog({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto">
               {policy?.invalidReason && (
-                <Alert variant="destructive">
-                  <TriangleAlert className="size-4" />
-                  <AlertDescription>
-                    This policy was disabled at startup because it no longer
-                    compiles: {policy.invalidReason}. Fix the condition and
-                    switch it back on — saving re-checks it, and the reason is
-                    cleared when it passes.
-                  </AlertDescription>
-                </Alert>
+                <div className="px-6 pt-5">
+                  <Alert variant="destructive">
+                    <TriangleAlert className="size-4" />
+                    <AlertDescription>
+                      Phạm vi này đã bị tắt khi khởi động vì điều kiện không còn
+                      hợp lệ: {policy.invalidReason}. Sửa điều kiện rồi bật lại —
+                      khi lưu hệ thống kiểm tra lại và xoá lý do nếu đã đúng.
+                    </AlertDescription>
+                  </Alert>
+                </div>
               )}
 
               <PolicyForm
                 form={form}
                 resources={resources}
-                currentRole={
-                  roleCode
-                    ? { id: roleId, code: roleCode }
-                    : { id: roleId, code: "" }
-                }
+                currentRole={{
+                  id: roleId,
+                  code: roleName ?? roleCode ?? "",
+                }}
                 lockRole
                 lockKind
                 // On edit, the resource is part of what the policy *is*:
@@ -474,14 +497,14 @@ function PolicyDialog({
                 onClick={onClose}
                 disabled={form.formState.isSubmitting}
               >
-                Cancel
+                Huỷ
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting
-                  ? "Saving..."
+                  ? "Đang lưu..."
                   : isEdit
-                  ? "Save scope"
-                  : "Create scope"}
+                  ? "Lưu phạm vi"
+                  : "Thêm phạm vi"}
               </Button>
             </DialogFooter>
           </form>

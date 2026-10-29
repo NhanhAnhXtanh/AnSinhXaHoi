@@ -6,13 +6,6 @@ import { API_URL } from "@/shared/api/constants";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/shared/ui/card";
-import {
   Form,
   FormControl,
   FormDescription,
@@ -31,7 +24,10 @@ import {
 } from "@/shared/ui/select";
 import { Switch } from "@/shared/ui/switch";
 import { Textarea } from "@/shared/ui/textarea";
+import { FormSection } from "@/shared/components/form/form-section";
 import { ScopeBuilder } from "./scope-builder";
+import { KIND_LABELS, KIND_OPTION_LABELS } from "./labels";
+import { actionLabel, resourceLabel } from "../labels";
 import {
   ACTIONS,
   EMPTY_SCOPE,
@@ -41,6 +37,10 @@ import {
 
 /**
  * The create and edit forms are the same form, so it lives here once.
+ *
+ * Nó trả về các `FormSection` (không có khung ngoài): màn tạo / sửa bọc trong
+ * `SectionedFormPanel` cùng thanh nút, hộp thoại ở tab vai trò đặt thẳng vào
+ * thân hộp. Bố cục theo Figma 311:81124.
  *
  * The shape it edits is `RowLevelPolicyRequest` on the backend. Two of its
  * fields are locked on edit rather than merely discouraged — see
@@ -160,432 +160,405 @@ export function PolicyForm({
   // disabled until a resource is picked. See `customResult`.
   const metadata = customResult(metadataResult?.data, "fields");
 
+
   return (
     <Form {...form}>
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>What this policy is</CardTitle>
-            <CardDescription>
-              A scope belongs to one role and widens what that role can reach. A
-              filter belongs to nobody and narrows what everyone can reach —
-              which is why it cannot be escaped by not holding a role.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="max-w-3xl space-y-6">
-            <div className="grid gap-6 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="kind"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Kind</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={lockIdentity || lockKind}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="SCOPE">
-                          Scope — widens one role
-                        </SelectItem>
-                        <SelectItem value="FILTER">
-                          Filter — narrows everyone
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      {lockIdentity
-                        ? "Cannot be changed: it would make this a different rule about different rows."
-                        : lockKind
-                          ? "A filter names no role, so it cannot be written from a role's own screen."
-                          : "Scopes union with each other; filters always intersect."}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      <FormSection
+        title="Phạm vi này là gì"
+        description="Chọn loại phạm vi, dữ liệu và vai trò áp dụng. “Mở rộng” cho một vai trò thấy thêm dữ liệu; “Hạn chế” thu hẹp dữ liệu của mọi người, không ai thoát được."
+      >
+        <FormField
+          control={form.control}
+          name="kind"
+          render={({ field }) => (
+            <FormItem className="md:col-span-4">
+              <FormLabel>Loại phạm vi</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value}
+                disabled={lockIdentity || lockKind}
+              >
+                <FormControl>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="SCOPE">{KIND_OPTION_LABELS.SCOPE}</SelectItem>
+                  <SelectItem value="FILTER">{KIND_OPTION_LABELS.FILTER}</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                {lockIdentity
+                  ? "Không đổi được: đổi loại là thành một phạm vi khác trên dữ liệu khác."
+                  : lockKind
+                    ? "Phạm vi hạn chế không gắn với vai trò nào, nên không tạo từ màn của một vai trò."
+                    : "Các phạm vi mở rộng cộng dồn với nhau; phạm vi hạn chế luôn được áp dụng."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-              <FormField
-                control={form.control}
-                name="resource"
-                rules={{ required: "A resource is required" }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Resource</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ?? ""}
-                      disabled={lockIdentity}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a resource" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {resourceOptions.map((candidate) => (
-                          <SelectItem key={candidate} value={candidate}>
-                            {candidate}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Only resources declared under row-level management appear
-                      here.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="action"
-                rules={{ required: "An action is required" }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Action</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an action" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ACTIONS.map((candidate) => (
-                          <SelectItem key={candidate} value={candidate}>
-                            {candidate}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      {action === "write"
-                        ? "Checked twice: on the row as it stands, and on the state the save would leave behind."
-                        : "Folded into the WHERE clause of every query for this resource."}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/*
-                A filter has no role by design. Showing the picker disabled
-                rather than hiding it is what makes that visible as a decision
-                instead of looking like a field somebody forgot.
-              */}
-              <FormField
-                control={form.control}
-                name="role.id"
-                rules={{
-                  validate: (value) =>
-                    kind === "FILTER" ||
-                    value != null ||
-                    "A scope has to name the role it widens",
-                }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    {/*
-                      Role ids are numbers on the wire but `Select` compares its
-                      values as strings, so the conversion happens at this
-                      boundary and nowhere else.
-                    */}
-                    <Select
-                      onValueChange={(next) => field.onChange(Number(next))}
-                      value={
-                        field.value === null || field.value === undefined
-                          ? ""
-                          : String(field.value)
-                      }
-                      disabled={kind === "FILTER" || lockRole}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              kind === "FILTER"
-                                ? "Filters apply to everyone"
-                                : roleQuery.isLoading
-                                  ? "Loading..."
-                                  : "Select a role"
-                            }
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {roleChoices.map((option) => (
-                          <SelectItem
-                            key={String(option.value)}
-                            value={String(option.value)}
-                          >
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {lockRole && (
-                      <FormDescription>
-                        Fixed: this scope belongs to the role you are editing.
-                        Write one for another role from that role&rsquo;s own
-                        screen.
-                      </FormDescription>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="name"
-              rules={{
-                required: "A name is required",
-                maxLength: { value: 160, message: "At most 160 characters" },
-              }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="Work in my department"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    How this rule is referred to in the audit trail and in
-                    explanations. Say what it lets people see.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="policyGroup"
-                rules={{ maxLength: { value: 64, message: "At most 64 characters" } }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Group</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        placeholder="Departmental"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Display only — it groups rows on this screen and nothing
-                      else.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="enabled"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col gap-2">
-                    <FormLabel>Enabled</FormLabel>
-                    <FormControl>
-                      <Switch
-                        checked={field.value ?? true}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {kind === "FILTER"
-                        ? "Turning a filter off removes a restriction from everyone."
-                        : "Turning a scope off narrows the role it belongs to."}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="description"
-              rules={{ maxLength: { value: 500, message: "At most 500 characters" } }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value ?? ""}
-                      rows={3}
-                      placeholder="Why this rule exists, for whoever reads it next"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Which rows it matches</CardTitle>
-            <CardDescription>
-              Every choice below is drawn from what the server says this resource
-              allows. There is no free-text expression here, and that is
-              deliberate: a condition this screen will not let you write is one
-              the API would refuse.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {metadata && (
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">
-                  Roles with no scope on this resource:
-                </span>
-                <Badge
-                  variant={
-                    metadata.defaultScope === "FULL" ? "secondary" : "outline"
-                  }
-                >
-                  {metadata.defaultScope === "FULL"
-                    ? "see everything"
-                    : "see nothing"}
-                </Badge>
-              </div>
-            )}
-
-            {metadata && metadata.designTime.length > 0 && (
-              <Alert>
-                <AlertDescription className="flex flex-col gap-1">
-                  <span className="font-medium">
-                    Also in force, declared in source and not editable here:
-                  </span>
-                  {metadata.designTime.map((declared, index) => (
-                    <span key={index} className="text-sm">
-                      {declared.kind} · {declared.action}
-                      {declared.role ? ` · ${declared.role}` : ""} —{" "}
-                      {declared.name}
-                    </span>
+        <FormField
+          control={form.control}
+          name="resource"
+          rules={{ required: "Vui lòng chọn dữ liệu áp dụng." }}
+          render={({ field }) => (
+            <FormItem className="md:col-span-4">
+              <FormLabel>Dữ liệu áp dụng</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value ?? ""}
+                disabled={lockIdentity}
+              >
+                <FormControl>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn loại dữ liệu" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {resourceOptions.map((candidate) => (
+                    <SelectItem key={candidate} value={candidate}>
+                      {resourceLabel(candidate)}
+                    </SelectItem>
                   ))}
-                </AlertDescription>
-              </Alert>
-            )}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                {lockIdentity
+                  ? "Không đổi được sau khi đã tạo."
+                  : "Chỉ liệt kê các loại dữ liệu có thể giới hạn."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-            <FormField
-              control={form.control}
-              name="scope"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <div>
-                      <ScopeBuilder
-                        metadata={metadata}
-                        value={field.value}
-                        onChange={field.onChange}
-                        action={action}
-                        disabled={metadataQuery.isLoading}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-        </Card>
+        <FormField
+          control={form.control}
+          name="action"
+          rules={{ required: "Vui lòng chọn thao tác." }}
+          render={({ field }) => (
+            <FormItem className="md:col-span-4">
+              <FormLabel>Thao tác</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                <FormControl>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn thao tác" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {ACTIONS.map((candidate) => (
+                    <SelectItem key={candidate} value={candidate}>
+                      {actionLabel(candidate)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                {action === "write"
+                  ? "Kiểm hai lần: với dòng đang có, và với dòng sau khi lưu."
+                  : "Áp dụng mỗi khi mở danh sách hoặc xem một dòng dữ liệu."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/*
-          Only `write` leaves a new state behind, so only `write` has a second
-          clause. Showing this card for `read` or `delete` would invite somebody
-          to fill in a condition that is never consulted.
+          Phạm vi hạn chế không có vai trò. Hiện ô bị khoá thay vì ẩn đi để thấy
+          đó là quyết định, không phải ô bị quên.
         */}
-        {action === "write" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>What it may become</CardTitle>
-              <CardDescription>
-                The condition above decides which records can be edited. This one
-                decides what they are allowed to look like <b>after</b> the save.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="checkScope"
-                render={({ field }) => (
-                  <FormItem className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <FormControl>
-                        <Switch
-                          checked={field.value === null || field.value === undefined}
-                          onCheckedChange={(sameAsAbove) =>
-                            // Null and an empty tree are opposites here: null
-                            // reuses the condition above, an empty tree allows
-                            // any resulting state at all.
-                            field.onChange(sameAsAbove ? null : EMPTY_SCOPE)
-                          }
-                        />
-                      </FormControl>
-                      <div className="space-y-1">
-                        <FormLabel>Apply the same condition to the saved record</FormLabel>
-                        <FormDescription>
-                          On by default, and the right answer when the condition
-                          above is about <b>whose</b> record it is — a department,
-                          a category, an owner. It is what stops somebody moving a
-                          record somewhere they cannot see it in order to hide it.
-                        </FormDescription>
-                      </div>
-                    </div>
+        <FormField
+          control={form.control}
+          name="role.id"
+          rules={{
+            validate: (value) =>
+              kind === "FILTER" ||
+              value != null ||
+              "Phạm vi mở rộng phải chọn vai trò được mở rộng.",
+          }}
+          render={({ field }) => (
+            <FormItem className="md:col-span-4">
+              <FormLabel>Vai trò</FormLabel>
+              {/*
+                Mã vai trò là số trên API nhưng `Select` so sánh bằng chuỗi, nên
+                đổi kiểu ở đúng chỗ này.
+              */}
+              <Select
+                onValueChange={(next) => field.onChange(Number(next))}
+                value={
+                  field.value === null || field.value === undefined
+                    ? ""
+                    : String(field.value)
+                }
+                disabled={kind === "FILTER" || lockRole}
+              >
+                <FormControl>
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        kind === "FILTER"
+                          ? "Áp dụng cho mọi vai trò"
+                          : roleQuery.isLoading
+                            ? "Đang tải..."
+                            : "Chọn vai trò"
+                      }
+                    />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {roleChoices.map((option) => (
+                    <SelectItem
+                      key={String(option.value)}
+                      value={String(option.value)}
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                {lockRole
+                  ? "Cố định: phạm vi này thuộc vai trò đang sửa."
+                  : kind === "FILTER"
+                    ? "Phạm vi hạn chế áp dụng cho mọi người."
+                    : "Chỉ cần chọn khi là phạm vi mở rộng."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-                    {field.value !== null && field.value !== undefined && (
-                      <>
-                        <Alert>
-                          <AlertDescription>
-                            Turn it off when the condition above is about a{" "}
-                            <b>state the work changes</b>. &ldquo;Only drafts can
-                            be edited&rdquo; applied to the saved record also
-                            means &ldquo;and a draft can never be
-                            published&rdquo;, which forbids the one edit that
-                            matters. Leave the builder below empty to allow any
-                            resulting state.
-                          </AlertDescription>
-                        </Alert>
-                        <FormControl>
-                          <div>
-                            <ScopeBuilder
-                              metadata={metadata}
-                              value={field.value}
-                              onChange={field.onChange}
-                              action={action}
-                              disabled={metadataQuery.isLoading}
-                            />
-                          </div>
-                        </FormControl>
-                      </>
-                    )}
-                    <FormMessage />
-                  </FormItem>
+        <FormField
+          control={form.control}
+          name="name"
+          rules={{
+            required: "Vui lòng đặt tên cho phạm vi.",
+            maxLength: { value: 160, message: "Tối đa 160 ký tự." },
+          }}
+          render={({ field }) => (
+            <FormItem className="md:col-span-4">
+              <FormLabel>
+                Tên phạm vi <span className="text-destructive">*</span>
+              </FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  value={field.value ?? ""}
+                  placeholder="Ví dụ: Cán bộ đơn vị chỉ thấy phiếu của mình"
+                />
+              </FormControl>
+              <FormDescription>
+                Viết rõ ai được thấy gì để người khác đọc là hiểu.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="enabled"
+          render={({ field }) => (
+            <FormItem className="md:col-span-4">
+              <FormLabel>Trạng thái</FormLabel>
+              <div className="flex h-9 items-center gap-2">
+                <FormControl>
+                  <Switch
+                    checked={field.value ?? true}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <span className="text-sm">
+                  {(field.value ?? true) ? "Đang áp dụng" : "Tạm tắt"}
+                </span>
+              </div>
+              <FormDescription>
+                {kind === "FILTER"
+                  ? "Tắt thì mọi người thoát khỏi giới hạn này."
+                  : "Tắt thì vai trò không còn thấy phần dữ liệu phạm vi này mở ra."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          rules={{ maxLength: { value: 500, message: "Tối đa 500 ký tự." } }}
+          render={({ field }) => (
+            <FormItem className="md:col-span-8">
+              <FormLabel>Mô tả</FormLabel>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  value={field.value ?? ""}
+                  rows={2}
+                  className="min-h-9 resize-y"
+                  placeholder="Vì sao có phạm vi này, để người đọc sau hiểu."
+                />
+              </FormControl>
+              <FormDescription>Không bắt buộc.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="policyGroup"
+          rules={{ maxLength: { value: 64, message: "Tối đa 64 ký tự." } }}
+          render={({ field }) => (
+            <FormItem className="md:col-span-4">
+              <FormLabel>Nhóm hiển thị</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  value={field.value ?? ""}
+                  placeholder="Ví dụ: Theo đơn vị"
+                />
+              </FormControl>
+              <FormDescription>
+                Chỉ để gom các dòng trên màn này, không ảnh hưởng dữ liệu.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </FormSection>
+
+      <FormSection
+        title="Dòng dữ liệu được thấy"
+        description="Chọn điều kiện để xác định những dòng dữ liệu mà phạm vi này cho thấy. Mọi lựa chọn đều lấy từ danh sách có sẵn, không phải viết công thức."
+      >
+        <div className="flex flex-col gap-4 md:col-span-12">
+          {metadata && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">
+                Vai trò chưa có phạm vi riêng trên dữ liệu này:
+              </span>
+              <Badge
+                variant={metadata.defaultScope === "FULL" ? "secondary" : "outline"}
+              >
+                {metadata.defaultScope === "FULL"
+                  ? "thấy toàn bộ"
+                  : "không thấy gì"}
+              </Badge>
+            </div>
+          )}
+
+          {metadata && metadata.designTime.length > 0 && (
+            <Alert>
+              <AlertDescription className="flex flex-col gap-1">
+                <span className="font-medium">
+                  Đang áp dụng thêm, được cài sẵn trong hệ thống và không sửa ở
+                  đây:
+                </span>
+                {metadata.designTime.map((declared, index) => (
+                  <span key={index} className="text-sm">
+                    {KIND_LABELS[declared.kind] ?? declared.kind} ·{" "}
+                    {actionLabel(declared.action)}
+                    {declared.role ? ` · ${declared.role}` : ""} —{" "}
+                    {declared.name}
+                  </span>
+                ))}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <FormField
+            control={form.control}
+            name="scope"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <div>
+                    <ScopeBuilder
+                      metadata={metadata}
+                      value={field.value}
+                      onChange={field.onChange}
+                      action={action}
+                      disabled={metadataQuery.isLoading}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </FormSection>
+
+      {/*
+        Chỉ thao tác "Thêm, sửa" để lại một trạng thái mới, nên chỉ nó có điều
+        kiện thứ hai. Hiện mục này cho Xem / Xoá là mời điền một điều kiện không
+        bao giờ được dùng.
+      */}
+      {action === "write" && (
+        <FormSection
+          title="Sau khi lưu"
+          description="Điều kiện ở trên quyết định dòng nào được sửa. Điều kiện này quyết định dòng được phép trông như thế nào sau khi lưu."
+        >
+          <FormField
+            control={form.control}
+            name="checkScope"
+            render={({ field }) => (
+              <FormItem className="space-y-4 md:col-span-12">
+                <div className="flex items-start gap-3">
+                  <FormControl>
+                    <Switch
+                      checked={field.value === null || field.value === undefined}
+                      onCheckedChange={(sameAsAbove) =>
+                        // `null` và cây rỗng là hai điều ngược nhau: `null` dùng
+                        // lại điều kiện ở trên, cây rỗng cho phép mọi trạng thái.
+                        field.onChange(sameAsAbove ? null : EMPTY_SCOPE)
+                      }
+                    />
+                  </FormControl>
+                  <div className="space-y-1">
+                    <FormLabel>Dòng sau khi lưu vẫn phải khớp điều kiện ở trên</FormLabel>
+                    <FormDescription>
+                      Bật sẵn, và nên bật khi điều kiện ở trên nói về việc dòng
+                      đó <b>của ai</b> — đơn vị, phòng ban, người tạo. Nhờ vậy
+                      không ai chuyển được dòng dữ liệu ra ngoài phạm vi mình
+                      thấy để giấu nó đi.
+                    </FormDescription>
+                  </div>
+                </div>
+
+                {field.value !== null && field.value !== undefined && (
+                  <>
+                    <Alert>
+                      <AlertDescription>
+                        Tắt khi điều kiện ở trên nói về <b>trạng thái mà việc
+                        sửa sẽ đổi</b>. Ví dụ “chỉ sửa được phiếu nháp” nếu áp cả
+                        sau khi lưu thì phiếu nháp không bao giờ nộp được. Để
+                        trống phần điều kiện bên dưới nếu cho phép mọi trạng
+                        thái sau khi lưu.
+                      </AlertDescription>
+                    </Alert>
+                    <FormControl>
+                      <div>
+                        <ScopeBuilder
+                          metadata={metadata}
+                          value={field.value}
+                          onChange={field.onChange}
+                          action={action}
+                          disabled={metadataQuery.isLoading}
+                        />
+                      </div>
+                    </FormControl>
+                  </>
                 )}
-              />
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </FormSection>
+      )}
     </Form>
   );
 }

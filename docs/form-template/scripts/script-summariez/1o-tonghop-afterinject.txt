@@ -1,0 +1,65 @@
+// Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1o"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1o (1o-snnmt-95xp)  —  hook afterInject  (THEO ĐƠN VỊ động · 1 KỲ NĂM)
+//  Hỗ trợ tiền điện hộ nghèo + hộ chính sách. 95 xã phường báo cáo — MỖI ĐƠN VỊ 1 DÒNG (danh sách
+//  phẳng). Clone dòng mẫu r9 cho từng đơn vị có dữ liệu.
+//  3 chỉ tiêu SỐ HỘ = 3 cột: D=3 hộ nghèo · F=5 hộ CS (TCXH khác) · G=6 hộ CS (TCXH quy định).
+//  CHỈ đổ số hộ (quantity). Tổng C(=D+E), E(=F+G), kinh phí M/N (=hộ×$H$9×$I$9 + hộ×$J$9×$K$9 — mức
+//  điện + số tháng CỐ ĐỊNH ở dòng r9, mọi đơn vị chung) + tổng L là CÔNG THỨC → tự tính khi clone dịch.
+//  Chỉ tiêu HO_CS.KINH_PHI KHÔNG đổ. Tổng cộng r8 = SUM(C9:C10) RANGE ĐỘNG (mẫu r9 + đệm r10, clone
+//  tự mở). 1 kỳ cả năm. CONSUMER: mã ghép qua CK.
+// ============================================================================
+
+const SHEET = '1o-snnmt-95xp';
+const CK = 'indi' + 'catorCode';
+
+const COL = {                              // mã chỉ tiêu -> cột 0-based (số hộ)
+  '1O.TIEN_DIEN.HO_NGHEO': 3,              // D
+  '1O.TIEN_DIEN.HO_CS_TCXH_KHAC': 5,       // F
+  '1O.TIEN_DIEN.HO_CS_TCXH_QUY_DINH': 6,   // G
+};
+const DATA_ROW = 9;                        // dòng mẫu (1-based) — điểm clone
+const B = 1;
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+function setText(ctx, r, c, v) { try { ctx.cell.set(SHEET, r, c, v); } catch (e) { /* bỏ qua */ } }
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    async function apiGet(path) { try { return (await ctx.api.get(path)) || []; } catch (e) { ctx.ui.message('Lỗi 1o: ' + e.message); return []; } }
+
+    const units = await apiGet('/rest/qt/master/organization-units');
+    const nameOf = {}; for (const u of units) nameOf[u.code] = u.name || u.code;
+
+    const byOrg = {};
+    for (const r of await apiGet('/rest/qt/summary/data?from=' + a + '-01-01&to=' + a + '-12-31&groupByOrg=true' + src)) {
+      const col = COL[r[CK]]; if (col == null) continue;
+      const code = r.organizationCode || '';
+      (byOrg[code] || (byOrg[code] = {}))[col] = num(r.quantity);
+    }
+    const orgs = Object.keys(byOrg);
+    if (orgs.length === 0) { ctx.ui.message('1o: chưa có đơn vị nào nộp.'); return; }
+
+    if (orgs.length > 1) ctx.rows.clone(SHEET, DATA_ROW - 1, orgs.length - 1);
+
+    orgs.forEach((code, i) => {
+      const r0 = DATA_ROW - 1 + i;
+      setText(ctx, r0, B, nameOf[code] || code);
+      const cols = byOrg[code];
+      for (const c in cols) put(ctx, r0, Number(c), cols[c]);   // chỉ đổ số hộ
+    });
+
+    ctx.ui.message('Đã đổ 1o: ' + orgs.length + ' đơn vị. Kinh phí + tổng + tab 01 tự tính.');
+  },
+});

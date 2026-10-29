@@ -1,0 +1,137 @@
+// Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1e"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+// SUA 2026-09-29: chi lay don vi DUOC GIAO bieu trong nam (period-organizations?from&to&reportType)
+//   thay cho /rest/qt/master/organization-units (toan bo danh muc don vi).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1e (1e-sgd-xp)  —  hook afterInject  (NHÓM B: khối tỉnh/xã · 2 KỲ · 7 chỉ tiêu)
+//  Hỗ trợ bán trú (ăn/nhà ở + nấu ăn + dụng cụ/tủ thuốc/đồ dùng). 7 chỉ tiêu sổ cái biểu con:
+//    AN_O.HS_BAN_TRU · AN_O.HS_NGHI_TRO · AN_O.TRE_NHA_TRE (mỗi cái qty+amt) ;
+//    NAU_AN.KINH_PHI (amt) ; BAN_TRU.DUNG_CU · BAN_TRU.TU_THUOC · DO_DUNG_CA_NHAN (amt).
+//  ‼ THỨ TỰ KỲ (user cập nhật 2026-08): khối C–M = Kỳ I (HK1 = năm a, T7–12) ; khối N–AB = Kỳ II
+//    (HK2 = năm b, T1–6). a = ctx.shared.a ; b = ctx.shared.b.
+//  ĐỔ per đơn vị:
+//    Kỳ I  (HK1, năm a): D/E/F số ĐT ; H/I/J tiền ăn+nhà ở ; L nấu ăn.
+//    Kỳ II (HK2, năm b): O/P/Q số ĐT ; S/T/U tiền ăn+nhà ở ; Z nấu ăn.
+//    Dụng cụ W · tủ thuốc X · đồ dùng AA: CẢ NĂM HỌC (sheet chỉ có 1 cột, không tách kỳ) → gộp a→b.
+//  Cột tổng C/G/M/N/R/V/AB/AC + định mức K/Y + tiểu tổng r12/r15 (SUM range động) + tổng r11 GIỮ CÔNG THỨC
+//  template — script KHÔNG đụng (clone tự mở range).
+//  ‼ Template có sẵn công thức M='=E+J', V='=SUM(W:Y)' (khác header 11=5+10, 20=21+22) — GIỮ NGUYÊN theo
+//    template, script không sửa; nếu là lỗi thì sửa ở Excel.
+//  2 khối: type==TINH|SO (tỉnh lên đầu) → Khối tỉnh (mẫu r13) ; MỌI type khác → Khối xã (mẫu r16). Mỗi đơn vị 1 dòng (clone).
+//  ĐƠN VỊ: chỉ đơn vị ĐƯỢC GIAO biểu 1e trong năm (kể cả chưa nộp) — /summary/period-organizations?reportType=1e.
+// ============================================================================
+
+const SHEET = '1e-sgd-xp';
+const CK = 'indi' + 'catorCode';
+const MA = {
+  HS_BAN_TRU: '1E.AN_O.HS_BAN_TRU',
+  HS_NGHI_TRO: '1E.AN_O.HS_NGHI_TRO',
+  TRE: '1E.AN_O.TRE_NHA_TRE',
+  NAU_AN: '1E.NAU_AN.KINH_PHI',
+  DUNG_CU: '1E.BAN_TRU.DUNG_CU',
+  TU_THUOC: '1E.BAN_TRU.TU_THUOC',
+  DO_DUNG: '1E.DO_DUNG_CA_NHAN',
+};
+// Cột 0-based. Kỳ I (HK1 năm a): qty D/E/F, amt H/I/J, nấu ăn L.
+const HK1 = { q: { HS_BAN_TRU: 3, HS_NGHI_TRO: 4, TRE: 5 }, a: { HS_BAN_TRU: 7, TRE: 8, HS_NGHI_TRO: 9, NAU_AN: 11 } };
+// Kỳ II (HK2 năm b): qty O/P/Q, amt S/T/U, nấu ăn Z.
+const HK2 = { q: { HS_BAN_TRU: 14, HS_NGHI_TRO: 15, TRE: 16 }, a: { HS_BAN_TRU: 18, TRE: 19, HS_NGHI_TRO: 20, NAU_AN: 25 } };
+// Cả năm học (amt): dụng cụ W=22, tủ thuốc X=23, đồ dùng AA=26.
+const NAM = { a: { DUNG_CU: 22, TU_THUOC: 23, DO_DUNG: 26 } };
+const B = 1;
+// Dòng 0-based: r11 tổng=10 ; r12 khối tỉnh=11 ; r13 Sở mẫu=12 (đệm r14) ; r15 khối xã=14 ; r16 xã mẫu=15 (đệm r17).
+const SO_ROW = 12, XA_TOT = 14, XA_ROW = 15;
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+function setText(ctx, r, c, v) { if (v == null || v === '') return; try { ctx.cell.set(SHEET, r, c, v); } catch (e) { /* bỏ qua */ } }
+
+// Đơn vị của tab = đơn vị ĐƯỢC GIAO biểu (theo mã), rồi tới đơn vị có số mà không nằm trong danh sách
+// giao (dữ liệu cũ) — tên/loại của nhóm sau tra danh mục. KHÔNG lấy cả danh mục đơn vị làm dòng.
+async function unitsOf(apiGet, assigned, maps) {
+  const units = [], seen = {}, extra = [];
+  for (const u of assigned) if (u && u.code && !seen[u.code]) { seen[u.code] = true; units.push(u); }
+  for (const m of maps) for (const code in m) {
+    if (code && code !== 'TONG_HOP' && !seen[code]) { seen[code] = true; extra.push(code); }
+  }
+  if (extra.length === 0) return units;
+  const byCode = {}; for (const u of await apiGet('/rest/qt/master/organization-units')) byCode[u.code] = u;
+  for (const code of extra.sort()) units.push(byCode[code] || { code: code, name: code, orgType: '' });
+  return units;
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    async function apiGet(path) { try { return (await ctx.api.get(path)) || []; } catch (e) { ctx.ui.message('Lỗi 1e: ' + e.message); return []; } }
+
+    // Đơn vị ĐƯỢC GIAO biểu 1e trong năm (kể cả chưa nộp) — KHÔNG lấy cả danh mục đơn vị: đơn vị
+    // không được giao biểu 1e thì không có dòng.
+    const assigned = await apiGet('/rest/qt/summary/period-organizations?from=' + a + '-01-01&to=' + a
+      + '-12-31&reportType=1e');
+
+    // byOrg[code][MÃ] = {q, a} (groupByOrg) trong 1 khoảng.
+    async function periodByOrg(from, to) {
+      const codeByMa = {}; for (const k in MA) codeByMa[MA[k]] = k;
+      const m = {};
+      for (const r of await apiGet('/rest/qt/summary/data?from=' + from + '&to=' + to + '&groupByOrg=true' + src)) {
+        const key = codeByMa[r[CK]]; if (!key) continue;
+        const code = r.organizationCode || '';
+        const e = m[code] || (m[code] = {});
+        const cur = e[key] || (e[key] = { q: 0, a: 0 });
+        cur.q += (num(r.quantity) || 0); cur.a += (num(r.amount) || 0);
+      }
+      return m;
+    }
+    // Kỳ I (HK1) = T7–12 năm a → C–M ; Kỳ II (HK2) = T1–6 năm b → N–AB ; cả năm học → W/X/AA.
+    const hk1 = await periodByOrg(a + '-07-01', a + '-12-31');
+    const hk2 = await periodByOrg(a + '-01-01', a + '-06-30');
+    const nam = await periodByOrg(a + '-01-01', a + '-12-31');
+
+    const units = await unitsOf(apiGet, assigned, [hk1, hk2, nam]);
+    const nameOf = {}; for (const u of units) nameOf[u.code] = u.name || u.code;
+    // Khối tỉnh = TỈNH + SỞ (tỉnh lên đầu, rồi đến sở theo mã); MỌI loại khác → Khối xã/phường.
+    const KHOI_TINH = ['TINH', 'SO'];
+    const so = units.filter((u) => KHOI_TINH.includes(u.orgType))
+      .sort((x, y) => KHOI_TINH.indexOf(x.orgType) - KHOI_TINH.indexOf(y.orgType));
+    const xa = units.filter((u) => !KHOI_TINH.includes(u.orgType));
+
+    // Clone Khối tỉnh trước (đẩy khối xã xuống), rồi Khối xã.
+    const shift = so.length > 1 ? so.length - 1 : 0;
+    if (so.length > 1) ctx.rows.clone(SHEET, SO_ROW, so.length - 1);
+    const xaRow = XA_ROW + shift;
+    if (xa.length > 1) ctx.rows.clone(SHEET, xaRow, xa.length - 1);
+
+    function writeUnit(r0, u) {
+      setText(ctx, r0, B, nameOf[u.code] || u.code);
+      const e1 = hk1[u.code], e2 = hk2[u.code], en = nam[u.code];
+      // Kỳ I
+      if (e1) for (const k in e1) {
+        if (HK1.q[k] != null) put(ctx, r0, HK1.q[k], e1[k].q);
+        if (HK1.a[k] != null) put(ctx, r0, HK1.a[k], e1[k].a);
+      }
+      // Kỳ II
+      if (e2) for (const k in e2) {
+        if (HK2.q[k] != null) put(ctx, r0, HK2.q[k], e2[k].q);
+        if (HK2.a[k] != null) put(ctx, r0, HK2.a[k], e2[k].a);
+      }
+      // Cả năm (dụng cụ/tủ thuốc/đồ dùng — amt)
+      if (en) for (const k in en) {
+        if (NAM.a[k] != null) put(ctx, r0, NAM.a[k], en[k].a);
+      }
+    }
+    for (let i = 0; i < so.length; i += 1) writeUnit(SO_ROW + i, so[i]);
+    for (let j = 0; j < xa.length; j += 1) writeUnit(xaRow + j, xa[j]);
+
+    // Cột tổng + tiểu tổng r12/r15 + tổng r11 + định mức K/Y: GIỮ CÔNG THỨC template (SUM range động).
+    ctx.ui.message('Đã đổ 1e: ' + so.length + ' Sở + ' + xa.length + ' đơn vị khối xã. Tổng + tiểu tổng tự tính (công thức).');
+  },
+});

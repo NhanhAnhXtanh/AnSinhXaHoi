@@ -1,0 +1,58 @@
+// Nguon: DB qt_template_script — bieu 1l, phien ban PB-000026, script "Tong hop theo ky"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1l - afterInject: Tong hop theo ky ====
+// Do so cai (theo ky) vao bieu 1l o man Tong hop. Chi chay khi co periodId.
+// Reuse SHEET + BINDINGS (indicatorCode -> row) tu getInputData cua bieu 1l.
+const SHEET = '1l';
+const QTY_COL = 2; // cot So doi tuong (0-based)
+const AMT_COL = 3; // cot Kinh phi (0-based) - o nhap tay cua 1l, khong phai cong thuc
+const ROW = {
+  '1L.HO_NGHEO_DTTS': 9,
+  '1L.TRE_EM_6T.MENH_GIA': 11,
+  '1L.TRE_EM_6T.TRUY_LINH': 12,
+  '1L.NGUOI_CO_CONG': 13,
+  '1L.CUU_CHIEN_BINH_TNXP': 14,
+  '1L.BTXH': 15,
+  '1L.HIEN_TANG': 16,
+  '1L.NGUOI_75_TUOI': 17,
+  '1L.XA_ATK': 18,
+  '1L.HUU_TRI_XH': 19,
+  '1L.DAI_BIEU_QH_HDND': 20,
+  '1L.CAN_BO_XA_NGHI': 21,
+  '1L.DAN_QUAN': 22,
+  '1L.CAN_NGHEO_100': 25,
+  '1L.CAN_NGHEO_70': 26,
+  '1L.HSSV_50': 27,
+  '1L.HO_NONG_LAM_NGU': 28,
+  '1L.DTTS_DIA_BAN': 29,
+  '1L.DTTS_XA': 30,
+  '1L.LUC_LUONG_ANTT': 31,
+  '1L.Y_TE_THON_BAN': 32,
+  '1L.KHONG_CHUYEN_TRACH': 33,
+  '1L.NAN_NHAN': 34,
+  '1L.NQ_RIENG': 35,
+};
+const CK = 'indi' + 'catorCode';
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+return defineScript({
+  async afterInject(ctx) {
+    const periodId = ctx.shared && ctx.shared.periodId;
+    if (!periodId) return; // chi chay o man Tong hop, bo qua khi nhap lieu
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? '&scopeKind=' + ctx.shared.scopeKind : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? '&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet) : '';
+    let rows;
+    try { rows = await ctx.api.get('/rest/qt/summary/data?periodId=' + periodId + scope + src); }
+    catch (e) { ctx.ui.message('Loi 1l: ' + e.message); return; }
+    let n = 0;
+    for (const r of (rows || [])) {
+      const row = ROW[r[CK]];
+      if (row == null) continue;
+      const q = num(r.quantity);
+      if (q != null) { try { ctx.cell.set(SHEET, row, QTY_COL, q); n++; } catch (e) {} }
+      const a = num(r.amount);
+      if (a != null) { try { ctx.cell.set(SHEET, row, AMT_COL, a); } catch (e) {} }
+    }
+    ctx.ui.message('Da do ' + n + ' dong so cai vao bieu theo ky.');
+  }
+});

@@ -2,6 +2,7 @@
 
 import type { CSSProperties, PropsWithChildren } from "react";
 
+import { ContentErrorBoundary } from "@/shared/components/layout/content-error-boundary";
 import { Header } from "@/shared/components/layout/header";
 import { Sidebar } from "@/shared/components/layout/sidebar";
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar";
@@ -48,7 +49,7 @@ export function Layout({ children }: PropsWithChildren) {
           "focus:text-sm focus:font-medium focus:text-primary-foreground"
         )}
       >
-        Skip to content
+        Tới nội dung chính
       </a>
 
       <Sidebar />
@@ -66,7 +67,8 @@ export function Layout({ children }: PropsWithChildren) {
             "gap-4 px-(--shell-gutter-x) py-(--shell-gutter-y)"
           )}
         >
-          {children}
+          {/* Một màn vỡ lúc hiển thị chỉ thay vùng này, khung vẫn còn. */}
+          <ContentErrorBoundary>{children}</ContentErrorBoundary>
         </main>
       </SidebarInset>
     </SidebarProvider>

@@ -3,10 +3,7 @@ import { useCan } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useNavigate } from "react-router";
 
-import {
-  EditView,
-  EditViewHeader,
-} from "@/shared/components/views/edit-view";
+import { EditView } from "@/shared/components/views/edit-view";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
@@ -35,6 +32,8 @@ import {
 } from "@/shared/components/views/record-detail";
 import { PermissionMatrix, type PermissionRef } from "./permission-matrix";
 import { RoleDataScopes } from "./data-scopes";
+import { AdminPageHeader, RecordHeaderActions } from "../record-actions";
+import { errorDescription } from "../labels";
 
 /**
  * What the tab band says beside each tab, in one line.
@@ -47,9 +46,9 @@ import { RoleDataScopes } from "./data-scopes";
  */
 const TAB_HINTS: Record<string, string> = {
   permissions:
-    "A row is a resource, a column an action; the box where they meet is the permission code. Changes reach an open session within seconds.",
+    "Mỗi dòng là một chức năng, mỗi cột là một thao tác. Thay đổi có hiệu lực với người đang đăng nhập sau vài giây.",
   scopes:
-    "A permission decides whether an endpoint answers this role at all; a scope decides which rows it answers with. Each scope is saved on its own.",
+    "Chọn mỗi thao tác được thấy phần dữ liệu nào. Mỗi phạm vi được lưu riêng ngay khi bấm lưu trong hộp của nó.",
 };
 
 /**
@@ -84,7 +83,17 @@ export const RoleEdit = () => {
     refineCore: { onFinish, query },
     ...form
   } = useForm({
-    refineCoreProps: {},
+    refineCoreProps: {
+      successNotification: () => ({
+        type: "success",
+        message: "Đã lưu thay đổi vai trò",
+      }),
+      errorNotification: (error) => ({
+        type: "error",
+        message: "Không lưu được vai trò",
+        description: errorDescription(error),
+      }),
+    },
   });
 
   const record = query?.data?.data;
@@ -124,7 +133,33 @@ export const RoleEdit = () => {
 
   return (
     <EditView>
-      <EditViewHeader />
+      <AdminPageHeader
+        title="Sửa vai trò"
+        description={
+          record?.name
+            ? `${record.name}. Thay đổi chỉ có hiệu lực sau khi bạn bấm Lưu thay đổi.`
+            : "Thay đổi chỉ có hiệu lực sau khi bạn bấm Lưu thay đổi."
+        }
+        actions={
+          <RecordHeaderActions
+            resource="roles"
+            id={record?.id as number | undefined}
+            editLabel={false}
+            showLabel="Xem chi tiết"
+            remove={
+              !record || isSystemRole
+                ? false
+                : {
+                    label: "Xoá vai trò",
+                    title: `Xoá vai trò ${record.name}?`,
+                    description:
+                      "Cán bộ đang giữ vai trò này sẽ mất các quyền của nó. Việc xoá không lấy lại được.",
+                    successMessage: `Đã xoá vai trò ${record.name}`,
+                  }
+            }
+          />
+        }
+      />
       <Form {...form}>
         <form
           // Collapsed, the identity fields are still mounted and still
@@ -137,11 +172,11 @@ export const RoleEdit = () => {
           {isSystemRole && (
             <Alert>
               <ShieldIcon className="size-4" />
-              <AlertTitle>System role</AlertTitle>
+              <AlertTitle>Vai trò hệ thống</AlertTitle>
               <AlertDescription>
-                The application relies on this role, so its code is fixed and it
-                cannot be deleted. What it grants is still yours to change —
-                including, if you are not careful, taking away your own access.
+                Hệ thống dựa vào vai trò này nên không đổi được mã và không xoá
+                được. Các quyền vẫn sửa được — cẩn thận kẻo bỏ mất quyền của
+                chính bạn.
               </AlertDescription>
             </Alert>
           )}
@@ -166,30 +201,30 @@ export const RoleEdit = () => {
             >
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm leading-5 font-semibold">
-                  Role details
+                  Thông tin vai trò
                 </h2>
                 <p className="text-muted-foreground truncate text-xs">
                   {detailsOpen ? (
-                    "What this role is called, and what it is for."
+                    "Tên gọi của vai trò và vai trò dùng cho việc gì."
                   ) : (
-                    <span className="font-mono">
-                      {code || "—"}
-                      {name ? ` · ${name}` : ""}
+                    <span>
+                      {name || code || "—"}
                     </span>
                   )}
                 </p>
               </div>
 
               <MetaStrip className="shrink-0">
-                <MetaItem label="Type">
+                <MetaItem label="Loại">
                   {isSystemRole ? (
-                    <Badge variant="secondary">System</Badge>
+                    <Badge variant="neutral" dot>
+                      Hệ thống
+                    </Badge>
                   ) : (
-                    <Badge variant="outline">Custom</Badge>
+                    <Badge variant="info" dot>
+                      Tuỳ chỉnh
+                    </Badge>
                   )}
-                </MetaItem>
-                <MetaItem label="Role ID">
-                  <span className="tabular-nums">{record?.id ?? "—"}</span>
                 </MetaItem>
               </MetaStrip>
 
@@ -209,7 +244,7 @@ export const RoleEdit = () => {
                 ) : (
                   <ChevronDownIcon className="size-4" />
                 )}
-                {detailsOpen ? "Hide details" : "Show details"}
+                {detailsOpen ? "Thu gọn" : "Mở rộng"}
               </Button>
             </div>
 
@@ -232,16 +267,16 @@ export const RoleEdit = () => {
                 control={form.control}
                 name="code"
                 rules={{
-                  required: "Code is required",
+                  required: "Vui lòng nhập mã vai trò.",
                   pattern: {
                     value: /^[A-Z][A-Z0-9_]*$/,
                     message:
-                      "Upper case letters, digits and underscores, starting with a letter",
+                      "Chỉ dùng chữ in hoa không dấu, chữ số và gạch dưới; bắt đầu bằng chữ.",
                   },
                 }}
                 render={({ field }) => (
                   <FormItem className="lg:col-span-3">
-                    <FormLabel>Code</FormLabel>
+                    <FormLabel>Mã vai trò</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -261,10 +296,10 @@ export const RoleEdit = () => {
               <FormField
                 control={form.control}
                 name="name"
-                rules={{ required: "Name is required" }}
+                rules={{ required: "Vui lòng nhập tên vai trò." }}
                 render={({ field }) => (
                   <FormItem className="lg:col-span-4">
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>Tên vai trò</FormLabel>
                     <FormControl>
                       <Input {...field} value={field.value ?? ""} />
                     </FormControl>
@@ -278,7 +313,7 @@ export const RoleEdit = () => {
                 name="description"
                 render={({ field }) => (
                   <FormItem className="lg:col-span-5">
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Mô tả</FormLabel>
                     <FormControl>
                       {/* Two rows, not three: it is a sentence about what the
                           role is for, and on this row it now has the width to
@@ -303,13 +338,10 @@ export const RoleEdit = () => {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <TabsList>
                 <TabsTrigger value="permissions">
-                  Permissions
-                  <Badge variant="secondary" className="ml-2 tabular-nums">
-                    {grantedCount}
-                  </Badge>
+                  Quyền ({grantedCount})
                 </TabsTrigger>
                 {mayReadScopes && (
-                  <TabsTrigger value="scopes">Data scopes</TabsTrigger>
+                  <TabsTrigger value="scopes">Phạm vi dữ liệu</TabsTrigger>
                 )}
               </TabsList>
 
@@ -359,6 +391,7 @@ export const RoleEdit = () => {
                   <RoleDataScopes
                     roleId={record?.id as number | undefined}
                     roleCode={record?.code as string | undefined}
+                    roleName={record?.name as string | undefined}
                   />
                 </Card>
               </TabsContent>
@@ -380,14 +413,14 @@ export const RoleEdit = () => {
             )}
           >
             <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Saving..." : "Save"}
+              {form.formState.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => navigate(-1)}
             >
-              Cancel
+              Huỷ
             </Button>
 
             {/* Said where the ambiguity actually is. On the permissions tab
@@ -395,8 +428,8 @@ export const RoleEdit = () => {
                 one it has nothing to do with what is on screen. */}
             {tab === "scopes" && (
               <span className="text-muted-foreground text-sm">
-                Saves the role&rsquo;s details and permissions. Each data scope
-                is saved on its own.
+                Nút này lưu thông tin và quyền của vai trò. Mỗi phạm vi dữ liệu
+                được lưu riêng.
               </span>
             )}
 
@@ -406,7 +439,7 @@ export const RoleEdit = () => {
                   aria-hidden
                   className="bg-warning inline-block size-2 rounded-full"
                 />
-                Unsaved changes
+                Có thay đổi chưa lưu
               </span>
             )}
           </div>

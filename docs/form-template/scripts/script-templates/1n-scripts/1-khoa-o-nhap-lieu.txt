@@ -1,0 +1,58 @@
+// Nguon: DB qt_template_script — bieu 1n, phien ban PB-000028, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1n · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1n".
+// Nguồn: form-template/1n.xlsx (sheet '1n', A1:I22). Tọa độ 0-based. DỌC 3 DÒNG LÁ (r8,r9,r10).
+//
+// Biểu 1n (Phụ lục 01n — trợ cấp hưu trí xã hội, NĐ176/2025):
+//   C(2)=Hệ số | D(3)=Mức chuẩn TW | E(4)=C*D ← CT | F(5)=Đối tượng | G(6)=Kinh phí ← CT | H(7)=Ghi chú
+//   Dòng lá: r8 trợ cấp hưu trí | r9 đối tượng 70–75 tuổi | r10 hỗ trợ mai táng.
+//   Nhóm A "TRỢ CẤP HƯU TRÍ" (r7) = công thức tổng → giữ khoá.
+// Hệ số C + mức chuẩn D là HẰNG SỐ CHÍNH SÁCH (đã điền sẵn) và số tháng C16(=12) → KHOÁ.
+// Đơn vị chỉ nhập F (số đối tượng) + H (ghi chú) ở 3 dòng lá.
+//   Lưu ý: mai táng (r10) chi 1 lần — công thức G không nhân số tháng (biểu 01 xử lý riêng).
+
+const SHEET = '1n';
+const LEAF_ROWS = [8, 9, 10];
+const INPUT_COLS = [5, 7]; // F số đối tượng, H ghi chú
+
+function isEditable(row, col) {
+  if (row === 2 && col === 1) return true;  // B3 tháng/năm
+  return LEAF_ROWS.indexOf(row) >= 0 && INPUT_COLS.indexOf(col) >= 0;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 2, 1, false);
+  LEAF_ROWS.forEach((row) => INPUT_COLS.forEach((col) => ctx.cell.lock(SHEET, row, col, false)));
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tự điền tên đơn vị của phiếu vào ô ĐƠN VỊ (A1) rồi GIỮ KHOÁ (đơn vị không sửa).
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

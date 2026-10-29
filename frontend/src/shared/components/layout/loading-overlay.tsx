@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
 interface LoadingOverlayProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -37,7 +37,7 @@ export const LoadingOverlay = React.forwardRef<
           )}
         >
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
           </div>
         </div>
       ) : null}

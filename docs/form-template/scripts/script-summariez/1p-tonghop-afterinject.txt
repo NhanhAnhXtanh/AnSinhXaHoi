@@ -1,0 +1,59 @@
+// Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1p"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1p (1p-bhxh)  —  hook afterInject  (THEO LOẠI · NỬA NĂM DƯƠNG LỊCH)
+//  NSNN hỗ trợ đóng BHXH tự nguyện. Sheet gom theo 2 nửa năm DƯƠNG LỊCH (không phải học kỳ):
+//    6 tháng đầu năm (T1–6) = cột C/D · 6 tháng cuối năm (T7–12) = cột E/F.
+//  ĐỔ: 6th đầu  from=Y-01-01 to=Y-06-30 → C=2 số ĐT, D=3 kinh phí.
+//      6th cuối from=Y-07-01 to=Y-12-31 → E=4 số ĐT, F=5 kinh phí.
+//  Kinh phí là ô SỐ (nhập tay ở biểu con) → đổ amount để đối chiếu. Cột tổng r10 + tab 01 tự tính.
+// ============================================================================
+
+const SHEET = '1p-bhxh';
+const CK = 'indi' + 'catorCode';
+
+const ROW = {
+  '1P.BHXH_TN.HO_NGHEO': 11,
+  '1P.BHXH_TN.CAN_NGHEO': 12,
+  '1P.BHXH_TN.DTTS': 13,
+  '1P.BHXH_TN.KHAC': 14,
+};
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? ('&scopeKind=' + ctx.shared.scopeKind) : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    // FORM CHUNG NĂM HỌC: cột "6 tháng cuối" (E/F) = Kỳ 1 = HK1 (T7–12 năm Y);
+    //                     cột "6 tháng đầu"  (C/D) = Kỳ 2 = HK2 (T1–6 năm Y+1).
+    const HN = [
+      { from: a + '-01-01', to: a + '-06-30', qCol: 2, kpCol: 3 }, // 6th đầu C/D ← HK2
+      { from: a + '-07-01', to: a + '-12-31', qCol: 4, kpCol: 5 },             // 6th cuối E/F ← HK1
+    ];
+    let total = 0;
+    for (const k of HN) {
+      const path = '/rest/qt/summary/data?from=' + k.from + '&to=' + k.to + scope + src;
+      let rows;
+      try { rows = await ctx.api.get(path); }
+      catch (e) { ctx.ui.message('Lỗi lấy số 1p nửa năm ' + k.from + ': ' + e.message); continue; }
+      for (const r of (rows || [])) {
+        const row = ROW[r[CK]];
+        if (row == null) continue;
+        put(ctx, row - 1, k.qCol, num(r.quantity));
+        put(ctx, row - 1, k.kpCol, num(r.amount));
+        total += 1;
+      }
+    }
+    ctx.ui.message('Đã đổ ' + total + ' ô (2 nửa năm) vào 1p. Cột tổng + tab 01 tự tính.');
+  },
+});

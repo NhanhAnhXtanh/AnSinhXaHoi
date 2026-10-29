@@ -1,57 +1,82 @@
+import type { ReactNode } from "react";
 import { useCan, useShow } from "@refinedev/core";
 import { TriangleAlert } from "lucide-react";
 
 import { LoadingOverlay } from "@/shared/components/layout/loading-overlay";
-import {
-  ShowView,
-  ShowViewHeader,
-} from "@/shared/components/views/show-view";
+import { ShowView } from "@/shared/components/views/show-view";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/shared/ui/card";
+import { Card, CardContent } from "@/shared/ui/card";
 import { Separator } from "@/shared/ui/separator";
 import { ExplainPanel } from "./explain-panel";
-import { readCondition } from "@/domains/row-level-policy/read-condition";
+import { KIND_LABELS, readConditionVi } from "./labels";
 import type { RowLevelPolicy } from "@/domains/row-level-policy/types";
-import { formatDateTime } from "@/shared/lib/format";
+import { actionLabel, formatDateTimeVi, resourceLabel } from "../labels";
+import { AdminPageHeader, RecordHeaderActions } from "../record-actions";
 
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <span className="text-overline text-muted-foreground">{children}</span>;
+}
+
+/**
+ * Xem một phạm vi dữ liệu: nó là gì, điều kiện đọc thành câu, và (cho người có
+ * quyền xem người dùng) công cụ kiểm tra ai thấy gì.
+ */
 export const RowLevelPolicyShow = () => {
   const { result: record, query } = useShow<RowLevelPolicy>({});
   const { isLoading } = query;
 
-  // The explain and simulate endpoints take somebody else's account id, so they
-  // require users:read on top of the policy permission. Without it they would
-  // 403, so the panel is not offered rather than offered and then refused.
+  // Kiểm tra / mô phỏng nhận mã tài khoản của người khác, nên cần thêm quyền xem
+  // người dùng. Không có thì không hiện, vì máy chủ sẽ trả 403.
   const { data: canReadUsers } = useCan({ resource: "users", action: "list" });
   const mayExplain = canReadUsers?.can ?? false;
 
+  const roleName = record?.role ? record.role.name || record.role.code : null;
+
   return (
     <ShowView>
-      <ShowViewHeader />
+      <AdminPageHeader
+        title={record?.name ?? "Phạm vi dữ liệu"}
+        badge={
+          record ? (
+            <div className="flex items-center gap-2">
+              <Badge variant={record.kind === "FILTER" ? "warning" : "info"} dot>
+                {KIND_LABELS[record.kind] ?? record.kind}
+              </Badge>
+              {!record.enabled && (
+                <Badge variant="neutral" dot>
+                  Tạm tắt
+                </Badge>
+              )}
+            </div>
+          ) : undefined
+        }
+        description={
+          record
+            ? `${resourceLabel(record.resource)} · Thao tác: ${actionLabel(record.action)} · ${roleName ?? "Mọi vai trò"}`
+            : undefined
+        }
+        actions={
+          <RecordHeaderActions
+            resource="row_level_policies"
+            id={record?.id}
+            editLabel="Sửa phạm vi"
+            remove={
+              record
+                ? {
+                    label: "Xoá phạm vi",
+                    title: `Xoá phạm vi “${record.name}”?`,
+                    description:
+                      "Phần dữ liệu phạm vi này mở ra hoặc giới hạn sẽ trở về mặc định. Việc xoá không lấy lại được.",
+                    successMessage: `Đã xoá phạm vi ${record.name}`,
+                  }
+                : false
+            }
+          />
+        }
+      />
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2">
-            {record?.name ?? "—"}
-            {record && (
-              <Badge variant={record.kind === "FILTER" ? "default" : "secondary"}>
-                {record.kind}
-              </Badge>
-            )}
-            {record && !record.enabled && <Badge variant="outline">Off</Badge>}
-          </CardTitle>
-          <CardDescription className="font-mono">
-            {record?.resource} · {record?.action} ·{" "}
-            {record?.role ? record.role.code : "everyone"}
-          </CardDescription>
-        </CardHeader>
-
         <CardContent>
           <LoadingOverlay loading={isLoading}>
             <div className="flex flex-col gap-6">
@@ -59,18 +84,16 @@ export const RowLevelPolicyShow = () => {
                 <Alert variant="destructive">
                   <TriangleAlert className="h-4 w-4" />
                   <AlertDescription>
-                    Disabled at startup because it no longer compiles:{" "}
+                    Đã bị tắt khi khởi động vì điều kiện không còn hợp lệ:{" "}
                     {record.invalidReason}
                     {record.kind === "FILTER" && (
                       <>
                         {" "}
-                        Because this is a filter, everything on{" "}
-                        <span className="font-mono">
-                          {record.resource}:{record.action}
-                        </span>{" "}
-                        is refused until it is fixed — a prohibition that stopped
-                        applying is a leak, and losing one rule quietly is worse
-                        than losing the screen loudly.
+                        Vì đây là phạm vi hạn chế, mọi thao tác “
+                        {actionLabel(record.action)}” trên{" "}
+                        {resourceLabel(record.resource)} bị từ chối cho đến khi
+                        sửa xong — một giới hạn ngừng áp dụng là lọt dữ liệu,
+                        nên thà chặn hẳn còn hơn.
                       </>
                     )}
                   </AlertDescription>
@@ -78,21 +101,17 @@ export const RowLevelPolicyShow = () => {
               )}
 
               <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                  What it does
-                </span>
+                <SectionLabel>Phạm vi này làm gì</SectionLabel>
                 <p className="text-sm">
                   {record?.kind === "FILTER"
-                    ? "Removes rows from everybody, whatever roles they hold. It names no role, which is what makes it inescapable."
-                    : `Widens what ${record?.role?.code ?? "a role"} can reach. It unions with that account's other scopes, so holding one more role only ever adds rows.`}
+                    ? "Bớt dữ liệu của mọi người, dù giữ vai trò nào. Nó không gắn với vai trò nào nên không ai thoát được."
+                    : `Mở rộng dữ liệu ${roleName ?? "một vai trò"} được thấy. Nó cộng thêm với các phạm vi khác của cán bộ, nên có thêm vai trò chỉ thấy rộng hơn.`}
                 </p>
               </div>
 
               {record?.description && (
                 <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                    Description
-                  </span>
+                  <SectionLabel>Mô tả</SectionLabel>
                   <p className="text-sm">{record.description}</p>
                 </div>
               )}
@@ -100,39 +119,43 @@ export const RowLevelPolicyShow = () => {
               <Separator />
 
               <div className="flex flex-col gap-2">
-                <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                  Condition
-                </span>
+                <SectionLabel>Dòng dữ liệu được thấy</SectionLabel>
                 <p className="text-sm">
-                  {record ? readCondition(record.scope) : "—"}
+                  {record ? readConditionVi(record.scope) : "—"}
                 </p>
-                {/*
-                  The stored tree as well as the sentence. Anybody debugging a
-                  policy eventually wants to see exactly what is in the column,
-                  and the alternative is opening devtools to find out.
-                */}
-                <pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs">
-                  {record ? JSON.stringify(record.scope, null, 2) : ""}
-                </pre>
+                {/* Cây điều kiện gốc, cho người cần đối chiếu đúng từng nút. */}
+                <details className="text-xs">
+                  <summary className="text-muted-foreground cursor-pointer">
+                    Xem cấu trúc điều kiện
+                  </summary>
+                  <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3">
+                    {record ? JSON.stringify(record.scope, null, 2) : ""}
+                  </pre>
+                </details>
               </div>
 
               {record?.action === "write" && (
                 <div className="flex flex-col gap-2">
-                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                    What it may become
-                  </span>
+                  <SectionLabel>Sau khi lưu</SectionLabel>
                   {record.checkScope ? (
                     <>
-                      <p className="text-sm">{readCondition(record.checkScope)}</p>
-                      <pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs">
-                        {JSON.stringify(record.checkScope, null, 2)}
-                      </pre>
+                      <p className="text-sm">
+                        {readConditionVi(record.checkScope)}
+                      </p>
+                      <details className="text-xs">
+                        <summary className="text-muted-foreground cursor-pointer">
+                          Xem cấu trúc điều kiện
+                        </summary>
+                        <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3">
+                          {JSON.stringify(record.checkScope, null, 2)}
+                        </pre>
+                      </details>
                     </>
                   ) : (
                     <p className="text-sm">
-                      The same condition, applied to the record after the save —
-                      which is what stops it being moved somewhere its writer
-                      cannot see.
+                      Vẫn theo điều kiện trên, áp cho dòng sau khi lưu — để
+                      không ai chuyển được dòng dữ liệu ra ngoài phạm vi mình
+                      thấy.
                     </p>
                   )}
                 </div>
@@ -142,15 +165,17 @@ export const RowLevelPolicyShow = () => {
 
               <div className="text-muted-foreground grid gap-2 text-xs sm:grid-cols-2">
                 <span>
-                  Created by {record?.createdBy?.username ?? "—"}
+                  Tạo bởi{" "}
+                  {record?.createdBy?.fullName || record?.createdBy?.username || "—"}
                   {record?.createdAt
-                    ? ` on ${formatDateTime(record.createdAt)}`
+                    ? ` lúc ${formatDateTimeVi(record.createdAt)}`
                     : ""}
                 </span>
                 <span>
-                  Last changed by {record?.updatedBy?.username ?? "—"}
+                  Sửa gần nhất bởi{" "}
+                  {record?.updatedBy?.fullName || record?.updatedBy?.username || "—"}
                   {record?.updatedAt
-                    ? ` on ${formatDateTime(record.updatedAt)}`
+                    ? ` lúc ${formatDateTimeVi(record.updatedAt)}`
                     : ""}
                 </span>
               </div>

@@ -19,10 +19,10 @@ import {
 import { cn } from "@/shared/lib/utils";
 import {
   PERMISSION_ACTIONS,
-  humanizeResource,
   splitPermissionCode,
   type Permission,
 } from "@/domains/role/types";
+import { actionLabel, resourceLabel } from "../labels";
 
 /**
  * The permissions a role grants, as a resource x action matrix.
@@ -130,7 +130,7 @@ function ReadOnlyMark({ granted, label }: { granted: boolean; label: string }) {
   return granted ? (
     <span
       role="img"
-      aria-label={`${label}: granted`}
+      aria-label={`${label}: đã cấp`}
       className="bg-primary text-primary-foreground inline-flex size-4 items-center justify-center rounded-[4px]"
     >
       <CheckIcon className="size-3.5" />
@@ -138,7 +138,7 @@ function ReadOnlyMark({ granted, label }: { granted: boolean; label: string }) {
   ) : (
     <span
       role="img"
-      aria-label={`${label}: not granted`}
+      aria-label={`${label}: chưa cấp`}
       className="border-input inline-block size-4 rounded-[4px] border"
     />
   );
@@ -188,7 +188,7 @@ export function PermissionMatrix({
       if (!row) {
         row = {
           resource,
-          label: humanizeResource(resource),
+          label: resourceLabel(resource),
           cells: new Map(),
           all: [],
         };
@@ -200,7 +200,7 @@ export function PermissionMatrix({
 
     return {
       rows: [...byResource.values()].sort((a, b) =>
-        a.label.localeCompare(b.label)
+        a.label.localeCompare(b.label, "vi")
       ),
       columns: orderActions(actions),
     };
@@ -276,7 +276,7 @@ export function PermissionMatrix({
   if (permissions.length === 0) {
     return (
       <p className="text-muted-foreground p-6 text-sm">
-        No permissions are defined.
+        Chưa có quyền nào trong hệ thống.
       </p>
     );
   }
@@ -293,9 +293,9 @@ export function PermissionMatrix({
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Filter resources or codes"
+            placeholder="Tìm chức năng..."
             className="bg-card h-9 pl-9"
-            aria-label="Filter permissions"
+            aria-label="Tìm chức năng"
           />
         </div>
 
@@ -304,7 +304,7 @@ export function PermissionMatrix({
             <span className="text-foreground font-semibold">
               {grantedCount}
             </span>{" "}
-            of {permissions.length} granted
+            / {permissions.length} quyền được cấp
           </span>
 
           {readOnly ? (
@@ -319,7 +319,7 @@ export function PermissionMatrix({
               aria-pressed={!grantedOnly}
               onClick={() => setGrantedOnly((previous) => !previous)}
             >
-              {grantedOnly ? "Show all resources" : "Granted only"}
+              {grantedOnly ? "Hiện tất cả chức năng" : "Chỉ chức năng được cấp"}
             </Button>
           ) : (
             <>
@@ -329,7 +329,7 @@ export function PermissionMatrix({
                 size="sm"
                 onClick={() => setMany(visibleSubject, true)}
               >
-                Grant all
+                Cấp tất cả
               </Button>
               <Button
                 type="button"
@@ -337,7 +337,7 @@ export function PermissionMatrix({
                 size="sm"
                 onClick={() => setMany(visibleSubject, false)}
               >
-                Clear
+                Bỏ chọn tất cả
               </Button>
             </>
           )}
@@ -371,11 +371,11 @@ export function PermissionMatrix({
                     <TriStateCheckbox
                       state={stateOf(visibleSubject)}
                       onToggle={(next) => setMany(visibleSubject, next)}
-                      label="Grant every permission shown"
+                      label="Cấp mọi quyền đang hiện"
                     />
                   )}
                   <span className="text-overline text-muted-foreground">
-                    Resource
+                    Chức năng
                   </span>
                 </div>
               </th>
@@ -394,14 +394,14 @@ export function PermissionMatrix({
                   >
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-overline text-muted-foreground">
-                        {action}
+                        {actionLabel(action)}
                       </span>
                       <div className="flex items-center gap-1.5">
                         {!readOnly && (
                           <TriStateCheckbox
                             state={stateOf(subject)}
                             onToggle={(next) => setMany(subject, next)}
-                            label={`Grant ${action} on every resource shown`}
+                            label={`Cấp thao tác ${actionLabel(action)} cho mọi chức năng đang hiện`}
                           />
                         )}
                         <span className="text-muted-foreground text-[11px] tabular-nums">
@@ -423,8 +423,8 @@ export function PermissionMatrix({
                   className="text-muted-foreground px-4 py-10 text-center text-sm"
                 >
                   {grantedOnly && !term
-                    ? "This role grants nothing."
-                    : "Nothing matches that filter."}
+                    ? "Vai trò này chưa được cấp quyền nào."
+                    : "Không có chức năng nào khớp với ô tìm."}
                 </td>
               </tr>
             )}
@@ -458,7 +458,7 @@ export function PermissionMatrix({
                         <TriStateCheckbox
                           state={stateOf(row.all)}
                           onToggle={(next) => setMany(row.all, next)}
-                          label={`Grant everything on ${row.label}`}
+                          label={`Cấp mọi thao tác cho ${row.label}`}
                         />
                       )}
                       <span className="flex min-w-0 flex-col">
@@ -470,14 +470,11 @@ export function PermissionMatrix({
                                 <TriangleAlertIcon className="text-warning size-3.5 shrink-0" />
                               </TooltipTrigger>
                               <TooltipContent>
-                                Granted without read — the screens this reaches
-                                stay hidden.
+                                Có cấp quyền khác nhưng chưa cấp quyền Xem — màn
+                                hình của chức năng này vẫn bị ẩn.
                               </TooltipContent>
                             </Tooltip>
                           )}
-                        </span>
-                        <span className="text-muted-foreground truncate font-mono text-[11px]">
-                          {row.resource}
                         </span>
                       </span>
                     </label>
@@ -492,7 +489,7 @@ export function PermissionMatrix({
                           key={action}
                           className="text-muted-foreground/50 group-hover:bg-muted/40 border-b border-l px-3 py-2 text-center transition-colors"
                         >
-                          <span aria-label="Not applicable">&mdash;</span>
+                          <span aria-label="Không áp dụng">&mdash;</span>
                         </td>
                       );
                     }
@@ -502,11 +499,11 @@ export function PermissionMatrix({
                         <td
                           key={action}
                           className="group-hover:bg-muted/40 border-b border-l px-3 py-2 text-center transition-colors"
-                          title={permission.description ?? permission.code}
+                          title={`${actionLabel(action)} · ${row.label}`}
                         >
                           <ReadOnlyMark
                             granted={selected.has(permission.id)}
-                            label={permission.code}
+                            label={`${actionLabel(action)} ${row.label}`}
                           />
                         </td>
                       );
@@ -519,12 +516,12 @@ export function PermissionMatrix({
                       >
                         <label
                           className="flex cursor-pointer items-center justify-center px-3 py-2"
-                          title={permission.description ?? permission.code}
+                          title={`${actionLabel(action)} · ${row.label}`}
                         >
                           <TriStateCheckbox
                             state={selected.has(permission.id)}
                             onToggle={(next) => setMany([permission], next)}
-                            label={permission.code}
+                            label={`${actionLabel(action)} ${row.label}`}
                           />
                         </label>
                       </td>

@@ -1,0 +1,95 @@
+# Đơn vị báo cáo ASXH (Sở, UBND huyện/xã, trường…) — cây phân cấp qua parent_id.
+# Port từ bảng QT_ORGANIZATION của bản Jmix; bỏ xoá mềm (deleted_*) và metadata jsonb.
+databaseChangeLog:
+  - changeSet:
+      id: 100-create-report-units
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_report_units
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_report_units
+              # Mã quan hệ ngân sách: nhập tay, duy nhất, bất biến sau khi tạo
+              # (BR-01.1). Service kiểm trùng không phân biệt hoa thường.
+              - column:
+                  name: budget_code
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_asxh_report_units_budget_code
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              # NULL = đơn vị gốc.
+              - column:
+                  name: parent_id
+                  type: bigint
+              - column:
+                  name: unit_type
+                  type: varchar(32)
+                  defaultValue: KHAC
+                  constraints:
+                    nullable: false
+              - column:
+                  name: block
+                  type: varchar(16)
+                  defaultValue: TINH
+                  constraints:
+                    nullable: false
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              # Độc lập với active: còn trong danh mục nhưng có thể không thuộc diện báo cáo.
+              - column:
+                  name: receives_reports
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # RESTRICT: xoá đơn vị còn cấp dưới bị cơ sở dữ liệu từ chối (service đã báo
+        # trước bằng câu tiếng Việt; đây là lưới chặn thứ hai).
+        - addForeignKeyConstraint:
+            baseTableName: asxh_report_units
+            baseColumnNames: parent_id
+            constraintName: fk_asxh_report_units_parent
+            referencedTableName: asxh_report_units
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # Tự tham chiếu trực tiếp là chu trình ngắn nhất; chu trình dài hơn do service chặn.
+        - sql:
+            sql: >-
+              ALTER TABLE asxh_report_units ADD CONSTRAINT ck_asxh_report_units_not_self_parent CHECK (parent_id IS NULL OR parent_id <> id)
+            rollbackSql: >-
+              ALTER TABLE asxh_report_units DROP CONSTRAINT ck_asxh_report_units_not_self_parent
+        - createIndex:
+            tableName: asxh_report_units
+            indexName: idx_asxh_report_units_parent_id
+            columns:
+              - column:
+                  name: parent_id
+        - createIndex:
+            tableName: asxh_report_units
+            indexName: idx_asxh_report_units_name
+            columns:
+              - column:
+                  name: name

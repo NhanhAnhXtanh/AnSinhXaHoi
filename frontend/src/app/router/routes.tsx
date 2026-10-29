@@ -1,50 +1,70 @@
 import { Authenticated, CanAccess } from "@refinedev/core";
 import { Navigate, Outlet, Route, Routes } from "react-router";
 
-import {
-  BlogPostList,
-  BlogPostCreate,
-  BlogPostEdit,
-  BlogPostShow,
-} from "@/features/blog-posts";
-import {
-  CategoryList,
-  CategoryCreate,
-  CategoryEdit,
-  CategoryShow,
-} from "@/features/categories";
-import { Dashboard } from "@/features/dashboard";
-import { TaskList, TaskCreate, TaskEdit, TaskShow } from "@/features/tasks";
-import {
-  OrganizationList,
-  OrganizationCreate,
-  OrganizationEdit,
-  OrganizationShow,
-} from "@/features/organizations";
-import {
-  DepartmentList,
-  DepartmentCreate,
-  DepartmentEdit,
-  DepartmentShow,
-} from "@/features/departments";
-import { NotificationList } from "@/features/notifications";
-import {
-  UserList,
-  UserCreate,
-  UserEdit,
-  UserShow,
-  RoleList,
-  RoleCreate,
-  RoleEdit,
-  RoleShow,
-  PermissionList,
-  PermissionShow,
-  RowLevelPolicyList,
-  RowLevelPolicyCreate,
-  RowLevelPolicyEdit,
-  RowLevelPolicyShow,
-} from "@/features/administration";
-import { Login, Profile } from "@/features/identity";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
+
+import { LoadingState } from "@/shared/components/asxh";
+
+/**
+ * Mỗi màn tải theo route (React.lazy): trang đăng nhập và khung app chỉ tải mã của
+ * chính chúng, màn nào mở mới kéo chunk của feature đó. Feature chỉ xuất qua
+ * `index.ts` nên nạp động cả index rồi chọn đúng component — các màn cùng một
+ * feature dùng chung một chunk.
+ */
+function lazyNamed<M, K extends keyof M>(load: () => Promise<M>, name: K) {
+  return lazy(async () => ({ default: (await load())[name] as ComponentType }));
+}
+
+const loadAdministration = () => import("@/features/administration");
+const loadIdentity = () => import("@/features/identity");
+const loadInputReports = () => import("@/features/input-reports");
+const loadReportReview = () => import("@/features/report-review");
+const loadAnnualReview = () => import("@/features/annual-review");
+const loadReportUnits = () => import("@/features/report-units");
+const loadTemplates = () => import("@/features/templates");
+
+const Dashboard = lazyNamed(() => import("@/features/dashboard"), "Dashboard");
+const NotificationList = lazyNamed(() => import("@/features/notifications"), "NotificationList");
+const UserList = lazyNamed(loadAdministration, "UserList");
+const UserCreate = lazyNamed(loadAdministration, "UserCreate");
+const UserEdit = lazyNamed(loadAdministration, "UserEdit");
+const UserShow = lazyNamed(loadAdministration, "UserShow");
+const RoleList = lazyNamed(loadAdministration, "RoleList");
+const RoleCreate = lazyNamed(loadAdministration, "RoleCreate");
+const RoleEdit = lazyNamed(loadAdministration, "RoleEdit");
+const RoleShow = lazyNamed(loadAdministration, "RoleShow");
+const RowLevelPolicyList = lazyNamed(loadAdministration, "RowLevelPolicyList");
+const RowLevelPolicyCreate = lazyNamed(loadAdministration, "RowLevelPolicyCreate");
+const RowLevelPolicyEdit = lazyNamed(loadAdministration, "RowLevelPolicyEdit");
+const RowLevelPolicyShow = lazyNamed(loadAdministration, "RowLevelPolicyShow");
+const Login = lazyNamed(loadIdentity, "Login");
+const Profile = lazyNamed(loadIdentity, "Profile");
+const InputReportList = lazyNamed(loadInputReports, "InputReportList");
+const InputReportWork = lazyNamed(loadInputReports, "InputReportWork");
+const ReviewList = lazyNamed(loadReportReview, "ReviewList");
+const ReviewWork = lazyNamed(loadReportReview, "ReviewWork");
+const PeriodSetup = lazyNamed(() => import("@/features/period-setup"), "PeriodSetup");
+const PublicationHistoryList = lazyNamed(
+  () => import("@/features/publication-history"),
+  "PublicationHistoryList"
+);
+const MeasureKindList = lazyNamed(() => import("@/features/measure-kinds"), "MeasureKindList");
+const SummaryPage = lazyNamed(() => import("@/features/summary"), "SummaryPage");
+const AnnualReviewList = lazyNamed(loadAnnualReview, "AnnualReviewList");
+const AnnualReviewWork = lazyNamed(loadAnnualReview, "AnnualReviewWork");
+const AnnualSubmissionHistory = lazyNamed(loadAnnualReview, "AnnualSubmissionHistory");
+const ReportUnitList = lazyNamed(loadReportUnits, "ReportUnitList");
+const ReportUnitCreate = lazyNamed(loadReportUnits, "ReportUnitCreate");
+const ReportUnitEdit = lazyNamed(loadReportUnits, "ReportUnitEdit");
+const ReportCalendar = lazyNamed(() => import("@/features/report-calendar"), "ReportCalendar");
+const TemplateSets = lazyNamed(loadTemplates, "TemplateSets");
+const TemplateDesigner = lazyNamed(loadTemplates, "TemplateDesigner");
+
+/** Chờ chunk của màn: khung app (sidebar, header) vẫn đứng yên, chỉ vùng nội dung hiện chờ. */
+function RouteSuspense({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<LoadingState variant="page" label="Đang mở màn hình…" />}>{children}</Suspense>;
+}
+
 import { ErrorComponent } from "@/shared/components/layout/error-component";
 import { Forbidden } from "@/shared/components/layout/forbidden";
 import { Layout } from "@/shared/components/layout/layout";
@@ -66,7 +86,9 @@ export function AppRoutes() {
         element={
           <Authenticated key="authenticated-routes" redirectOnFail="/login">
             <Layout>
-              <Outlet />
+              <RouteSuspense>
+                <Outlet />
+              </RouteSuspense>
             </Layout>
           </Authenticated>
         }
@@ -79,92 +101,6 @@ export function AppRoutes() {
         */}
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        {/*
-          Blog posts render their create / edit / show / clone actions as
-          dialogs on top of the list. Nesting them under the list route keeps
-          `<BlogPostList />` mounted (and its filters, sorting and pagination
-          intact) while `<Outlet />` inside it renders the open dialog. The URLs
-          are unchanged, so the list action buttons and deep links still work.
-        */}
-        <Route path="/blog-posts" element={<BlogPostList />}>
-          <Route path="create" element={<BlogPostCreate />} />
-          <Route path="edit/:id" element={<BlogPostEdit />} />
-          <Route path="show/:id" element={<BlogPostShow />} />
-          <Route path="clone/:id" element={<BlogPostCreate />} />
-        </Route>
-        <Route path="/categories">
-          <Route index element={<CategoryList />} />
-          <Route path="create" element={<CategoryCreate />} />
-          <Route path="edit/:id" element={<CategoryEdit />} />
-          <Route path="show/:id" element={<CategoryShow />} />
-          <Route path="clone/:id" element={<CategoryCreate />} />
-        </Route>
-
-        {/*
-          Tasks — plain full-page routes, guarded like the rest. Not a dialog
-          pattern despite being the busiest screen here: a task's description is
-          long-form and its edit form carries two lookups, which is more than a
-          dialog over a list has room for.
-        */}
-        <Route
-          path="/tasks"
-          element={
-            <CanAccess
-              resource="tasks"
-              action="list"
-              fallback={<Forbidden resource="tasks" />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<TaskList />} />
-          <Route path="create" element={<TaskCreate />} />
-          <Route path="edit/:id" element={<TaskEdit />} />
-          <Route path="show/:id" element={<TaskShow />} />
-        </Route>
-
-        {/*
-          Organization structure — plain full-page routes, like categories, and
-          guarded like the administration ones below: the sidebar hides them,
-          but a typed or bookmarked URL would otherwise render a screen whose
-          list request 403s.
-        */}
-        <Route
-          path="/organizations"
-          element={
-            <CanAccess
-              resource="organizations"
-              action="list"
-              fallback={<Forbidden resource="organizations" />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<OrganizationList />} />
-          <Route path="create" element={<OrganizationCreate />} />
-          <Route path="edit/:id" element={<OrganizationEdit />} />
-          <Route path="show/:id" element={<OrganizationShow />} />
-        </Route>
-        <Route
-          path="/departments"
-          element={
-            <CanAccess
-              resource="departments"
-              action="list"
-              fallback={<Forbidden resource="departments" />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<DepartmentList />} />
-          <Route path="create" element={<DepartmentCreate />} />
-          <Route path="edit/:id" element={<DepartmentEdit />} />
-          <Route path="show/:id" element={<DepartmentShow />} />
-        </Route>
-
         {/*
           Administration — plain full-page routes, like categories, each wrapped
           in `<CanAccess>`. The sidebar already hides these, so the guard only
@@ -181,7 +117,7 @@ export function AppRoutes() {
             <CanAccess
               resource="users"
               action="list"
-              fallback={<Forbidden resource="users" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -198,7 +134,7 @@ export function AppRoutes() {
             <CanAccess
               resource="roles"
               action="list"
-              fallback={<Forbidden resource="roles" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -215,7 +151,7 @@ export function AppRoutes() {
             <CanAccess
               resource="row_level_policies"
               action="list"
-              fallback={<Forbidden resource="row_level_policies" />}
+              fallback={<Forbidden />}
             >
               <Outlet />
             </CanAccess>
@@ -226,22 +162,6 @@ export function AppRoutes() {
           <Route path="edit/:id" element={<RowLevelPolicyEdit />} />
           <Route path="show/:id" element={<RowLevelPolicyShow />} />
         </Route>
-        <Route
-          path="/permissions"
-          element={
-            <CanAccess
-              resource="permissions"
-              action="list"
-              fallback={<Forbidden resource="permissions" />}
-            >
-              <Outlet />
-            </CanAccess>
-          }
-        >
-          <Route index element={<PermissionList />} />
-          <Route path="show/:id" element={<PermissionShow />} />
-        </Route>
-
         {/*
           Notifications have a list and nothing else. No create screen, because
           the application raises a notification rather than a person writing
@@ -251,6 +171,126 @@ export function AppRoutes() {
           there is no URL to guard against.
         */}
         <Route path="/notifications" element={<NotificationList />} />
+
+        {/*
+          Màn nghiệp vụ ASXH — gọi API thật, nên bọc <CanAccess> như các màn
+          quản trị: thanh bên đã ẩn mục không có quyền, guard này lo đường dẫn
+          gõ tay hoặc đánh dấu sẵn. Mã quyền của từng màn (kể cả màn mang tên
+          khác tên resource backend) nằm ở `shared/lib/permissions.ts`.
+        */}
+        <Route
+          path="/input-reports"
+          element={
+            <CanAccess resource="input_reports" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<InputReportList />} />
+          <Route path=":id" element={<InputReportWork />} />
+        </Route>
+        <Route
+          path="/report-review"
+          element={
+            <CanAccess resource="report_review" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<ReviewList />} />
+          <Route path=":id" element={<ReviewWork />} />
+        </Route>
+        <Route
+          path="/period-setup"
+          element={
+            <CanAccess resource="period_setup" action="list" fallback={<Forbidden />}>
+              <PeriodSetup />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/publication-history"
+          element={
+            <CanAccess resource="publication_history" action="list" fallback={<Forbidden />}>
+              <PublicationHistoryList />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/measure-kinds"
+          element={
+            <CanAccess resource="measure_kinds" action="list" fallback={<Forbidden />}>
+              <MeasureKindList />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/summary"
+          element={
+            <CanAccess resource="summary" action="list" fallback={<Forbidden />}>
+              <SummaryPage />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/annual-review"
+          element={
+            <CanAccess resource="annual_review" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<AnnualReviewList />} />
+          {/* `history` đứng trước `:id` cho dễ đọc; react-router vẫn ưu tiên đoạn cố định. */}
+          <Route path="history" element={<AnnualSubmissionHistory />} />
+          <Route path=":id" element={<AnnualReviewWork />} />
+        </Route>
+        <Route
+          path="/report-units"
+          element={
+            <CanAccess resource="report_units" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<ReportUnitList />} />
+          {/* Quyền xem danh sách chưa đủ: gõ tay đường dẫn thêm / sửa cũng phải có quyền ghi. */}
+          <Route
+            path="create"
+            element={
+              <CanAccess resource="report_units" action="create" fallback={<Forbidden />}>
+                <ReportUnitCreate />
+              </CanAccess>
+            }
+          />
+          <Route
+            path="edit/:id"
+            element={
+              <CanAccess resource="report_units" action="edit" fallback={<Forbidden />}>
+                <ReportUnitEdit />
+              </CanAccess>
+            }
+          />
+        </Route>
+        <Route
+          path="/report-calendar"
+          element={
+            <CanAccess resource="report_calendar" action="list" fallback={<Forbidden />}>
+              <ReportCalendar />
+            </CanAccess>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <CanAccess resource="templates" action="list" fallback={<Forbidden />}>
+              <Outlet />
+            </CanAccess>
+          }
+        >
+          <Route index element={<TemplateSets />} />
+          <Route path="designer/:id" element={<TemplateDesigner />} />
+        </Route>
 
         {/* Not a resource: no list of "my accounts", no id in the URL. */}
         <Route path="/profile" element={<Profile />} />
@@ -265,7 +305,14 @@ export function AppRoutes() {
       */}
       <Route
         element={
-          <Authenticated key="unauthenticated-routes" fallback={<Outlet />}>
+          <Authenticated
+            key="unauthenticated-routes"
+            fallback={
+              <RouteSuspense>
+                <Outlet />
+              </RouteSuspense>
+            }
+          >
             <Navigate to="/" replace />
           </Authenticated>
         }

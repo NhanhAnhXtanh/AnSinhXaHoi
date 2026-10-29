@@ -1,0 +1,59 @@
+// Nguon: DB qt_template_script — bieu 1g, phien ban PB-000020, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1g · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1g".
+// Nguồn: form-template/1g.xlsx (sheet '1g', A1:O21). Tọa độ 0-based. DỌC 3 DÒNG LOẠI (r9,r10,r11).
+//
+// Biểu 1g (Phụ lục 01g — chính sách nội trú HSSV) theo CƠ CHẾ BIỂU MỚI: 3 LOẠI cố định
+//   (I = HSSV DTTS hộ nghèo | II = tốt nghiệp PTDT nội trú | III = Kinh hộ nghèo), 1 đơn vị/phiếu.
+//   C(2)=Mức học bổng | D(3)=Mức đồ dùng | E(4)=Mức ở lại Tết | F(5)=Đối tượng học bổng
+//   G(6)=Thời gian | H(7)=KP học bổng =ROUND(C*F*G*C15) ← CT
+//   I(8)=Đối tượng đồ dùng | J(9)=Đi lại 0,2 | K(10)=Đi lại 0,3 | L(11)=Đối tượng ở lại Tết
+//   M(12)=KP khác =SUM(I:L) ← CT | N(13)=Tổng ← CT | O(14)=Ghi chú
+// Mức C/D/E + thời gian G (đã điền sẵn theo loại) + lương C15 là HẰNG SỐ CHÍNH SÁCH → KHOÁ.
+// Đơn vị nhập: F, I, J, K, L (số đối tượng) + O (ghi chú) ở 3 dòng loại.
+
+const SHEET = '1g';
+const LEAF_ROWS = [9, 10, 11];
+const INPUT_COLS = [5, 8, 9, 10, 11, 14]; // F, I, J, K, L (đối tượng) + O (ghi chú)
+
+function isEditable(row, col) {
+  if (row === 2 && col === 1) return true;  // B3 tháng/năm
+  return LEAF_ROWS.indexOf(row) >= 0 && INPUT_COLS.indexOf(col) >= 0;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 2, 1, false);
+  LEAF_ROWS.forEach((row) => INPUT_COLS.forEach((col) => ctx.cell.lock(SHEET, row, col, false)));
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tự điền tên đơn vị của phiếu vào ô ĐƠN VỊ (A1) rồi GIỮ KHOÁ (đơn vị không sửa).
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

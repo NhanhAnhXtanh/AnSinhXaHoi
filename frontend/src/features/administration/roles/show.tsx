@@ -2,10 +2,7 @@ import { useState } from "react";
 import { useCan, useShow } from "@refinedev/core";
 
 import { LoadingOverlay } from "@/shared/components/layout/loading-overlay";
-import {
-  ShowView,
-  ShowViewHeader,
-} from "@/shared/components/views/show-view";
+import { ShowView } from "@/shared/components/views/show-view";
 import { Badge } from "@/shared/ui/badge";
 import { Card } from "@/shared/ui/card";
 import {
@@ -14,46 +11,32 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/shared/components/tabs/tabs";
-import {
-  MetaItem,
-  MetaStrip,
-} from "@/shared/components/views/record-detail";
 import { PermissionMatrix } from "./permission-matrix";
 import { RoleDataScopes } from "./data-scopes";
+import { AdminPageHeader, RecordHeaderActions } from "../record-actions";
 import type { Role } from "@/domains/role/types";
 
-/**
- * The line beside each tab, said once rather than as a heading on top of the
- * panel it describes. Same band, same wording as the edit screen.
- */
+/** Dòng giải thích cạnh hàng tab — nói một lần, cùng chữ với màn sửa. */
 const TAB_HINTS: Record<string, string> = {
   permissions:
-    "A row is a resource, a column an action. Every endpoint re-checks the code it needs, so this is the whole of what the API will answer for.",
+    "Mỗi dòng là một chức năng, mỗi cột là một thao tác. Thay đổi có hiệu lực với người đang đăng nhập sau vài giây.",
   scopes:
-    "A permission decides whether an endpoint answers this role at all; a scope decides which rows it answers with. Open the role for editing to change one.",
+    "Quyền quyết định vai trò được làm gì; phạm vi quyết định vai trò được thấy những dòng dữ liệu nào. Muốn đổi, bấm “Sửa vai trò”.",
 };
 
 /**
- * Reading a role.
+ * Xem một vai trò (Figma 310:56162, 310:72315).
  *
- * The same three parts as the edit screen, in the same order and the same
- * proportions: one identity strip on top, then the two halves of what a role
- * grants as tabs with the panel below them taking the rest of the screen. What
- * you read here and what you change there should not be two different shapes.
- *
- * The permissions are the matrix rather than a wall of code badges, and for the
- * same reason the edit screen draws one: a code is a resource *and* an action,
- * and a flat list of forty of them flattens one of those axes away. Read-only
- * here — the boxes are marks, and it opens on the rows that actually grant
- * something, with the whole catalogue one button away.
+ * Tên, loại và mô tả nằm ở đầu trang; phần còn lại là hai tab — quyền và phạm
+ * vi dữ liệu — vì đó là hai nửa của việc một vai trò được cấp. Ma trận quyền ở
+ * chế độ chỉ đọc, mở sẵn trên các chức năng có cấp.
  */
 export const RoleShow = () => {
   const { result: record, query } = useShow<Role>({});
   const { isLoading } = query;
 
-  // `row_level_policies:*` is seeded to ADMIN alone. Somebody who may read a
-  // role is not necessarily somebody who may read its data scopes, so the tab
-  // is not offered rather than offered and then refused.
+  // `row_level_policies:*` chỉ cấp cho quản trị, nên người xem được vai trò chưa
+  // chắc xem được phạm vi của nó: không có quyền thì không hiện tab.
   const { data: canReadScopes } = useCan({
     resource: "row_level_policies",
     action: "list",
@@ -64,59 +47,45 @@ export const RoleShow = () => {
 
   return (
     <ShowView>
-      <ShowViewHeader />
-
-      {/*
-        Everything this role *is*, on one strip: what it is called and what it
-        is for on the left, the facts the API settled on the right. It replaces
-        a card whose header carried the name and whose body carried a single
-        paragraph — the same content over three times the height.
-      */}
-      <Card className="py-4">
-        <LoadingOverlay loading={isLoading}>
-          <div className="flex flex-wrap items-start gap-x-6 gap-y-4 px-6">
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg leading-6 font-semibold tracking-tight">
-                  {record?.name ?? "—"}
-                </h2>
-                {record?.systemRole && (
-                  <Badge variant="secondary">System</Badge>
-                )}
-              </div>
-              <p className="text-muted-foreground text-sm">
-                {record?.description || "No description."}
-              </p>
-            </div>
-
-            <MetaStrip className="shrink-0">
-              <MetaItem label="Code">
-                <span className="font-mono">{record?.code ?? "—"}</span>
-              </MetaItem>
-              <MetaItem label="Role ID">
-                <span className="tabular-nums">{record?.id ?? "—"}</span>
-              </MetaItem>
-              <MetaItem label="Permissions">
-                <span className="tabular-nums">
-                  {record?.permissions?.length ?? 0}
-                </span>
-              </MetaItem>
-            </MetaStrip>
-          </div>
-        </LoadingOverlay>
-      </Card>
+      <AdminPageHeader
+        title={record?.name ?? "Vai trò"}
+        badge={
+          record?.systemRole ? (
+            <Badge variant="neutral" dot>
+              Vai trò hệ thống
+            </Badge>
+          ) : undefined
+        }
+        description={record?.description || undefined}
+        actions={
+          <RecordHeaderActions
+            resource="roles"
+            id={record?.id}
+            editLabel="Sửa vai trò"
+            // Vai trò hệ thống không xoá được — API trả 409.
+            remove={
+              !record || record.systemRole
+                ? false
+                : {
+                    label: "Xoá vai trò",
+                    title: `Xoá vai trò ${record.name}?`,
+                    description:
+                      "Cán bộ đang giữ vai trò này sẽ mất các quyền của nó. Việc xoá không lấy lại được.",
+                    successMessage: `Đã xoá vai trò ${record.name}`,
+                  }
+            }
+          />
+        }
+      />
 
       <Tabs value={tab} onValueChange={setTab} className="gap-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <TabsList>
             <TabsTrigger value="permissions">
-              Permissions
-              <Badge variant="secondary" className="ml-2 tabular-nums">
-                {record?.permissions?.length ?? 0}
-              </Badge>
+              Quyền ({record?.permissions?.length ?? 0})
             </TabsTrigger>
             {mayReadScopes && (
-              <TabsTrigger value="scopes">Data scopes</TabsTrigger>
+              <TabsTrigger value="scopes">Phạm vi dữ liệu</TabsTrigger>
             )}
           </TabsList>
 
@@ -126,14 +95,11 @@ export const RoleShow = () => {
         </div>
 
         <TabsContent value="permissions">
-          {/* Less to reserve than on the edit screen: no save bar at the
-              bottom, and an identity strip with no fields in it. */}
-          <Card className="[--panel-reserve:25rem] gap-0 overflow-hidden py-0">
+          <Card className="[--panel-reserve:19rem] gap-0 overflow-hidden py-0">
             <LoadingOverlay loading={isLoading}>
-              {/* Keyed on the record, because the matrix opens on the granted
-                  rows and works that out at mount: mounted before the role
-                  arrived, it would open on "this role grants nothing" and stay
-                  there. */}
+              {/* Gắn khoá theo bản ghi: ma trận mở trên các dòng có cấp và tính
+                  điều đó lúc dựng, dựng trước khi có vai trò thì sẽ mở trên
+                  "không cấp gì" và đứng yên ở đó. */}
               <PermissionMatrix
                 key={record?.id ?? "loading"}
                 value={record?.permissions}
@@ -149,6 +115,7 @@ export const RoleShow = () => {
               <RoleDataScopes
                 roleId={record?.id}
                 roleCode={record?.code}
+                roleName={record?.name}
                 readOnly
               />
             </Card>

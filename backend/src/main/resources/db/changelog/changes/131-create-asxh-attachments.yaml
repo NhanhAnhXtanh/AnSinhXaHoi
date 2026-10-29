@@ -1,0 +1,117 @@
+# Giấy tờ đính kèm phiếu (xác nhận Kho bạc) và ô tích "Đã có phiếu xác nhận".
+#
+# Phụ thuộc 121 (asxh_input_reports). CASCADE vì thu hồi kỳ xoá phiếu bằng câu lệnh hàng loạt;
+# file vật lý trên đĩa KHÔNG bị xoá theo (cố ý — chứng từ giữ lại để đối chiếu).
+databaseChangeLog:
+  - changeSet:
+      id: 131-create-asxh-attachments
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_input_report_attachments
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_input_report_attachments
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # TREASURY_CONFIRMATION
+              - column:
+                  name: kind
+                  type: varchar(40)
+                  defaultValue: TREASURY_CONFIRMATION
+                  constraints:
+                    nullable: false
+              - column:
+                  name: file_name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_type
+                  type: varchar(255)
+              - column:
+                  name: file_size
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # Đường dẫn tương đối trong thư mục asxh.attachments.storage-dir.
+              - column:
+                  name: storage_path
+                  type: varchar(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(255)
+              # Xoá mềm (BR-38.3).
+              - column:
+                  name: deleted_at
+                  type: timestamp with time zone
+              - column:
+                  name: deleted_by
+                  type: varchar(255)
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_report_attachments
+            baseColumnNames: report_id
+            constraintName: fk_asxh_input_report_attachments_report
+            referencedTableName: asxh_input_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: asxh_input_report_attachments
+            indexName: idx_asxh_input_report_attachments_report
+            columns:
+              - column:
+                  name: report_id
+
+        - createTable:
+            tableName: asxh_input_report_treasury_confirmations
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_input_report_treasury_confirmations
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_asxh_treasury_confirmations_report
+              - column:
+                  name: confirmed
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(255)
+        - addForeignKeyConstraint:
+            baseTableName: asxh_input_report_treasury_confirmations
+            baseColumnNames: report_id
+            constraintName: fk_asxh_treasury_confirmations_report
+            referencedTableName: asxh_input_reports
+            referencedColumnNames: id
+            onDelete: CASCADE

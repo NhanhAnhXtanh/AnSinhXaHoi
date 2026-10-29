@@ -19,7 +19,7 @@ export const InputPassword = ({ className, ...props }: InputPasswordProps) => {
       />
       <button
         type="button"
-        aria-label={showPassword ? "Hide password" : "Show password"}
+        aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
         className={cn(
           "appearance-none rounded-sm",
           "absolute right-2 top-1/2 -translate-y-1/2",

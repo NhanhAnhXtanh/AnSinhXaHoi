@@ -14,12 +14,14 @@ export function DataTableSorter<TData>({
   className,
   ...props
 }: DataTableSorterProps<TData>) {
+  // The column's id is an internal field name, so the label talks about the
+  // order rather than naming the field.
   const title =
     column.getIsSorted() === "desc"
-      ? `Sort by ${column.id} as descending`
+      ? "Đang xếp giảm dần — bấm để đổi"
       : column.getIsSorted() === "asc"
-      ? `Sort by ${column.id} as ascending`
-      : `Sort by ${column.id}`;
+      ? "Đang xếp tăng dần — bấm để đổi"
+      : "Sắp xếp theo cột này";
 
   return (
     <Button

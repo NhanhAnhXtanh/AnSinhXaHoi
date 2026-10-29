@@ -1,0 +1,27 @@
+# Hạn nộp sửa tay của từng kỳ.
+#
+# Màn "Lịch và kỳ báo cáo" cho Sở sửa hạn nộp từng kỳ chưa mở đợt
+# (PATCH /api/report_periods/{id}). Khi sau đó Sở đổi số ngày hạn nộp của cả lịch
+# (UC-21), hạn nộp của kỳ chưa dùng được tính lại = ngày cuối kỳ + số ngày mới —
+# nếu không đánh dấu thì hạn vừa sửa tay sẽ bị ghi đè lặng lẽ. Cột này giữ dấu đó:
+# TRUE = hạn nộp do người dùng chọn, không tính lại theo lịch.
+#
+# Mặc định FALSE: mọi kỳ đã có đều đang mang hạn nộp do hệ thống tính.
+databaseChangeLog:
+  - changeSet:
+      id: 104-add-report-period-deadline-manual
+      author: dth
+      changes:
+        - addColumn:
+            tableName: asxh_report_periods
+            columns:
+              - column:
+                  name: deadline_manual
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: asxh_report_periods
+            columnName: deadline_manual

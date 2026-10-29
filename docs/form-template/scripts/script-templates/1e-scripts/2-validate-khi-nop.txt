@@ -1,0 +1,55 @@
+// Nguon: DB qt_template_script — bieu 1e, phien ban PB-000016, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1e · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1e".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Số tháng (C19) và tham số mức KHOÁ cố định → không kiểm. Kiểm số HS + kinh phí (gồm ô công
+// thức G,L,M,Q đọc giá trị đã tính, bắt luôn lỗi công thức). KHÔNG kiểm Ghi chú (R). Dòng = row 10.
+
+const SHEET = '1e';
+const DATA_ROW = 10;
+
+const NUMERIC_CELLS = [
+  { col: 3,  label: 'Số học sinh bán trú' },
+  { col: 4,  label: 'Số HS hỗ trợ thêm tiền nghỉ trọ' },
+  { col: 5,  label: 'Số trẻ em nhà trẻ' },
+  { col: 6,  label: 'Kinh phí hỗ trợ ăn và nhà ở' },   // G: ô công thức
+  { col: 11, label: 'Kinh phí nấu ăn' },               // L: ô công thức
+  { col: 12, label: 'Kinh phí hỗ trợ bán trú' },       // M: ô công thức
+  { col: 13, label: 'Kinh phí mua sắm dụng cụ VH/TDTT' },
+  { col: 14, label: 'Kinh phí lập tủ thuốc dùng chung' },
+  { col: 15, label: 'Kinh phí đồ dùng cá nhân trẻ nhà trẻ' },
+  { col: 16, label: 'Tổng cộng kinh phí' },            // Q: ô công thức
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+
+    for (const cell of NUMERIC_CELLS) {
+      const n = toNumber(ctx.cell.get(SHEET, DATA_ROW, cell.col));
+      if (Number.isNaN(n)) {
+        issues.push({ severity: 'ERROR', code: 'NOT_NUMBER', message: `${cell.label}: phải là số.` });
+      } else if (typeof n === 'number') {
+        if (n < 0) {
+          issues.push({ severity: 'ERROR', code: 'NEGATIVE', message: `${cell.label}: không được âm.` });
+        }
+        if (n > 0) anyValue = true;
+      }
+    }
+
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1E', message: 'Biểu 1e chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

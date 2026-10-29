@@ -42,6 +42,9 @@ type CloneButtonProps = {
   iconOnly?: boolean;
 } & React.ComponentProps<typeof Button>;
 
+/** Refine's label is English with no i18n provider; the wording is fixed here. */
+const CLONE_LABEL = "Nhân bản";
+
 export const CloneButton = React.forwardRef<
   React.ComponentRef<typeof Button>,
   CloneButtonProps
@@ -59,13 +62,14 @@ export const CloneButton = React.forwardRef<
     },
     ref
   ) => {
-    const { hidden, disabled, LinkComponent, to, label } = useCloneButton({
+    const { hidden, disabled, LinkComponent, to } = useCloneButton({
       accessControl,
       resource,
       id: recordItemId,
       meta,
     });
 
+    const label = CLONE_LABEL;
     const isDisabled = disabled || rest.disabled;
     const isHidden = hidden || rest.hidden;
 

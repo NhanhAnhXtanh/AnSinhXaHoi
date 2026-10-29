@@ -50,7 +50,11 @@ public class AuthService {
             "$2a$10$ff7CTQvwMv0Szb.qGXF3zeMUkV8Jjta52A6kYzGDeZY4YE2pyd.YS";
 
     /** The same answer for every way of failing, for the same reason. */
-    private static final String INVALID_CREDENTIALS = "Incorrect username or password";
+    // Câu tiếng Việt ngay tại nguồn (người dùng đọc nguyên văn qua ApiExceptionHandler).
+    private static final String INVALID_CREDENTIALS = "Tên đăng nhập hoặc mật khẩu không đúng.";
+    private static final String ACCOUNT_INACTIVE =
+            "Tài khoản này đã ngừng hoạt động. Bạn liên hệ quản trị viên để được mở lại.";
+    private static final String SESSION_EXPIRED = "Phiên đăng nhập đã hết hạn. Bạn đăng nhập lại để tiếp tục.";
 
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
@@ -123,7 +127,7 @@ public class AuthService {
         if (!user.canSignIn()) {
             // The account was disabled while the session was open. Consuming
             // the token above already burned it, so this ends the session.
-            throw new BadCredentialsException("This account is no longer active");
+            throw new BadCredentialsException(ACCOUNT_INACTIVE);
         }
         return issue(user, now);
     }
@@ -161,10 +165,10 @@ public class AuthService {
      * second ago without costing a query.
      */
     public AuthoritiesResponse authorities() {
-        Long id = CurrentUser.id().orElseThrow(() -> new BadCredentialsException("Not signed in"));
+        Long id = CurrentUser.id().orElseThrow(() -> new BadCredentialsException(SESSION_EXPIRED));
         return authorizationService.entryOf(id)
                 .map(entry -> AuthoritiesResponse.from(entry, rowLevel.scopedResourcesFor(id)))
-                .orElseThrow(() -> new BadCredentialsException("This account no longer exists"));
+                .orElseThrow(() -> new BadCredentialsException(SESSION_EXPIRED));
     }
 
     /**
@@ -199,11 +203,11 @@ public class AuthService {
      */
     private User currentUser() {
         Long id = CurrentUser.id()
-                .orElseThrow(() -> new BadCredentialsException("Not signed in"));
+                .orElseThrow(() -> new BadCredentialsException(SESSION_EXPIRED));
         try {
             return userService.get(id);
         } catch (ResourceNotFoundException e) {
-            throw new BadCredentialsException("This account no longer exists");
+            throw new BadCredentialsException(SESSION_EXPIRED);
         }
     }
 }

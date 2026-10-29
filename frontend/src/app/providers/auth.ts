@@ -15,6 +15,7 @@ import {
   type Identity,
   type TokenPair,
 } from "@/shared/api/session";
+import { vietnameseOr } from "@/shared/lib/user-message";
 
 /**
  * Wires the `/api/auth` endpoints to the hooks Refine calls.
@@ -46,6 +47,29 @@ async function readError(response: Response, fallback: string): Promise<ApiError
   }
 }
 
+/**
+ * Lời báo cho cán bộ — mọi lỗi của provider này đều đi qua đây, nên không câu
+ * tiếng Anh nào tới được màn đăng nhập hay thông báo nổi.
+ *
+ * `name` là dòng tiêu đề Refine dùng khi tự mở thông báo nổi (`useLogin` đặt
+ * `message: error.name`), nên cũng phải là tiếng Việt.
+ */
+const LOGIN_FAILED_TITLE = "Đăng nhập không thành công";
+const MSG_WRONG_CREDENTIALS = "Tên đăng nhập hoặc mật khẩu không đúng.";
+const MSG_SERVER_BUSY =
+  "Hệ thống đang bận hoặc gặp sự cố. Bạn thử lại sau ít phút.";
+const MSG_NO_PERMISSIONS =
+  "Đăng nhập được nhưng chưa tải được quyền sử dụng. Bạn thử lại.";
+const MSG_OFFLINE =
+  "Không kết nối được tới hệ thống. Bạn kiểm tra mạng rồi thử lại.";
+
+function loginFailure(message: string) {
+  return {
+    success: false as const,
+    error: { name: LOGIN_FAILED_TITLE, message },
+  };
+}
+
 export const authProvider: AuthProvider = {
   async login({ username, password }) {
     try {
@@ -56,16 +80,13 @@ export const authProvider: AuthProvider = {
       });
 
       if (!response.ok) {
-        const error = await readError(response, "Sign in failed");
-        return {
-          success: false,
-          error: {
-            name: "LoginError",
-            // The API answers every failed sign-in with the same message on
-            // purpose; showing it verbatim keeps that property intact.
-            message: error.message ?? "Incorrect username or password",
-          },
-        };
+        const error = await readError(response, "");
+        // The API answers every failed sign-in with the same message on
+        // purpose (now in Vietnamese); showing it verbatim keeps that property
+        // intact. Anything that did not come from it — a proxy's page, an
+        // English sentence — is replaced by the wording for its status.
+        const fallback = response.status >= 500 ? MSG_SERVER_BUSY : MSG_WRONG_CREDENTIALS;
+        return loginFailure(vietnameseOr(error.message, fallback));
       }
 
       saveSession((await response.json()) as TokenPair);
@@ -76,13 +97,7 @@ export const authProvider: AuthProvider = {
       // waiting would show every user an empty sidebar for a frame.
       if (!(await loadAuthorities(API_URL))) {
         clearSession();
-        return {
-          success: false,
-          error: {
-            name: "LoginError",
-            message: "Signed in, but could not load your permissions. Try again.",
-          },
-        };
+        return loginFailure(MSG_NO_PERMISSIONS);
       }
 
       // The live channel needs a token, so it cannot open before now. Opening
@@ -91,13 +106,7 @@ export const authProvider: AuthProvider = {
       connect();
       return { success: true, redirectTo: "/" };
     } catch {
-      return {
-        success: false,
-        error: {
-          name: "LoginError",
-          message: "Could not reach the server. Check your connection and try again.",
-        },
-      };
+      return loginFailure(MSG_OFFLINE);
     }
   },
 
@@ -191,7 +200,9 @@ export const authProvider: AuthProvider = {
     if (error?.statusCode === 401 || error?.status === 401) {
       disconnect();
       clearSession();
-      return { logout: true, redirectTo: "/login", error };
+      // `?expired=1` makes the login screen say the session ran out, instead of
+      // greeting someone mid-task with a bare sign-in form.
+      return { logout: true, redirectTo: "/login?expired=1", error };
     }
     return {};
   },

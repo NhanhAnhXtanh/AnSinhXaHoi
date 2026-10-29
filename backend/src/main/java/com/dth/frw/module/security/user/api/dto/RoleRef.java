@@ -10,5 +10,5 @@ import jakarta.validation.constraints.NotNull;
  * payload arrives as whole objects. Only the id is read; anything else is
  * ignored.
  */
-public record RoleRef(@NotNull(message = "Role id is required") Long id) {
+public record RoleRef(@NotNull(message = "Vai trò chưa hợp lệ.") Long id) {
 }

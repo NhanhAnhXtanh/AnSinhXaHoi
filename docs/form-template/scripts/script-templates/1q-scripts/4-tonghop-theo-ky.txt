@@ -1,0 +1,34 @@
+// Nguon: DB qt_template_script — bieu 1q, phien ban PB-000031, script "Tong hop theo ky"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1q afterInject: TONG HOP THEO KY ====
+// Do so doi tuong (quantity) tu so cai vao dung o qty ma getInputData doc.
+// O kinh phi la cong thuc -> KHONG set (de tu tinh). Chi set o quantity.
+const SHEET = '1q';
+// indicatorCode -> { row, col } cua o so doi tuong (0-based), lay tu BINDINGS getInputData.
+const BIND = {
+  '1Q.TT.BAO_DAN_TOC':    { row: 8,  col: 14 },
+  '1Q.TT.BAO_DONG_NAI':   { row: 9,  col: 14 },
+  '1Q.TT.BAO_BINH_PHUOC': { row: 10, col: 14 },
+  '1Q.TT.BAN_TIN_DTTS':   { row: 11, col: 14 },
+  '1Q.TT.HOP_MAT':        { row: 12, col: 14 },
+  '1Q.TT.TAP_HUAN':       { row: 13, col: 14 },
+  '1Q.TT.HOC_TAP':        { row: 14, col: 14 },
+  '1Q.TET.SO_DOI_TUONG':      { row: 15, col: 2 },
+  '1Q.OM_DAU.SO_DOI_TUONG':   { row: 15, col: 5 },
+  '1Q.KHO_KHAN.SO_DOI_TUONG': { row: 15, col: 8 },
+  '1Q.QUA_DOI.SO_DOI_TUONG':  { row: 15, col: 11 },
+};
+const CK = 'indi' + 'catorCode';
+function num(v){ if(v==null||v==='')return null; const n=Number(v); return Number.isFinite(n)?n:null; }
+return defineScript({
+  async afterInject(ctx){
+    const periodId = ctx.shared && ctx.shared.periodId;
+    if(!periodId) return; // chi chay o man tong hop, bo qua khi nhap lieu
+    const scope=(ctx.shared&&ctx.shared.scopeKind)?'&scopeKind='+ctx.shared.scopeKind:'';
+    const src=(ctx.shared&&ctx.shared.sourceSheet)?'&sourceSheetCode='+encodeURIComponent(ctx.shared.sourceSheet):'';
+    let rows; try{ rows=await ctx.api.get('/rest/qt/summary/data?periodId='+periodId+scope+src);}catch(e){ctx.ui.message('Loi 1q: '+e.message);return;}
+    let n=0; for(const r of (rows||[])){ const b=BIND[r[CK]]; if(b==null)continue; const q=num(r.quantity); if(q==null)continue; try{ctx.cell.set(SHEET,b.row,b.col,q);n++;}catch(e){} }
+    ctx.ui.message('Da do '+n+' dong so cai vao bieu theo ky.');
+  }
+});

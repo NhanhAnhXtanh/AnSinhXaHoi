@@ -1,0 +1,76 @@
+// Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1m"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1m (1m-syt-sgddt-xp)  —  hook afterInject  (THEO LOẠI · NỬA NĂM DƯƠNG LỊCH)
+//  Trợ giúp đối tượng BTXH (49 chỉ tiêu A1/A2/A3/B). Sheet gom theo 2 nửa năm DƯƠNG LỊCH:
+//    6 tháng đầu (T1–6) = F đối tượng / G kinh phí · 6 tháng cuối (T7–12) = H đối tượng / I kinh phí.
+//  ĐỔ đối tượng + kinh phí: kinh phí G/I ở bản đơn vị là Ô SỐ (không công thức) → đổ amount để đối
+//  chiếu. Cột tổng J + tab 01 là công thức → tự tính (put bỏ qua). Hệ số C, mức chuẩn D cố định.
+//  NGUỒN: GET /rest/qt/summary/data?from&to cho mỗi nửa năm. CONSUMER: mã ghép qua CK.
+// ============================================================================
+
+const SHEET = '1m-syt-sgddt-xp';
+const CK = 'indi' + 'catorCode';
+
+// MÃ CHỈ TIÊU -> DÒNG Excel (1-based) ô lá. Đối chiếu tuần tự 49/49 với BINDINGS biểu con 1m.
+const ROW = {
+  // A.I — Trợ cấp xã hội hàng tháng (24)
+  '1M.A1.01.DUOI4T': 15, '1M.A1.01.4_16T': 16, '1M.A1.02': 18,
+  '1M.A1.03.DUOI4T': 20, '1M.A1.03.4_16T': 21, '1M.A1.03.16T_LEN': 22,
+  '1M.A1.04.1CON': 24, '1M.A1.04.2CON': 25, '1M.A1.04.3CON': 26,
+  '1M.A1.04.4CON': 27, '1M.A1.04.5CON': 28, '1M.A1.04.6CON': 29,
+  '1M.A1.05_1.60_80T': 32, '1M.A1.05_1.80T_LEN': 33, '1M.A1.05_2': 34,
+  '1M.A1.05_3': 35, '1M.A1.05_4': 36,
+  '1M.A1.06_1.DUOI16T': 39, '1M.A1.06_1.16_60T': 40, '1M.A1.06_1.60T_LEN': 41,
+  '1M.A1.06_2.DUOI16T': 43, '1M.A1.06_2.16_60T': 44, '1M.A1.06_2.60T_LEN': 45,
+  '1M.A1.07': 46,
+  // A.II — Nhận nuôi dưỡng, chăm sóc tại cộng đồng (15)
+  '1M.A2.01_1': 49, '1M.A2.01_2.1TRE': 51, '1M.A2.01_2.2TRE': 52, '1M.A2.01_2.3TRE': 53,
+  '1M.A2.02': 54, '1M.A2.03_1.A': 57, '1M.A2.03_1.B': 58,
+  '1M.A2.03_2.1': 60, '1M.A2.03_2.2': 61, '1M.A2.03_2.3': 62, '1M.A2.03_2.4': 63,
+  '1M.A2.03_3.1NGUOI': 66, '1M.A2.03_3.2NGUOI': 67, '1M.A2.03_3.1TRE': 69, '1M.A2.03_3.2TRE': 70,
+  // A.III — Trợ cấp đối tượng ở cơ sở TGXH (9)
+  '1M.A3.01_1.DUOI4T': 75, '1M.A3.01_1.4_16T': 76, '1M.A3.01_2.DUOI4T': 78, '1M.A3.01_2.4_16T': 79,
+  '1M.A3.02': 80, '1M.A3.03.DUOI4T': 82, '1M.A3.03.4T_LEN': 83, '1M.A3.04.DUOI4T': 85, '1M.A3.04.4T_LEN': 86,
+  // B — Mai táng (1)
+  '1M.B.MAI_TANG': 87,
+};
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? ('&scopeKind=' + ctx.shared.scopeKind) : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    // FORM CHUNG NĂM HỌC: cột "6 tháng cuối" (H/I) = Kỳ 1 = HK1 (T7–12 năm Y);
+    //                     cột "6 tháng đầu"  (F/G) = Kỳ 2 = HK2 (T1–6 năm Y+1).
+    const HN = [
+      { from: a + '-01-01', to: a + '-06-30', qCol: 5, kpCol: 6 }, // 6th đầu F/G ← HK2
+      { from: a + '-07-01', to: a + '-12-31', qCol: 7, kpCol: 8 },             // 6th cuối H/I ← HK1
+    ];
+    let total = 0;
+    for (const k of HN) {
+      const path = '/rest/qt/summary/data?from=' + k.from + '&to=' + k.to + scope + src;
+      let rows;
+      try { rows = await ctx.api.get(path); }
+      catch (e) { ctx.ui.message('Lỗi lấy số 1m nửa năm ' + k.from + ': ' + e.message); continue; }
+      for (const r of (rows || [])) {
+        const row = ROW[r[CK]];
+        if (row == null) continue;
+        put(ctx, row - 1, k.qCol, num(r.quantity));
+        put(ctx, row - 1, k.kpCol, num(r.amount));
+        total += 1;
+      }
+    }
+    ctx.ui.message('Đã đổ ' + total + ' ô (đối tượng+kinh phí, 2 nửa năm) vào 1m. Cột tổng + tab 01 tự tính.');
+  },
+});

@@ -1,5 +1,6 @@
 package com.dth.frw.module.security.user.api.dto;
 
+import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.domain.catalog.department.Department;
 import com.dth.frw.domain.catalog.organization.Organization;
 import com.dth.frw.domain.security.role.Role;
@@ -31,6 +32,8 @@ public record UserResponse(
         OrganizationSummary organization,
         /** Null for an account in no department, placed or otherwise. */
         DepartmentSummary department,
+        /** Đơn vị báo cáo ASXH; null với tài khoản Sở / UBND. */
+        ReportUnitSummary reportUnit,
         Instant createdAt,
         Instant updatedAt,
         Instant lastLoginAt) {
@@ -79,6 +82,17 @@ public record UserResponse(
         }
     }
 
+    /**
+     * Đơn vị báo cáo theo cách endpoint này báo — khai riêng, không dùng chung DTO của slice
+     * đơn vị. {@code active} để form người dùng báo trước "đơn vị đã ngừng hoạt động".
+     */
+    public record ReportUnitSummary(Long id, String budgetCode, String name, boolean active) {
+
+        static ReportUnitSummary from(ReportUnit unit) {
+            return new ReportUnitSummary(unit.getId(), unit.getBudgetCode(), unit.getName(), unit.isActive());
+        }
+    }
+
     public static UserResponse from(User user) {
         return new UserResponse(
                 user.getId(),
@@ -98,6 +112,9 @@ public record UserResponse(
                 user.getDepartment() == null
                         ? null
                         : DepartmentSummary.from(user.getDepartment()),
+                user.getReportUnit() == null
+                        ? null
+                        : ReportUnitSummary.from(user.getReportUnit()),
                 user.getCreatedAt(),
                 user.getUpdatedAt(),
                 user.getLastLoginAt());

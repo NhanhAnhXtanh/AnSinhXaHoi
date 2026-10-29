@@ -4,7 +4,6 @@ import { createColumnHelper } from "@tanstack/react-table";
 import React from "react";
 
 import {
-  actionsColumnWidth,
   DataTable,
   RESIZABLE_COLUMN_DEFAULTS,
 } from "@/shared/components/data-table/data-table";
@@ -19,15 +18,23 @@ import {
   ListView,
   ListViewHeader,
 } from "@/shared/components/views/list-view";
-import { EditButton } from "@/shared/components/buttons/edit";
-import { ShowButton } from "@/shared/components/buttons/show";
-import { DeleteButton } from "@/shared/components/buttons/delete";
+import { CreateButton } from "@/shared/components/buttons/create";
 import { Badge } from "@/shared/ui/badge";
-import type { Organization as OrganizationRow } from "@/domains/organization/types";
-import type { Department as DepartmentRow } from "@/domains/department/types";
-import type { User } from "@/domains/user/types";
-import { STATUS_LABELS } from "@/domains/user/types";
-import { USER_STATUS_VARIANTS } from "@/shared/lib/status-variants";
+import {
+  ACCOUNT_LEVEL_LABELS,
+  accountLevelOf,
+  type RoleSummary,
+  type User,
+} from "@/domains/user/types";
+import { Plus } from "lucide-react";
+import { formatDateTimeVi, USER_STATUS_FILTER_OPTIONS } from "../labels";
+import {
+  ActionsCell,
+  ActionsHeader,
+  MENU_ONLY_COLUMN,
+} from "../record-actions";
+import { UserRowActions } from "./user-actions";
+import { UserStatusBadge } from "./user-status-badge";
 
 /**
  * The fixed half of the filter panel.
@@ -39,103 +46,84 @@ import { USER_STATUS_VARIANTS } from "@/shared/lib/status-variants";
  * options come from resources this account may not be allowed to read.
  */
 const STATIC_FILTER_FIELDS: AdvancedFilterField[] = [
-  { field: "id", label: "ID", type: "number", placeholder: "Any" },
-  { field: "username", label: "Username", type: "text", placeholder: "Any" },
-  { field: "email", label: "Email", type: "text", placeholder: "Any" },
-  { field: "fullName", label: "Full name", type: "text", placeholder: "Any" },
+  { field: "fullName", label: "Họ tên", type: "text", placeholder: "Tất cả" },
+  { field: "username", label: "Tên đăng nhập", type: "text", placeholder: "Tất cả" },
+  { field: "email", label: "Thư điện tử", type: "text", placeholder: "Tất cả" },
   {
     field: "status",
-    label: "Status",
+    label: "Trạng thái",
     type: "select",
-    options: [
-      { label: "Active", value: "active" },
-      { label: "Inactive", value: "inactive" },
-      { label: "Locked", value: "locked" },
-    ],
+    options: USER_STATUS_FILTER_OPTIONS,
   },
 ];
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+/** Dòng `/api/report_units` mà ô lọc "Đơn vị" cần — khai cục bộ, không nhập feature khác. */
+type ReportUnitRow = { id: number; name: string };
 
 export const UserList = () => {
-  // Reading organizations and departments are separate grants from reading
-  // users. Asking anyway would spend a request on a guaranteed 403 and raise an
-  // error toast on every visit, for a filter that could not be populated either
-  // way — so the lookups are gated and the fields drop out below.
-  const { data: canReadOrganizations } = useCan({
-    resource: "organizations",
-    action: "list",
-  });
-  const { data: canReadDepartments } = useCan({
-    resource: "departments",
-    action: "list",
-  });
-  const mayReadOrganizations = canReadOrganizations?.can ?? false;
-  const mayReadDepartments = canReadDepartments?.can ?? false;
+  // Đọc đơn vị báo cáo và vai trò là quyền riêng, khác quyền đọc người dùng. Hỏi khi
+  // không có quyền chỉ tốn một yêu cầu chắc chắn 403 và một thông báo lỗi mỗi lần vào
+  // màn — nên chỉ tải khi có quyền, không có thì ô lọc đó không hiện.
+  const { data: canReadUnits } = useCan({ resource: "report_units", action: "list" });
+  const { data: canReadRoles } = useCan({ resource: "roles", action: "list" });
+  const mayReadUnits = canReadUnits?.can ?? false;
+  const mayReadRoles = canReadRoles?.can ?? false;
 
-  const { result: organizationResult } = useList<OrganizationRow>({
-    resource: "organizations",
-    pagination: { pageSize: 200 },
+  const { result: unitResult } = useList<ReportUnitRow>({
+    resource: "report_units",
+    pagination: { pageSize: 1000 },
     sorters: [{ field: "name", order: "asc" }],
-    queryOptions: { enabled: mayReadOrganizations },
+    queryOptions: { enabled: mayReadUnits },
   });
 
-  const { result: departmentResult } = useList<DepartmentRow>({
-    resource: "departments",
-    pagination: { pageSize: 200 },
-    sorters: [{ field: "name", order: "asc" }],
-    queryOptions: { enabled: mayReadDepartments },
+  const { result: roleResult } = useList<RoleSummary>({
+    resource: "roles",
+    pagination: { pageSize: 100 },
+    sorters: [{ field: "code", order: "asc" }],
+    queryOptions: { enabled: mayReadRoles },
   });
 
   const columns = React.useMemo(() => {
     const columnHelper = createColumnHelper<User>();
 
     return [
-      columnHelper.accessor("username", {
-        id: "username",
+      columnHelper.accessor("fullName", {
+        id: "fullName",
         enableResizing: true,
-        header: "Username",
+        header: "Họ tên",
         enableSorting: true,
         cell: ({ row }) => (
           <div className="flex flex-col">
-            <span className="font-medium">{row.original.username}</span>
+            <span className="font-medium">
+              {row.original.fullName || row.original.username}
+            </span>
             <span className="text-muted-foreground text-xs">
-              {row.original.email}
+              {row.original.username}
             </span>
           </div>
         ),
       }),
-      columnHelper.accessor("fullName", {
-        id: "fullName",
-        enableResizing: true,
-        header: "Full name",
-        enableSorting: true,
-      }),
       columnHelper.display({
         id: "placement",
         enableResizing: true,
-        header: "Placement",
-        // Not sortable: `_sort=organization` is not a property the API accepts,
-        // and offering the header would produce a sort that quietly does
-        // nothing. Filter by organization or department instead.
+        header: "Đơn vị công tác",
+        // Không sắp xếp được: API không nhận `_sort=reportUnit`, cho bấm tiêu đề thì
+        // thành một lần sắp xếp không làm gì. Dùng ô lọc Đơn vị thay vào.
         enableSorting: false,
+        // Figma 309:16321: tên đơn vị báo cáo (hoặc "—"), dòng dưới là cấp tài khoản.
         cell: ({ row }) => {
-          const { organization, department } = row.original;
-          if (!organization) {
-            return <span className="text-muted-foreground text-sm">—</span>;
-          }
+          const { reportUnit } = row.original;
           return (
             <div className="flex flex-col">
-              <span className="text-sm">{organization.name}</span>
+              <span className="text-sm">
+                {reportUnit ? (
+                  reportUnit.name
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </span>
               <span className="text-muted-foreground text-xs">
-                {department?.name ?? "No department"}
+                Tài khoản cấp {ACCOUNT_LEVEL_LABELS[accountLevelOf(row.original)]}
               </span>
             </div>
           );
@@ -143,20 +131,13 @@ export const UserList = () => {
       }),
       columnHelper.accessor("status", {
         id: "status",
-        header: "Status",
+        header: "Trạng thái",
         enableSorting: true,
-        cell: ({ getValue }) => {
-          const status = getValue();
-          return (
-            <Badge variant={USER_STATUS_VARIANTS[status] ?? "secondary"}>
-              {STATUS_LABELS[status] ?? status}
-            </Badge>
-          );
-        },
+        cell: ({ getValue }) => <UserStatusBadge status={getValue()} />,
       }),
       columnHelper.display({
         id: "roles",
-        header: "Roles",
+        header: "Vai trò",
         // Not sortable: the value is a collection, and sorting a row by "its
         // roles" has no meaning the API could implement.
         enableSorting: false,
@@ -172,26 +153,33 @@ export const UserList = () => {
       }),
       columnHelper.accessor("lastLoginAt", {
         id: "lastLoginAt",
-        header: "Last sign-in",
+        header: "Đăng nhập gần nhất",
         enableSorting: true,
-        cell: ({ getValue }) => (
-          <span className="text-muted-foreground text-sm">
-            {formatDate(getValue())}
-          </span>
-        ),
+        cell: ({ getValue }) => {
+          const value = getValue();
+          return (
+            <span className="text-sm tabular-nums">
+              {value ? (
+                formatDateTimeVi(value)
+              ) : (
+                <span className="text-muted-foreground">Chưa đăng nhập</span>
+              )}
+            </span>
+          );
+        },
       }),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
+        header: () => <ActionsHeader />,
+        // Chỉ một nút ⋯: Sửa, Xem chi tiết, Đặt lại mật khẩu, Khoá và Xoá đều
+        // nằm trong menu, mục nào tài khoản này không có quyền thì ẩn.
         cell: ({ row }) => (
-          <div className="flex gap-1">
-            <EditButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            <ShowButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            <DeleteButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-          </div>
+          <ActionsCell>
+            <UserRowActions user={row.original} />
+          </ActionsCell>
         ),
         enableSorting: false,
-        ...actionsColumnWidth(3),
+        ...MENU_ONLY_COLUMN,
       }),
     ];
   }, []);
@@ -199,49 +187,50 @@ export const UserList = () => {
   const advancedFilterFields = React.useMemo<AdvancedFilterField[]>(
     () => [
       ...STATIC_FILTER_FIELDS,
-      // Offered only to somebody who may read the resource each filters on. A
-      // select with no options is a control that looks broken rather than one
-      // that explains itself.
-      ...(mayReadOrganizations
+      {
+        field: "accountLevel",
+        label: "Cấp tài khoản",
+        type: "select" as const,
+        placeholder: "Tất cả",
+        operators: ["eq" as const],
+        options: [
+          { label: "Cấp Đơn vị", value: "don_vi" },
+          { label: "Cấp Sở hoặc UBND", value: "so_ubnd" },
+        ],
+      },
+      // Chỉ hiện với người được đọc danh mục tương ứng: một ô chọn không có lựa chọn
+      // nào trông như hỏng chứ không tự giải thích được.
+      ...(mayReadUnits
         ? [
             {
-              field: "organization.id",
-              label: "Organization",
+              field: "reportUnit.id",
+              label: "Đơn vị",
               type: "select" as const,
-              placeholder: "Any organization",
-              options: (organizationResult?.data ?? []).map((item) => ({
+              placeholder: "Tất cả đơn vị",
+              options: (unitResult?.data ?? []).map((item) => ({
                 label: item.name,
                 value: String(item.id),
               })),
             },
           ]
         : []),
-      // Not filtered by the organization filter above it, unlike the picker on
-      // the form. This is a search, not a write: narrowing to one department is
-      // already narrower than any organization it could belong to, and making
-      // the two fields depend on each other would mean a filter that empties
-      // itself when an unrelated one is cleared.
-      ...(mayReadDepartments
+      ...(mayReadRoles
         ? [
             {
-              field: "department.id",
-              label: "Department",
+              field: "roles.id",
+              label: "Vai trò",
               type: "select" as const,
-              placeholder: "Any department",
-              options: (departmentResult?.data ?? []).map((item) => ({
-                label: `${item.organization.name} · ${item.name}`,
+              placeholder: "Tất cả vai trò",
+              operators: ["eq" as const],
+              options: (roleResult?.data ?? []).map((item) => ({
+                label: item.name,
                 value: String(item.id),
               })),
             },
           ]
         : []),
     ],
-    [
-      mayReadOrganizations,
-      mayReadDepartments,
-      organizationResult?.data,
-      departmentResult?.data,
-    ]
+    [mayReadUnits, mayReadRoles, unitResult?.data, roleResult?.data]
   );
 
   const table = useTable({
@@ -272,14 +261,29 @@ export const UserList = () => {
 
   return (
     <ListView>
-      <ListViewHeader description="Accounts that can sign in, the roles they hold and where they are placed." />
+      <ListViewHeader
+        title="Người dùng"
+        description="Tài khoản đăng nhập, vai trò và đơn vị công tác của từng cán bộ."
+        canCreate={false}
+        actions={
+          <CreateButton resource="users">
+            <Plus className="size-4" />
+            Thêm người dùng
+          </CreateButton>
+        }
+      />
       <DataTable
         table={table}
         toolbar={
           <>
             <ListToolbar
               table={table}
-              search={<DataTableQuickFilter table={table} />}
+              search={
+                <DataTableQuickFilter
+                  table={table}
+                  placeholder="Tìm theo họ tên hoặc tên đăng nhập..."
+                />
+              }
               filters={<DataTableAdvancedFilter table={table} fields={advancedFilterFields} />}
             />
             <DataTableFilterChips table={table} fields={advancedFilterFields} />

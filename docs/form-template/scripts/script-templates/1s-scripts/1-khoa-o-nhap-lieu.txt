@@ -1,0 +1,59 @@
+// Nguon: DB qt_template_script — bieu 1s, phien ban PB-000032, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1s · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1s".
+// Nguồn: form-template/1s.xlsx (sheet '1s', A1:J20). Tọa độ 0-based. Dòng dữ liệu = row 8.
+//
+// Biểu 1s (Phụ lục 01s — hỗ trợ đất trồng lúa, NĐ112/2024) — BẢNG NGANG một dòng (row 8):
+//   C(c2)=DT đất chuyên trồng lúa | D(c3)=Trong đó vùng QH | E(c4)=DT đất trồng lúa còn lại (ha)
+//   F(c5)=ROUND(C*C13) · G(c6)=ROUND(D*C13) · H(c7)=ROUND(E*C14) · I(c8)=ROUND(F+G+H) ← CÔNG THỨC
+//   J(c9)=Ghi chú
+// Định mức C13,C14 (đất lúa thường / khác) là HẰNG SỐ CHÍNH SÁCH → KHOÁ.
+// Đơn vị nhập 3 diện tích C,D,E + J (ghi chú).
+
+const SHEET = '1s';
+const DATA_ROW = 8;
+const INPUT_COLS = [2, 3, 4, 9]; // C,D,E diện tích · J ghi chú
+
+function isEditable(row, col) {
+  if (row === 2 && col === 1) return true;
+  return row === DATA_ROW && INPUT_COLS.indexOf(col) >= 0;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 2, 1, false);
+  INPUT_COLS.forEach((col) => ctx.cell.lock(SHEET, DATA_ROW, col, false));
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tự điền tên đơn vị của phiếu vào ô ĐƠN VỊ (A1) rồi GIỮ KHOÁ (đơn vị không sửa).
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+    // + ô "Chỉ tiêu / Đơn vị" của dòng nhập (cùng tên đơn vị).
+    if (_org) ctx.cell.set(SHEET, DATA_ROW, 1, _org);
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

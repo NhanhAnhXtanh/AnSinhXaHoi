@@ -1,0 +1,264 @@
+# Số liệu đã lưu của phiếu (bản Jmix gọi là "sổ cái" — chỉ là tên kỹ thuật) và nhật ký ghi.
+#
+# Phụ thuộc 100/102 (đơn vị, kỳ), 110 (biểu, phiên bản), 121 (phiếu, tờ biểu).
+#
+# Khoá ngoại tới phiếu và tờ biểu là CASCADE: thu hồi kỳ (InputReportService.deleteAllForPeriod)
+# xoá tờ biểu rồi phiếu bằng câu lệnh hàng loạt — số liệu đã lưu của kỳ phải biến mất cùng, nếu
+# không bước tổng hợp sau khi phát hành lại sẽ cộng dồn số cũ với số mới.
+databaseChangeLog:
+  - changeSet:
+      id: 130-create-asxh-ledger
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_ledger_entries
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_ledger_entries
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sheet_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_version_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: period_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # Đơn vị số liệu (của ai).
+              - column:
+                  name: unit_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # Đơn vị nộp (phiếu của ai) — trùng unit_id trừ biểu nhập hộ.
+              - column:
+                  name: submitter_unit_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: indicator_code
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: indicator_name
+                  type: varchar(4000)
+                  constraints:
+                    nullable: false
+              # numeric không giới hạn số lẻ: không tự làm tròn số thật.
+              - column:
+                  name: quantity
+                  type: numeric
+              - column:
+                  name: amount
+                  type: numeric
+              - column:
+                  name: note
+                  type: varchar(4000)
+              - column:
+                  name: order_no
+                  type: int
+              # SCRIPT | BHXH_IMPORT
+              - column:
+                  name: source
+                  type: varchar(20)
+                  defaultValue: SCRIPT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        # Mỗi (tờ biểu, đơn vị số liệu, chỉ tiêu) một dòng.
+        - addUniqueConstraint:
+            tableName: asxh_ledger_entries
+            columnNames: sheet_id, unit_id, indicator_code
+            constraintName: uq_asxh_ledger_entries_key
+        - addForeignKeyConstraint:
+            baseTableName: asxh_ledger_entries
+            baseColumnNames: report_id
+            constraintName: fk_asxh_ledger_entries_report
+            referencedTableName: asxh_input_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: asxh_ledger_entries
+            baseColumnNames: sheet_id
+            constraintName: fk_asxh_ledger_entries_sheet
+            referencedTableName: asxh_input_report_sheets
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: asxh_ledger_entries
+            baseColumnNames: template_id
+            constraintName: fk_asxh_ledger_entries_template
+            referencedTableName: asxh_templates
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_ledger_entries
+            baseColumnNames: template_version_id
+            constraintName: fk_asxh_ledger_entries_version
+            referencedTableName: asxh_template_versions
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_ledger_entries
+            baseColumnNames: period_id
+            constraintName: fk_asxh_ledger_entries_period
+            referencedTableName: asxh_report_periods
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_ledger_entries
+            baseColumnNames: unit_id
+            constraintName: fk_asxh_ledger_entries_unit
+            referencedTableName: asxh_report_units
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_ledger_entries
+            baseColumnNames: submitter_unit_id
+            constraintName: fk_asxh_ledger_entries_submitter
+            referencedTableName: asxh_report_units
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # Tổng hợp đọc theo (kỳ, biểu) rồi lọc đơn vị.
+        - createIndex:
+            tableName: asxh_ledger_entries
+            indexName: idx_asxh_ledger_entries_period_template
+            columns:
+              - column:
+                  name: period_id
+              - column:
+                  name: template_id
+        - createIndex:
+            tableName: asxh_ledger_entries
+            indexName: idx_asxh_ledger_entries_report
+            columns:
+              - column:
+                  name: report_id
+        - createIndex:
+            tableName: asxh_ledger_entries
+            indexName: idx_asxh_ledger_entries_unit
+            columns:
+              - column:
+                  name: unit_id
+        - createIndex:
+            tableName: asxh_ledger_entries
+            indexName: idx_asxh_ledger_entries_submitter
+            columns:
+              - column:
+                  name: submitter_unit_id
+        - createIndex:
+            tableName: asxh_ledger_entries
+            indexName: idx_asxh_ledger_entries_template
+            columns:
+              - column:
+                  name: template_id
+        - createIndex:
+            tableName: asxh_ledger_entries
+            indexName: idx_asxh_ledger_entries_version
+            columns:
+              - column:
+                  name: template_version_id
+
+        # Nhật ký ghi: KHÔNG khoá ngoại — dòng FAILED ghi trong giao dịch riêng để sống sót khi
+        # duyệt bị huỷ, và phải còn sau khi phiếu bị thu hồi.
+        - createTable:
+            tableName: asxh_ledger_write_audits
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_ledger_write_audits
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sheet_id
+                  type: bigint
+              - column:
+                  name: template_id
+                  type: bigint
+              - column:
+                  name: template_version_id
+                  type: bigint
+              # SCRIPT | BHXH_IMPORT
+              - column:
+                  name: source
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              # SUCCESS | FAILED
+              - column:
+                  name: result
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lines_added
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lines_updated
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lines_removed
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: fail_reason
+                  type: varchar(2000)
+              - column:
+                  name: operated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: operated_by
+                  type: varchar(255)
+        - createIndex:
+            tableName: asxh_ledger_write_audits
+            indexName: idx_asxh_ledger_write_audits_report
+            columns:
+              - column:
+                  name: report_id

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { BaseRecord, CrudOperators, HttpError } from "@refinedev/core";
 import type { UseTableReturnType } from "@refinedev/react-table";
 import type { ColumnFiltersState } from "@tanstack/react-table";
-import { SlidersHorizontal, X } from "lucide-react";
+import { FunnelX, SlidersHorizontal, X } from "lucide-react";
 
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -188,7 +188,7 @@ export function DataTableAdvancedFilter<TData extends BaseRecord>({
       <PopoverTrigger asChild>
         <Button variant="outline" className={cn("gap-2", className)}>
           <SlidersHorizontal className={cn("h-4", "w-4")} />
-          Advanced filter
+          Bộ lọc khác
           {activeCount > 0 && (
             <Badge
               variant="secondary"
@@ -251,7 +251,7 @@ export function DataTableAdvancedFilter<TData extends BaseRecord>({
                         id={`advanced-filter-${field.field}`}
                         className={cn("flex-1")}
                       >
-                        <SelectValue placeholder={field.placeholder ?? "Any"} />
+                        <SelectValue placeholder={field.placeholder ?? "Tất cả"} />
                       </SelectTrigger>
                       <SelectContent>
                         {field.options?.map((option) => (
@@ -266,7 +266,7 @@ export function DataTableAdvancedFilter<TData extends BaseRecord>({
                       id={`advanced-filter-${field.field}`}
                       type={field.type === "number" ? "number" : "text"}
                       className={cn("flex-1")}
-                      placeholder={field.placeholder ?? "Any"}
+                      placeholder={field.placeholder ?? "Tất cả"}
                       value={entry.value}
                       onChange={(event) =>
                         patch(field.field, { value: event.target.value })
@@ -277,7 +277,7 @@ export function DataTableAdvancedFilter<TData extends BaseRecord>({
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`Clear ${field.label}`}
+                    aria-label={`Xoá ô ${field.label}`}
                     disabled={!entry.value}
                     className={cn("h-8", "w-8", "shrink-0")}
                     onClick={() => patch(field.field, { value: "" })}
@@ -313,10 +313,10 @@ export function DataTableAdvancedFilter<TData extends BaseRecord>({
             onClick={handleClear}
           >
             <X className={cn("h-3.5", "w-3.5")} />
-            Clear
+            Bỏ lọc
           </Button>
           <Button size="sm" onClick={handleApply}>
-            Apply
+            Áp dụng
           </Button>
         </div>
       </PopoverContent>
@@ -339,7 +339,7 @@ export function DataTableFilterChips<TData extends BaseRecord>({
   table,
   fields,
   searchField = "q",
-  searchLabel = "Search",
+  searchLabel = "Tìm kiếm",
   className,
 }: DataTableFilterChipsProps<TData>) {
   const { setColumnFilters, getState } = table.reactTable;
@@ -366,12 +366,17 @@ export function DataTableFilterChips<TData extends BaseRecord>({
                 ?.label ?? rawValue
             : rawValue;
 
+        // "Trạng thái: Đã duyệt" rather than "Trạng thái: bằng Đã duyệt" —
+        // equality is what a chip means by default, so only the other
+        // operators are spelled out.
+        const operator = entry.operator ?? "eq";
         return {
           id: entry.id,
           label: field.label,
-          text: `${operatorLabel(
-            entry.operator ?? "eq"
-          ).toLowerCase()} ${valueLabel}`,
+          text:
+            operator === "eq"
+              ? valueLabel
+              : `${operatorLabel(operator).toLowerCase()} ${valueLabel}`,
         };
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entries is derived per render
@@ -394,14 +399,21 @@ export function DataTableFilterChips<TData extends BaseRecord>({
         <Badge
           key={chip.id}
           variant="secondary"
-          className={cn("gap-1", "pl-2", "pr-1", "py-1", "font-normal")}
+          className={cn(
+            "gap-1",
+            "rounded-md",
+            "pl-2",
+            "pr-1",
+            "py-1",
+            "font-normal"
+          )}
         >
           <span className={cn("text-xs")}>
-            <span className={cn("font-medium")}>{chip.label}</span> {chip.text}
+            <span className={cn("font-medium")}>{chip.label}:</span> {chip.text}
           </span>
           <button
             type="button"
-            aria-label={`Remove ${chip.label} filter`}
+            aria-label={`Bỏ lọc ${chip.label}`}
             onClick={() => removeChip(chip.id)}
             className={cn(
               "rounded-sm",
@@ -420,10 +432,11 @@ export function DataTableFilterChips<TData extends BaseRecord>({
       <Button
         variant="ghost"
         size="sm"
-        className={cn("h-7", "text-xs", "text-muted-foreground")}
+        className={cn("h-7", "gap-1.5", "text-xs", "text-muted-foreground")}
         onClick={() => setColumnFilters([])}
       >
-        Clear all
+        <FunnelX className={cn("h-3.5", "w-3.5")} />
+        Xoá lọc
       </Button>
     </div>
   );

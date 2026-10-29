@@ -1,0 +1,56 @@
+// Nguon: DB qt_template_script — bieu 1e, phien ban PB-000016, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1e · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1e".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột. Dòng dữ liệu = row 10.
+//
+// CƠ CHẾ SỔ CÁI = SỔ ĐỐI CHIẾU: mỗi chỉ tiêu lưu qty (số HS) + amt (kinh phí của chính nó).
+//   Ăn HS bán trú D→H · Nhà ở HS nghỉ trọ E→J · Ăn trẻ nhà trẻ F→I · Nấu ăn L (công thức) ·
+//   3 kinh phí bán trú NHẬP TAY N/O/P. Mức C15:C18 + số tháng C19 khoá → không lưu. Bỏ ô tổng C,G,M,Q.
+
+const SHEET = '1e';
+const R = 10;
+
+// qty/amt = cột (0-based); null = không có ô tương ứng.
+const BINDINGS = [
+  { indicatorCode: '1E.AN_O.HS_BAN_TRU', indicatorName: 'Hỗ trợ tiền ăn và nhà ở › Số HS bán trú', qty: 3, amt: 7 },
+  { indicatorCode: '1E.AN_O.HS_NGHI_TRO', indicatorName: 'Hỗ trợ tiền ăn và nhà ở › Số HS hỗ trợ thêm tiền nghỉ trọ', qty: 4, amt: 9 },
+  { indicatorCode: '1E.AN_O.TRE_NHA_TRE', indicatorName: 'Hỗ trợ tiền ăn và nhà ở › Số trẻ em nhà trẻ', qty: 5, amt: 8 },
+  { indicatorCode: '1E.NAU_AN.KINH_PHI', indicatorName: 'Phục vụ nấu ăn cho học sinh › Kinh phí', qty: null, amt: 11 },
+  { indicatorCode: '1E.BAN_TRU.DUNG_CU', indicatorName: 'Hỗ trợ bán trú › Mua sắm dụng cụ văn hóa, TDTT', qty: null, amt: 13 },
+  { indicatorCode: '1E.BAN_TRU.TU_THUOC', indicatorName: 'Hỗ trợ bán trú › Lập tủ thuốc dùng chung', qty: null, amt: 14 },
+  { indicatorCode: '1E.DO_DUNG_CA_NHAN', indicatorName: 'Hỗ trợ mua đồ dùng cá nhân trẻ em nhà trẻ', qty: null, amt: 15 },
+];
+const NOTE_COL = 17;
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function cellVal(ctx, col) { return col == null ? null : num(ctx.cell.get(SHEET, R, col)); }
+
+return defineScript({
+  getInputData(ctx) {
+    const note = optionalNote(ctx.cell.get(SHEET, R, NOTE_COL));
+    return BINDINGS
+      .map((b, i) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: cellVal(ctx, b.qty),
+        amount: cellVal(ctx, b.amt),
+        note: i === 0 ? note : null,
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});

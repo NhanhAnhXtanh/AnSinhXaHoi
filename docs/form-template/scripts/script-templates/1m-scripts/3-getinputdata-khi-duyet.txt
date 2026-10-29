@@ -1,0 +1,100 @@
+// Nguon: DB qt_template_script — bieu 1m, phien ban PB-000027, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1m · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1m".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// QUY TẮC: chỉ lưu SỐ ĐỐI TƯỢNG (q=F) của các dòng lá. BỎ ô công thức E (=C*D), G (kinh phí).
+//   Hệ số C, mức chuẩn D, số tháng C85(=6) là hằng số CHÍNH SÁCH khoá → không lưu. Tổng hợp tính
+//   lại = số ĐT × hệ số × mức chuẩn × số tháng (RIÊNG mai táng chi 1 lần, KHÔNG nhân số tháng).
+//   measureKind = NGUOI mặc định. Mã theo STT phân cấp của biểu (A1/A2/A3/B).
+
+const SHEET = '1m';
+const QTY_COL = 5, AMT_COL = 6, NOTE_COL = 7; // F đối tượng · G kinh phí (công thức) · H ghi chú
+
+const BINDINGS = [
+  // ===== A.I — TRỢ CẤP XÃ HỘI HÀNG THÁNG =====
+  { row: 11, indicatorCode: '1M.A1.01.DUOI4T',      indicatorName: 'BTXH › Trẻ dưới 16 tuổi không nguồn nuôi dưỡng — dưới 4 tuổi' },
+  { row: 12, indicatorCode: '1M.A1.01.4_16T',       indicatorName: 'BTXH › Trẻ dưới 16 tuổi không nguồn nuôi dưỡng — từ đủ 4 đến dưới 16 tuổi' },
+  { row: 14, indicatorCode: '1M.A1.02',             indicatorName: 'BTXH › Người từ 16 đến 22 tuổi đang học phổ thông/học nghề' },
+  { row: 16, indicatorCode: '1M.A1.03.DUOI4T',      indicatorName: 'BTXH › Trẻ nhiễm HIV thuộc hộ nghèo — dưới 4 tuổi' },
+  { row: 17, indicatorCode: '1M.A1.03.4_16T',       indicatorName: 'BTXH › Trẻ nhiễm HIV thuộc hộ nghèo — từ 4 đến dưới 16 tuổi' },
+  { row: 18, indicatorCode: '1M.A1.03.16T_LEN',     indicatorName: 'BTXH › Trẻ nhiễm HIV thuộc hộ nghèo — từ 16 tuổi trở lên' },
+  { row: 20, indicatorCode: '1M.A1.04.1CON',        indicatorName: 'BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 1 con' },
+  { row: 21, indicatorCode: '1M.A1.04.2CON',        indicatorName: 'BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 2 con' },
+  { row: 22, indicatorCode: '1M.A1.04.3CON',        indicatorName: 'BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 3 con' },
+  { row: 23, indicatorCode: '1M.A1.04.4CON',        indicatorName: 'BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 4 con' },
+  { row: 24, indicatorCode: '1M.A1.04.5CON',        indicatorName: 'BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 5 con' },
+  { row: 25, indicatorCode: '1M.A1.04.6CON',        indicatorName: 'BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 6 con' },
+  { row: 28, indicatorCode: '1M.A1.05_1.60_80T',    indicatorName: 'BTXH › Người cao tuổi hộ nghèo không người phụng dưỡng — 60 đến dưới 80 tuổi' },
+  { row: 29, indicatorCode: '1M.A1.05_1.80T_LEN',   indicatorName: 'BTXH › Người cao tuổi hộ nghèo không người phụng dưỡng — từ đủ 80 tuổi trở lên' },
+  { row: 30, indicatorCode: '1M.A1.05_2',           indicatorName: 'BTXH › Người từ đủ 75 đến 80 tuổi hộ nghèo/cận nghèo vùng khó khăn' },
+  { row: 31, indicatorCode: '1M.A1.05_3',           indicatorName: 'BTXH › Người từ đủ 80 tuổi trở lên không có lương hưu/trợ cấp BHXH' },
+  { row: 32, indicatorCode: '1M.A1.05_4',           indicatorName: 'BTXH › Người cao tuổi hộ nghèo không người phụng dưỡng (diện khác)' },
+  { row: 35, indicatorCode: '1M.A1.06_1.DUOI16T',   indicatorName: 'BTXH › Người khuyết tật đặc biệt nặng — dưới 16 tuổi' },
+  { row: 36, indicatorCode: '1M.A1.06_1.16_60T',    indicatorName: 'BTXH › Người khuyết tật đặc biệt nặng — từ 16 đến 60 tuổi' },
+  { row: 37, indicatorCode: '1M.A1.06_1.60T_LEN',   indicatorName: 'BTXH › Người khuyết tật đặc biệt nặng — từ đủ 60 tuổi trở lên' },
+  { row: 39, indicatorCode: '1M.A1.06_2.DUOI16T',   indicatorName: 'BTXH › Người khuyết tật nặng — dưới 16 tuổi' },
+  { row: 40, indicatorCode: '1M.A1.06_2.16_60T',    indicatorName: 'BTXH › Người khuyết tật nặng — từ 16 đến 60 tuổi' },
+  { row: 41, indicatorCode: '1M.A1.06_2.60T_LEN',   indicatorName: 'BTXH › Người khuyết tật nặng — từ đủ 60 tuổi trở lên' },
+  { row: 42, indicatorCode: '1M.A1.07',             indicatorName: 'BTXH › Trẻ em dưới 3 tuổi hộ nghèo/cận nghèo vùng khó khăn' },
+  // ===== A.II — NHẬN NUÔI DƯỠNG, CHĂM SÓC TẠI CỘNG ĐỒNG =====
+  { row: 45, indicatorCode: '1M.A2.01_1',           indicatorName: 'BTXH nhận nuôi › Nhận chăm sóc, nuôi dưỡng trẻ em dưới 4 tuổi' },
+  { row: 47, indicatorCode: '1M.A2.01_2.1TRE',      indicatorName: 'BTXH nhận nuôi › Nhận nuôi trẻ 4–16 tuổi — nuôi 1 trẻ' },
+  { row: 48, indicatorCode: '1M.A2.01_2.2TRE',      indicatorName: 'BTXH nhận nuôi › Nhận nuôi trẻ 4–16 tuổi — nuôi 2 trẻ' },
+  { row: 49, indicatorCode: '1M.A2.01_2.3TRE',      indicatorName: 'BTXH nhận nuôi › Nhận nuôi trẻ 4–16 tuổi — nuôi 3 trẻ' },
+  { row: 50, indicatorCode: '1M.A2.02',             indicatorName: 'BTXH nhận nuôi › Nhận nuôi người cao tuổi thuộc hộ nghèo' },
+  { row: 53, indicatorCode: '1M.A2.03_1.A',         indicatorName: 'BTXH nhận nuôi › Hỗ trợ nuôi dưỡng người KT đặc biệt nặng (mức hệ số 1,5)' },
+  { row: 54, indicatorCode: '1M.A2.03_1.B',         indicatorName: 'BTXH nhận nuôi › Hỗ trợ nuôi dưỡng người KT đặc biệt nặng (mức hệ số 2)' },
+  { row: 56, indicatorCode: '1M.A2.03_2.1',         indicatorName: 'BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 1 người khuyết tật' },
+  { row: 57, indicatorCode: '1M.A2.03_2.2',         indicatorName: 'BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 2 người khuyết tật' },
+  { row: 58, indicatorCode: '1M.A2.03_2.3',         indicatorName: 'BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 3 người khuyết tật' },
+  { row: 59, indicatorCode: '1M.A2.03_2.4',         indicatorName: 'BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 4 người khuyết tật' },
+  { row: 61, indicatorCode: '1M.A2.03_3.1NGUOI',    indicatorName: 'BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 1 người khuyết tật' },
+  { row: 62, indicatorCode: '1M.A2.03_3.2NGUOI',    indicatorName: 'BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 2 người khuyết tật' },
+  { row: 63, indicatorCode: '1M.A2.03_3.1TRE',      indicatorName: 'BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 1 trẻ em khuyết tật' },
+  { row: 64, indicatorCode: '1M.A2.03_3.2TRE',      indicatorName: 'BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 2 trẻ em khuyết tật' },
+  // ===== A.III — TRỢ CẤP ĐỐI TƯỢNG Ở CƠ SỞ TRỢ GIÚP XÃ HỘI =====
+  { row: 68, indicatorCode: '1M.A3.01_1.DUOI4T',    indicatorName: 'BTXH cơ sở TGXH › Trẻ không nguồn nuôi dưỡng — dưới 4 tuổi' },
+  { row: 69, indicatorCode: '1M.A3.01_1.4_16T',     indicatorName: 'BTXH cơ sở TGXH › Trẻ không nguồn nuôi dưỡng — từ đủ 4 đến dưới 16 tuổi' },
+  { row: 71, indicatorCode: '1M.A3.01_2.DUOI4T',    indicatorName: 'BTXH cơ sở TGXH › Trẻ nhiễm HIV hộ nghèo — dưới 4 tuổi' },
+  { row: 72, indicatorCode: '1M.A3.01_2.4_16T',     indicatorName: 'BTXH cơ sở TGXH › Trẻ nhiễm HIV hộ nghèo — từ đủ 4 đến dưới 16 tuổi' },
+  { row: 73, indicatorCode: '1M.A3.02',             indicatorName: 'BTXH cơ sở TGXH › Người cao tuổi diện sống ở cơ sở trợ giúp xã hội' },
+  { row: 75, indicatorCode: '1M.A3.03.DUOI4T',      indicatorName: 'BTXH cơ sở TGXH › Người khuyết tật đặc biệt nặng — dưới 4 tuổi' },
+  { row: 76, indicatorCode: '1M.A3.03.4T_LEN',      indicatorName: 'BTXH cơ sở TGXH › Người khuyết tật đặc biệt nặng — từ đủ 4 tuổi trở lên' },
+  { row: 78, indicatorCode: '1M.A3.04.DUOI4T',      indicatorName: 'BTXH cơ sở TGXH › Đối tượng cần bảo vệ khẩn cấp — dưới 4 tuổi' },
+  { row: 79, indicatorCode: '1M.A3.04.4T_LEN',      indicatorName: 'BTXH cơ sở TGXH › Đối tượng cần bảo vệ khẩn cấp — từ đủ 4 tuổi trở lên' },
+  // ===== B — MAI TÁNG (chi 1 lần, không nhân số tháng) =====
+  { row: 80, indicatorCode: '1M.B.MAI_TANG',        indicatorName: 'BTXH › Hỗ trợ chi phí mai táng' },
+];
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function inputOnly(ctx, row, col) {
+  return num(ctx.cell.get(SHEET, row, col));
+}
+
+return defineScript({
+  getInputData(ctx) {
+    return BINDINGS
+      .map((b) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: inputOnly(ctx, b.row, QTY_COL),
+        amount: num(ctx.cell.get(SHEET, b.row, AMT_COL)), // kinh phí (value công thức) — lưu để đối chiếu
+        note: optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL)),
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0) || r.note != null);
+  },
+});

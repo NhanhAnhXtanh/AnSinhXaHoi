@@ -28,3 +28,7 @@ _.ntvs_
 _.njsproj
 _.sln
 \*.sw?
+
+# Playwright (npm run e2e)
+playwright-report
+test-results

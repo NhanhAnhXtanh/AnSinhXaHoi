@@ -3,7 +3,6 @@ import { createColumnHelper } from "@tanstack/react-table";
 import React from "react";
 
 import {
-  actionsColumnWidth,
   DataTable,
   RESIZABLE_COLUMN_DEFAULTS,
 } from "@/shared/components/data-table/data-table";
@@ -18,22 +17,27 @@ import {
   ListView,
   ListViewHeader,
 } from "@/shared/components/views/list-view";
-import { EditButton } from "@/shared/components/buttons/edit";
-import { ShowButton } from "@/shared/components/buttons/show";
-import { DeleteButton } from "@/shared/components/buttons/delete";
+import { CreateButton } from "@/shared/components/buttons/create";
 import { Badge } from "@/shared/ui/badge";
+import { Plus } from "lucide-react";
 import type { Role } from "@/domains/role/types";
+import {
+  ActionsCell,
+  ActionsHeader,
+  MENU_ONLY_COLUMN,
+  RecordActionsMenu,
+} from "../record-actions";
 
 const ADVANCED_FILTER_FIELDS: AdvancedFilterField[] = [
-  { field: "code", label: "Code", type: "text", placeholder: "Any" },
-  { field: "name", label: "Name", type: "text", placeholder: "Any" },
+  { field: "name", label: "Tên vai trò", type: "text", placeholder: "Tất cả" },
+  { field: "code", label: "Mã vai trò", type: "text", placeholder: "Tất cả" },
   {
     field: "systemRole",
-    label: "System role",
+    label: "Loại",
     type: "select",
     options: [
-      { label: "Yes", value: "true" },
-      { label: "No", value: "false" },
+      { label: "Hệ thống", value: "true" },
+      { label: "Tuỳ chỉnh", value: "false" },
     ],
   },
 ];
@@ -43,70 +47,80 @@ export const RoleList = () => {
     const columnHelper = createColumnHelper<Role>();
 
     return [
-      columnHelper.accessor("code", {
-        id: "code",
-        header: "Code",
-        enableSorting: true,
-        cell: ({ getValue }) => (
-          <span className="font-mono text-xs">{getValue()}</span>
-        ),
-      }),
       columnHelper.accessor("name", {
         id: "name",
         enableResizing: true,
-        header: "Name",
+        header: "Vai trò",
         enableSorting: true,
         cell: ({ row }) => (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col">
             <span className="font-medium">{row.original.name}</span>
-            {row.original.systemRole && (
-              <Badge variant="secondary" className="text-[10px]">
-                System
-              </Badge>
-            )}
+            <span className="text-muted-foreground text-xs">
+              {row.original.description || "Chưa có mô tả"}
+            </span>
           </div>
         ),
-      }),
-      columnHelper.accessor("description", {
-        id: "description",
-        enableResizing: true,
-        header: "Description",
-        enableSorting: false,
-        cell: ({ getValue }) => (
-          <span className="text-muted-foreground text-sm">
-            {getValue() ?? "—"}
-          </span>
-        ),
+        size: 360,
       }),
       columnHelper.display({
         id: "permissions",
-        header: "Permissions",
+        header: "Quyền được cấp",
         enableSorting: false,
-        // The count rather than the codes: a role can grant a dozen, and the
-        // full list belongs on the show page where there is room for it.
+        // Số lượng thay vì liệt kê: một vai trò có thể có hàng chục quyền, danh
+        // sách đầy đủ nằm ở màn chi tiết.
         cell: ({ row }) => (
-          <Badge variant="outline">{row.original.permissions.length}</Badge>
+          <Badge variant="outline" className="tabular-nums">
+            {row.original.permissions.length} quyền
+          </Badge>
         ),
-        size: 120,
+        size: 150,
+      }),
+      columnHelper.accessor("systemRole", {
+        id: "systemRole",
+        header: "Loại",
+        enableSorting: false,
+        cell: ({ getValue }) =>
+          getValue() ? (
+            <Badge variant="neutral" dot>
+              Hệ thống
+            </Badge>
+          ) : (
+            <Badge variant="info" dot>
+              Tuỳ chỉnh
+            </Badge>
+          ),
+        size: 140,
       }),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <div className="flex gap-1">
-            <EditButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            <ShowButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            {/*
-              A system role cannot be deleted — the API answers 409 — so the
-              button is not offered rather than offered and then refused.
-            */}
-            {!row.original.systemRole && (
-              <DeleteButton recordItemId={row.original.id} iconOnly size="icon-sm" />
-            )}
-          </div>
-        ),
+        header: () => <ActionsHeader />,
+        cell: ({ row }) => {
+          const role = row.original;
+          return (
+            <ActionsCell>
+              <RecordActionsMenu
+                resource="roles"
+                id={role.id}
+                editLabel="Sửa vai trò"
+                // Vai trò hệ thống không xoá được — API trả 409 — nên không
+                // đưa mục Xoá ra rồi mới từ chối.
+                remove={
+                  role.systemRole
+                    ? false
+                    : {
+                        label: "Xoá vai trò",
+                        title: `Xoá vai trò ${role.name}?`,
+                        description:
+                          "Cán bộ đang giữ vai trò này sẽ mất các quyền của nó. Việc xoá không lấy lại được.",
+                        successMessage: `Đã xoá vai trò ${role.name}`,
+                      }
+                }
+              />
+            </ActionsCell>
+          );
+        },
         enableSorting: false,
-        ...actionsColumnWidth(3),
+        ...MENU_ONLY_COLUMN,
       }),
     ];
   }, []);
@@ -139,14 +153,29 @@ export const RoleList = () => {
 
   return (
     <ListView>
-      <ListViewHeader description="What each role may do, and which rows it may reach." />
+      <ListViewHeader
+        title="Vai trò"
+        description="Nhóm quyền dùng chung cho nhiều cán bộ: được làm gì và được thấy dữ liệu nào."
+        canCreate={false}
+        actions={
+          <CreateButton resource="roles">
+            <Plus className="size-4" />
+            Thêm vai trò
+          </CreateButton>
+        }
+      />
       <DataTable
         table={table}
         toolbar={
           <>
             <ListToolbar
               table={table}
-              search={<DataTableQuickFilter table={table} />}
+              search={
+                <DataTableQuickFilter
+                  table={table}
+                  placeholder="Tìm theo tên vai trò..."
+                />
+              }
               filters={<DataTableAdvancedFilter table={table} fields={ADVANCED_FILTER_FIELDS} />}
             />
             <DataTableFilterChips table={table} fields={ADVANCED_FILTER_FIELDS} />

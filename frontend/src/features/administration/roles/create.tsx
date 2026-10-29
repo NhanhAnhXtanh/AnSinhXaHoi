@@ -3,14 +3,10 @@ import { useCan } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
 import { useNavigate } from "react-router";
 
-import {
-  CreateView,
-  CreateViewHeader,
-} from "@/shared/components/views/create-view";
+import { CreateView } from "@/shared/components/views/create-view";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
-import { Badge } from "@/shared/ui/badge";
 import { Card } from "@/shared/ui/card";
 import {
   Tabs,
@@ -30,6 +26,8 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { PermissionMatrix, type PermissionRef } from "./permission-matrix";
 import { RoleDataScopes } from "./data-scopes";
+import { AdminPageHeader } from "../record-actions";
+import { errorDescription } from "../labels";
 
 /**
  * The create payload, which is `RoleRequest` on the backend rather than the
@@ -56,9 +54,9 @@ const DEFAULT_VALUES: RoleFormValues = {
 /** The same band the edit and show screens carry, so all three read alike. */
 const TAB_HINTS: Record<string, string> = {
   permissions:
-    "A row is a resource, a column an action; the box where they meet is the permission code. A role with none is valid but grants nothing.",
+    "Mỗi dòng là một chức năng, mỗi cột là một thao tác. Vai trò không có quyền nào vẫn lưu được nhưng không làm được gì.",
   scopes:
-    "A scope needs a role to belong to. Creating this one lands you on its edit screen with this tab ready.",
+    "Phạm vi dữ liệu cần gắn với một vai trò đã có. Tạo xong, màn sửa vai trò sẽ mở sẵn tab này.",
 };
 
 export const RoleCreate = () => {
@@ -74,7 +72,20 @@ export const RoleCreate = () => {
     // writes them is on the edit screen. Landing there is the difference
     // between the second half of the job being the next thing in front of you
     // and being something you have to go and find.
-    refineCoreProps: { redirect: "edit" },
+    refineCoreProps: {
+      redirect: "edit",
+      successNotification: (_data, values) => ({
+        type: "success",
+        message: `Đã tạo vai trò ${
+          (values as { name?: string } | undefined)?.name ?? ""
+        }`.trim(),
+      }),
+      errorNotification: (error) => ({
+        type: "error",
+        message: "Không tạo được vai trò",
+        description: errorDescription(error),
+      }),
+    },
     defaultValues: DEFAULT_VALUES,
   });
 
@@ -94,7 +105,10 @@ export const RoleCreate = () => {
 
   return (
     <CreateView>
-      <CreateViewHeader />
+      <AdminPageHeader
+        title="Thêm vai trò"
+        description="Đặt tên vai trò rồi chọn các chức năng vai trò được làm."
+      />
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -105,9 +119,9 @@ export const RoleCreate = () => {
               change between making one and changing it. */}
           <Card className="gap-0 overflow-hidden py-0">
             <div className="bg-surface-subtle border-b px-4 py-3">
-              <h2 className="text-sm leading-5 font-semibold">Role details</h2>
+              <h2 className="text-sm leading-5 font-semibold">Thông tin vai trò</h2>
               <p className="text-muted-foreground text-xs">
-                What this role is called, and what it is for.
+                Tên gọi của vai trò và vai trò dùng cho việc gì.
               </p>
             </div>
 
@@ -116,21 +130,21 @@ export const RoleCreate = () => {
                 control={form.control}
                 name="code"
                 rules={{
-                  required: "Code is required",
+                  required: "Vui lòng nhập mã vai trò.",
                   pattern: {
                     value: /^[A-Z][A-Z0-9_]*$/,
                     message:
-                      "Upper case letters, digits and underscores, starting with a letter",
+                      "Chỉ dùng chữ in hoa không dấu, chữ số và gạch dưới; bắt đầu bằng chữ.",
                   },
                 }}
                 render={({ field }) => (
                   <FormItem className="lg:col-span-3">
-                    <FormLabel>Code</FormLabel>
+                    <FormLabel>Mã vai trò</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         value={field.value ?? ""}
-                        placeholder="CONTENT_EDITOR"
+                        placeholder="Ví dụ: CAN_BO_DON_VI"
                         className="font-mono"
                         // Typing lower case and having it silently rejected is
                         // a worse experience than having it corrected as you
@@ -141,7 +155,7 @@ export const RoleCreate = () => {
                       />
                     </FormControl>
                     <FormDescription>
-                      The stable identifier. Fixed afterwards for system roles.
+                      Mã dùng nội bộ, không trùng với vai trò khác.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -151,19 +165,19 @@ export const RoleCreate = () => {
               <FormField
                 control={form.control}
                 name="name"
-                rules={{ required: "Name is required" }}
+                rules={{ required: "Vui lòng nhập tên vai trò." }}
                 render={({ field }) => (
                   <FormItem className="lg:col-span-4">
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>Tên vai trò</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         value={field.value ?? ""}
-                        placeholder="Content editor"
+                        placeholder="Ví dụ: Cán bộ đơn vị"
                       />
                     </FormControl>
                     <FormDescription>
-                      What people see in the UI.
+                      Tên này hiện khi chọn vai trò cho cán bộ.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -175,14 +189,14 @@ export const RoleCreate = () => {
                 name="description"
                 render={({ field }) => (
                   <FormItem className="lg:col-span-5">
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Mô tả</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
                         value={field.value ?? ""}
                         rows={2}
                         className="min-h-9 resize-y"
-                        placeholder="What this role is for, in one sentence."
+                        placeholder="Giải thích ngắn vai trò dùng cho việc gì."
                       />
                     </FormControl>
                     <FormMessage />
@@ -196,10 +210,7 @@ export const RoleCreate = () => {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <TabsList>
                 <TabsTrigger value="permissions">
-                  Permissions
-                  <Badge variant="secondary" className="ml-2 tabular-nums">
-                    {grantedCount}
-                  </Badge>
+                  Quyền ({grantedCount})
                 </TabsTrigger>
                 {/*
                   Present but empty rather than absent. A tab that appears only
@@ -208,7 +219,7 @@ export const RoleCreate = () => {
                   the order the work has to happen in.
                 */}
                 {mayReadScopes && (
-                  <TabsTrigger value="scopes">Data scopes</TabsTrigger>
+                  <TabsTrigger value="scopes">Phạm vi dữ liệu</TabsTrigger>
                 )}
               </TabsList>
 
@@ -240,7 +251,11 @@ export const RoleCreate = () => {
             {mayReadScopes && (
               <TabsContent value="scopes">
                 <Card className="gap-0 overflow-hidden py-0">
-                  <RoleDataScopes roleId={undefined} roleCode={undefined} />
+                  <RoleDataScopes
+                    roleId={undefined}
+                    roleCode={undefined}
+                    roleName={undefined}
+                  />
                 </Card>
               </TabsContent>
             )}
@@ -253,14 +268,14 @@ export const RoleCreate = () => {
             )}
           >
             <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Creating..." : "Create"}
+              {form.formState.isSubmitting ? "Đang tạo..." : "Tạo vai trò"}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => navigate(-1)}
             >
-              Cancel
+              Huỷ
             </Button>
           </div>
         </form>

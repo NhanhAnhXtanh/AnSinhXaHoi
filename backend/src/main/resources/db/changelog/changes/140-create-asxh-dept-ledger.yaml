@@ -1,0 +1,602 @@
+# Số liệu tổng hợp Sở (bản Jmix gọi là "sổ cái Sở" — chỉ là tên kỹ thuật; chữ người dùng thấy là
+# "số liệu tổng hợp đã lưu") và bảng bản chất chỉ tiêu dùng khi gộp nhiều kỳ.
+#
+# Phụ thuộc 100/102 (đơn vị, kỳ), 110 (biểu, phiên bản mẫu).
+#
+# Khoá ngoại tới kỳ / biểu / phiên bản mẫu là RESTRICT: kỳ đã có số liệu Sở không thu hồi được
+# (bản Jmix: hasOpenReportUsing), phiên bản mẫu đã ghim không xoá được (UC-16). Bảng con của
+# asxh_dept_reports là CASCADE.
+databaseChangeLog:
+  - changeSet:
+      id: 140-create-asxh-indicator-measures
+      author: dth
+      comment: Bản chất đại lượng của chỉ tiêu (người / lượt / đơn giá / thời gian / tiền) — quyết định cách gộp nhiều kỳ.
+      changes:
+        - createTable:
+            tableName: asxh_indicator_measures
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_indicator_measures
+              - column:
+                  name: indicator_code
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_asxh_indicator_measures_code
+              # NGUOI | LUOT | DON_GIA | THOI_GIAN | TIEN
+              - column:
+                  name: measure_kind
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: note
+                  type: varchar(1000)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+
+  - changeSet:
+      id: 140-create-asxh-dept-ledger-years
+      author: dth
+      comment: Bộ đếm phiên bản số liệu Sở chung của năm và trạng thái khoá năm (UC-60).
+      changes:
+        - createTable:
+            tableName: asxh_dept_ledger_years
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_dept_ledger_years
+              - column:
+                  name: year_no
+                  type: int
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_asxh_dept_ledger_years_year
+              - column:
+                  name: current_version
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              # OPEN | SUBMITTED | APPROVED
+              - column:
+                  name: lock_state
+                  type: varchar(20)
+                  defaultValue: OPEN
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_note
+                  type: varchar(1000)
+              - column:
+                  name: locked_at
+                  type: timestamp with time zone
+              - column:
+                  name: locked_by
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+
+  - changeSet:
+      id: 140-create-asxh-dept-reports
+      author: dth
+      comment: Số liệu tổng hợp Sở đã lưu của từng kỳ, các biểu của nó và tập phiếu nguồn đóng băng.
+      changes:
+        - createTable:
+            tableName: asxh_dept_reports
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_dept_reports
+              - column:
+                  name: period_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_asxh_dept_reports_period
+              - column:
+                  name: report_year
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ledger_version
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_fingerprint
+                  type: varchar(64)
+              - column:
+                  name: source_count
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_reports
+            baseColumnNames: period_id
+            constraintName: fk_asxh_dept_reports_period
+            referencedTableName: asxh_report_periods
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: asxh_dept_reports
+            indexName: ix_asxh_dept_reports_year
+            columns:
+              - column:
+                  name: report_year
+
+        - createTable:
+            tableName: asxh_dept_report_sheets
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_dept_report_sheets
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_version_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_order
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: draft_json
+                  type: text
+              - column:
+                  name: draft_updated_at
+                  type: timestamp with time zone
+              - column:
+                  name: draft_updated_by
+                  type: varchar(255)
+              # IN_PROGRESS | COMPLETED
+              - column:
+                  name: completion
+                  type: varchar(20)
+                  defaultValue: IN_PROGRESS
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completed_at
+                  type: timestamp with time zone
+              - column:
+                  name: completed_by
+                  type: varchar(255)
+              - column:
+                  name: revision
+                  type: bigint
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: asxh_dept_report_sheets
+            columnNames: report_id, template_id
+            constraintName: uq_asxh_dept_report_sheets_report_template
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_report_sheets
+            baseColumnNames: report_id
+            constraintName: fk_asxh_dept_report_sheets_report
+            referencedTableName: asxh_dept_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_report_sheets
+            baseColumnNames: template_id
+            constraintName: fk_asxh_dept_report_sheets_template
+            referencedTableName: asxh_templates
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_report_sheets
+            baseColumnNames: template_version_id
+            constraintName: fk_asxh_dept_report_sheets_version
+            referencedTableName: asxh_template_versions
+            referencedColumnNames: id
+            onDelete: RESTRICT
+
+        # Id thuần, không khoá ngoại tới phiếu: thu hồi kỳ xoá phiếu hàng loạt, tập nguồn là lịch sử.
+        - createTable:
+            tableName: asxh_dept_report_sources
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_dept_report_sources
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: input_report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: period_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: revision_no
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: approved_at
+                  type: timestamp with time zone
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_report_sources
+            baseColumnNames: report_id
+            constraintName: fk_asxh_dept_report_sources_report
+            referencedTableName: asxh_dept_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: asxh_dept_report_sources
+            indexName: ix_asxh_dept_report_sources_report
+            columns:
+              - column:
+                  name: report_id
+
+  - changeSet:
+      id: 140-create-asxh-dept-ledger-lines
+      author: dth
+      comment: Dòng số liệu Sở theo đơn vị × chỉ tiêu, có khoảng phiên bản năm [version_from, version_to).
+      changes:
+        - createTable:
+            tableName: asxh_dept_ledger_lines
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_dept_ledger_lines
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sheet_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # Mã quan hệ ngân sách của đơn vị, hoặc "*" = dòng "Sở điều chỉnh chung".
+              - column:
+                  name: unit_key
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_id
+                  type: bigint
+              - column:
+                  name: indicator_code
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: indicator_name
+                  type: varchar(4000)
+                  constraints:
+                    nullable: false
+              # ALL | HK1 | HK2 | YEAR
+              - column:
+                  name: slot
+                  type: varchar(10)
+                  defaultValue: ALL
+                  constraints:
+                    nullable: false
+              - column:
+                  name: measure_kind
+                  type: varchar(20)
+              - column:
+                  name: source_quantity
+                  type: numeric
+              - column:
+                  name: source_amount
+                  type: numeric
+              - column:
+                  name: quantity
+                  type: numeric
+              - column:
+                  name: amount
+                  type: numeric
+              - column:
+                  name: allocated_amount
+                  type: numeric
+              - column:
+                  name: adjust_reason
+                  type: text
+              - column:
+                  name: order_no
+                  type: int
+              - column:
+                  name: version_from
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version_to
+                  type: int
+              - column:
+                  name: change_id
+                  type: bigint
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_ledger_lines
+            baseColumnNames: report_id
+            constraintName: fk_asxh_dept_ledger_lines_report
+            referencedTableName: asxh_dept_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_ledger_lines
+            baseColumnNames: sheet_id
+            constraintName: fk_asxh_dept_ledger_lines_sheet
+            referencedTableName: asxh_dept_report_sheets
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_ledger_lines
+            baseColumnNames: unit_id
+            constraintName: fk_asxh_dept_ledger_lines_unit
+            referencedTableName: asxh_report_units
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: asxh_dept_ledger_lines
+            indexName: ix_asxh_dept_ledger_lines_sheet
+            columns:
+              - column:
+                  name: sheet_id
+              - column:
+                  name: version_to
+        - createIndex:
+            tableName: asxh_dept_ledger_lines
+            indexName: ix_asxh_dept_ledger_lines_report
+            columns:
+              - column:
+                  name: report_id
+              - column:
+                  name: version_from
+
+  - changeSet:
+      id: 140-create-asxh-dept-history
+      author: dth
+      comment: Lịch sử số liệu Sở (mốc theo phiên bản) và nhật ký từng ô thay đổi.
+      changes:
+        - createTable:
+            tableName: asxh_dept_changes
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_dept_changes
+              - column:
+                  name: report_year
+                  type: int
+                  constraints:
+                    nullable: false
+              # Số liệu kỳ; null với mốc của báo cáo năm.
+              - column:
+                  name: report_id
+                  type: bigint
+              # Id phiếu năm của slice báo cáo năm (không khoá ngoại).
+              - column:
+                  name: annual_ref
+                  type: bigint
+              - column:
+                  name: template_id
+                  type: bigint
+              - column:
+                  name: action
+                  type: varchar(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version_no
+                  type: int
+              - column:
+                  name: row_count
+                  type: int
+              - column:
+                  name: note
+                  type: varchar(1000)
+              - column:
+                  name: actor
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: occurred_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_changes
+            baseColumnNames: report_id
+            constraintName: fk_asxh_dept_changes_report
+            referencedTableName: asxh_dept_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: asxh_dept_changes
+            indexName: ix_asxh_dept_changes_report
+            columns:
+              - column:
+                  name: report_id
+        - createIndex:
+            tableName: asxh_dept_changes
+            indexName: ix_asxh_dept_changes_year
+            columns:
+              - column:
+                  name: report_year
+
+        - createTable:
+            tableName: asxh_dept_ledger_audits
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_dept_ledger_audits
+              - column:
+                  name: report_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: template_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_key
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: indicator_code
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: slot
+                  type: varchar(10)
+                  constraints:
+                    nullable: false
+              # ADDED | UPDATED | REMOVED
+              - column:
+                  name: action
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quantity_before
+                  type: numeric
+              - column:
+                  name: quantity_after
+                  type: numeric
+              - column:
+                  name: amount_before
+                  type: numeric
+              - column:
+                  name: amount_after
+                  type: numeric
+              - column:
+                  name: allocated_before
+                  type: numeric
+              - column:
+                  name: allocated_after
+                  type: numeric
+              - column:
+                  name: reason
+                  type: text
+              - column:
+                  name: operated_by
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: operated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: change_id
+                  type: bigint
+        - addForeignKeyConstraint:
+            baseTableName: asxh_dept_ledger_audits
+            baseColumnNames: report_id
+            constraintName: fk_asxh_dept_ledger_audits_report
+            referencedTableName: asxh_dept_reports
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: asxh_dept_ledger_audits
+            indexName: ix_asxh_dept_ledger_audits_report
+            columns:
+              - column:
+                  name: report_id
+              - column:
+                  name: template_id

@@ -1,0 +1,78 @@
+// Nguon: DB qt_template_script — bieu 1g, phien ban PB-000020, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1g · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1g".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// CƠ CHẾ SỔ CÁI = SỔ ĐỐI CHIẾU: 1 đơn vị/phiếu (organizationCode=''), 3 LOẠI I/II/III.
+//   Mỗi loại: đối tượng học bổng F + KINH PHÍ HỌC BỔNG H (=C*F*G*C15) → lưu ở chỉ tiêu HOC_BONG.DOI_TUONG.
+//   Các khoản đối tượng khác (đồ dùng I / đi lại J,K / ở lại Tết L) lưu số lượng (qty). KINH PHÍ KHÁC
+//   M (=SUM(I:L)) là kinh phí → lưu ở chỉ tiêu HO_TRO_KHAC.KINH_PHI (amt=M) mỗi loại.
+//   Mức C/D/E + thời gian G + lương C15 khoá → không lưu. measureKind = NGUOI.
+
+const SHEET = '1g';
+
+// row, qtyCol, amtCol (null = không có kinh phí riêng)
+const BINDINGS = [
+  // ===== Loại I — HSSV DTTS thuộc hộ nghèo (row 9) =====
+  { row: 9,  qty: 5,  amt: 7,    indicatorCode: '1G.I.HOC_BONG.DOI_TUONG',    indicatorName: 'Nội trú › HSSV DTTS hộ nghèo › Đối tượng hỗ trợ học bổng' },
+  { row: 9,  qty: 8,  amt: null, indicatorCode: '1G.I.DO_DUNG.DOI_TUONG',     indicatorName: 'Nội trú › HSSV DTTS hộ nghèo › Đối tượng hỗ trợ đồ dùng cá nhân' },
+  { row: 9,  qty: 9,  amt: null, indicatorCode: '1G.I.DI_LAI.M02',            indicatorName: 'Nội trú › HSSV DTTS hộ nghèo › Đối tượng hỗ trợ tiền đi lại mức 0,2' },
+  { row: 9,  qty: 10, amt: null, indicatorCode: '1G.I.DI_LAI.M03',            indicatorName: 'Nội trú › HSSV DTTS hộ nghèo › Đối tượng hỗ trợ tiền đi lại mức 0,3' },
+  { row: 9,  qty: 11, amt: null, indicatorCode: '1G.I.O_LAI_TET.DOI_TUONG',   indicatorName: 'Nội trú › HSSV DTTS hộ nghèo › Đối tượng hỗ trợ ở lại trường dịp Tết' },
+  { row: 9,  qty: null, amt: 12, indicatorCode: '1G.I.HO_TRO_KHAC.KINH_PHI',  indicatorName: 'Nội trú › HSSV DTTS hộ nghèo › Kinh phí hỗ trợ khác' },
+  // ===== Loại II — HSSV tốt nghiệp trường PTDT nội trú (row 10) =====
+  { row: 10, qty: 5,  amt: 7,    indicatorCode: '1G.II.HOC_BONG.DOI_TUONG',   indicatorName: 'Nội trú › HSSV tốt nghiệp PTDT nội trú › Đối tượng hỗ trợ học bổng' },
+  { row: 10, qty: 8,  amt: null, indicatorCode: '1G.II.DO_DUNG.DOI_TUONG',    indicatorName: 'Nội trú › HSSV tốt nghiệp PTDT nội trú › Đối tượng hỗ trợ đồ dùng cá nhân' },
+  { row: 10, qty: 9,  amt: null, indicatorCode: '1G.II.DI_LAI.M02',           indicatorName: 'Nội trú › HSSV tốt nghiệp PTDT nội trú › Đối tượng hỗ trợ tiền đi lại mức 0,2' },
+  { row: 10, qty: 10, amt: null, indicatorCode: '1G.II.DI_LAI.M03',           indicatorName: 'Nội trú › HSSV tốt nghiệp PTDT nội trú › Đối tượng hỗ trợ tiền đi lại mức 0,3' },
+  { row: 10, qty: 11, amt: null, indicatorCode: '1G.II.O_LAI_TET.DOI_TUONG',  indicatorName: 'Nội trú › HSSV tốt nghiệp PTDT nội trú › Đối tượng hỗ trợ ở lại trường dịp Tết' },
+  { row: 10, qty: null, amt: 12, indicatorCode: '1G.II.HO_TRO_KHAC.KINH_PHI', indicatorName: 'Nội trú › HSSV tốt nghiệp PTDT nội trú › Kinh phí hỗ trợ khác' },
+  // ===== Loại III — HSSV người Kinh thuộc hộ nghèo (row 11) =====
+  { row: 11, qty: 5,  amt: 7,    indicatorCode: '1G.III.HOC_BONG.DOI_TUONG',  indicatorName: 'Nội trú › HSSV Kinh hộ nghèo › Đối tượng hỗ trợ học bổng' },
+  { row: 11, qty: 8,  amt: null, indicatorCode: '1G.III.DO_DUNG.DOI_TUONG',   indicatorName: 'Nội trú › HSSV Kinh hộ nghèo › Đối tượng hỗ trợ đồ dùng cá nhân' },
+  { row: 11, qty: 9,  amt: null, indicatorCode: '1G.III.DI_LAI.M02',          indicatorName: 'Nội trú › HSSV Kinh hộ nghèo › Đối tượng hỗ trợ tiền đi lại mức 0,2' },
+  { row: 11, qty: 10, amt: null, indicatorCode: '1G.III.DI_LAI.M03',          indicatorName: 'Nội trú › HSSV Kinh hộ nghèo › Đối tượng hỗ trợ tiền đi lại mức 0,3' },
+  { row: 11, qty: 11, amt: null, indicatorCode: '1G.III.O_LAI_TET.DOI_TUONG', indicatorName: 'Nội trú › HSSV Kinh hộ nghèo › Đối tượng hỗ trợ ở lại trường dịp Tết' },
+  { row: 11, qty: null, amt: 12, indicatorCode: '1G.III.HO_TRO_KHAC.KINH_PHI',indicatorName: 'Nội trú › HSSV Kinh hộ nghèo › Kinh phí hỗ trợ khác' },
+];
+const NOTE_COL = 14;
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function cellVal(ctx, row, col) { return col == null ? null : num(ctx.cell.get(SHEET, row, col)); }
+
+return defineScript({
+  getInputData(ctx) {
+    const noteUsed = {};
+    return BINDINGS
+      .map((b) => {
+        let note = null;
+        if (!noteUsed[b.row]) {
+          note = optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL));
+          noteUsed[b.row] = true;
+        }
+        return {
+          organizationCode: '',
+          organizationName: '',
+          indicatorCode: b.indicatorCode,
+          indicatorName: b.indicatorName,
+          quantity: cellVal(ctx, b.row, b.qty),
+          amount: cellVal(ctx, b.row, b.amt),
+          note: note,
+        };
+      })
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});

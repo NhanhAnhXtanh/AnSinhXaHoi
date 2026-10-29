@@ -1,0 +1,67 @@
+// Nguon: DB qt_template_script — bieu 1q, phien ban PB-000031, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1q · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1q".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột. Cấu trúc MỚI (2 khối).
+//
+// CƠ CHẾ SỔ CÁI = SỔ ĐỐI CHIẾU: mỗi chỉ tiêu lưu số đối tượng (qty) + kinh phí (amt) của chính nó.
+//   Khối A: qty=O(14), amt=Q(16)=O*P. Khối B: Tết C(2)/E(4), Ốm đau F(5)/H(7), Khó khăn I(8)/K(10),
+//   Qua đời L(11)/N(13). Mức (P; D/G/J/M=0,5) + C19 khoá → không lưu. Bỏ ô tổng Q8.
+
+const SHEET = '1q';
+const NOTE_COL = 17; // R
+
+const BINDINGS = [
+  // ===== Khối A — Chế độ cung cấp thông tin (qty O=14, amt Q=16) =====
+  { row: 8,  qty: 14, amt: 16, indicatorCode: '1Q.TT.BAO_DAN_TOC',   indicatorName: 'Người có uy tín › Cung cấp thông tin › Báo Dân tộc và phát triển' },
+  { row: 9,  qty: 14, amt: 16, indicatorCode: '1Q.TT.BAO_DONG_NAI',  indicatorName: 'Người có uy tín › Cung cấp thông tin › Báo Đồng Nai' },
+  { row: 10, qty: 14, amt: 16, indicatorCode: '1Q.TT.BAO_BINH_PHUOC',indicatorName: 'Người có uy tín › Cung cấp thông tin › Báo Bình Phước' },
+  { row: 11, qty: 14, amt: 16, indicatorCode: '1Q.TT.BAN_TIN_DTTS',  indicatorName: 'Người có uy tín › Cung cấp thông tin › Bản tin DTTS và miền núi' },
+  { row: 12, qty: 14, amt: 16, indicatorCode: '1Q.TT.HOP_MAT',       indicatorName: 'Người có uy tín › Cung cấp thông tin › Họp mặt, cung cấp thông tin' },
+  { row: 13, qty: 14, amt: 16, indicatorCode: '1Q.TT.TAP_HUAN',      indicatorName: 'Người có uy tín › Cung cấp thông tin › Tập huấn, bồi dưỡng kiến thức' },
+  { row: 14, qty: 14, amt: 16, indicatorCode: '1Q.TT.HOC_TAP',       indicatorName: 'Người có uy tín › Cung cấp thông tin › Học tập, trao đổi kinh nghiệm' },
+  // ===== Khối B — Hỗ trợ vật chất (dòng r15) =====
+  { row: 15, qty: 2,  amt: 4,  indicatorCode: '1Q.TET.SO_DOI_TUONG',      indicatorName: 'Người có uy tín › Thăm hỏi tặng quà dịp Tết › Số đối tượng' },
+  { row: 15, qty: 5,  amt: 7,  indicatorCode: '1Q.OM_DAU.SO_DOI_TUONG',   indicatorName: 'Người có uy tín › Thăm hỏi hỗ trợ ốm đau › Số đối tượng' },
+  { row: 15, qty: 8,  amt: 10, indicatorCode: '1Q.KHO_KHAN.SO_DOI_TUONG', indicatorName: 'Người có uy tín › Hỗ trợ gia đình gặp khó khăn › Số đối tượng' },
+  { row: 15, qty: 11, amt: 13, indicatorCode: '1Q.QUA_DOI.SO_DOI_TUONG',  indicatorName: 'Người có uy tín › Thăm viếng khi qua đời › Số đối tượng' },
+];
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function cellVal(ctx, row, col) { return col == null ? null : num(ctx.cell.get(SHEET, row, col)); }
+
+return defineScript({
+  getInputData(ctx) {
+    const noteUsed = {};
+    return BINDINGS
+      .map((b) => {
+        let note = null;
+        if (!noteUsed[b.row]) {
+          note = optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL));
+          noteUsed[b.row] = true;
+        }
+        return {
+          organizationCode: '',
+          organizationName: '',
+          indicatorCode: b.indicatorCode,
+          indicatorName: b.indicatorName,
+          quantity: cellVal(ctx, b.row, b.qty),
+          amount: cellVal(ctx, b.row, b.amt),
+          note: note,
+        };
+      })
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});

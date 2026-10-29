@@ -1,0 +1,39 @@
+# Đơn vị báo cáo ASXH của tài khoản (UC-69, UC-70, UC-72).
+#
+# Có đơn vị => tài khoản cấp Đơn vị: chỉ thấy và chỉ ghi được phiếu của đơn vị mình
+# (InputReportRowLevelPolicies). Để trống => tài khoản Sở / UBND. Nullable vì mọi tài
+# khoản đang có đều là tài khoản Sở / quản trị.
+#
+# RESTRICT như phần còn lại của schema: xoá đơn vị còn tài khoản bị từ chối. SET NULL ở
+# đây nguy hiểm hơn vẻ ngoài — nó biến tài khoản đơn vị thành tài khoản Sở (không bị lọc
+# theo đơn vị) mà không ai hay.
+#
+# "Một đơn vị — một tài khoản" (BR-69.2) do UserService kiểm, KHÔNG đặt unique ở đây:
+# BA còn đang hỏi lại quy tắc này (UC-69 "Cần BA xác nhận"), gỡ một dòng code dễ hơn gỡ
+# một ràng buộc đã chạy trên CSDL thật.
+databaseChangeLog:
+  - changeSet:
+      id: 166-add-user-report-unit
+      author: dth
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: report_unit_id
+                  type: bigint
+        - addForeignKeyConstraint:
+            baseTableName: users
+            baseColumnNames: report_unit_id
+            constraintName: fk_users_report_unit
+            referencedTableName: asxh_report_units
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        # Lọc người dùng theo đơn vị (panel Tài khoản của màn Đơn vị) và kiểm khoá ngoại
+        # mỗi lần xoá đơn vị.
+        - createIndex:
+            tableName: users
+            indexName: idx_users_report_unit_id
+            columns:
+              - column:
+                  name: report_unit_id

@@ -1,0 +1,48 @@
+// Nguon: DB qt_template_script — bieu 1k, phien ban PB-000025, script "Script 2"
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1k · Script 2/3: VALIDATE KHI NỘP ====
+// displayOrder = 2, enabled = true, gắn biểu reportType = "1k".
+// Chạy trong TRÌNH DUYỆT khi bấm NỘP. 'ERROR' chặn nộp. Chỉ ĐỌC ô.
+// Kiểm các số đối tượng (C,D,E,J), kinh phí tuyển dụng (K nhập tay) và tổng KP (F,L công thức).
+// KHÔNG kiểm Ghi chú (M). Dòng dữ liệu = row 8.
+
+const SHEET = '1k';
+const DATA_ROW = 8;
+
+const NUMERIC_CELLS = [
+  { col: 2, label: 'Đối tượng phổ cập giáo dục' },
+  { col: 3, label: 'Đối tượng theo điểm a khoản 2 Điều 6' },
+  { col: 4, label: 'Đối tượng theo điểm a khoản 1 Điều 6' },
+  { col: 5, label: 'Kinh phí (phổ cập + ăn trưa + CP học tập)' }, // F: công thức
+  { col: 9, label: 'Đối tượng tuyển dụng một lần' },
+  { col: 10, label: 'Kinh phí tuyển dụng một lần' },
+  { col: 11, label: 'Tổng kinh phí thực hiện' },                  // L: công thức
+];
+
+function toNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+return defineScript({
+  validate(ctx) {
+    const issues = [];
+    let anyValue = false;
+    for (const cell of NUMERIC_CELLS) {
+      const n = toNumber(ctx.cell.get(SHEET, DATA_ROW, cell.col));
+      if (Number.isNaN(n)) {
+        issues.push({ severity: 'ERROR', code: 'NOT_NUMBER', message: `${cell.label}: phải là số.` });
+      } else if (typeof n === 'number') {
+        if (n < 0) issues.push({ severity: 'ERROR', code: 'NEGATIVE', message: `${cell.label}: không được âm.` });
+        if (n > 0) anyValue = true;
+      }
+    }
+    if (!anyValue) {
+      issues.push({ severity: 'ERROR', code: 'EMPTY_1K', message: 'Biểu 1k chưa có số liệu nào để nộp.' });
+    }
+    return issues;
+  },
+});

@@ -1,0 +1,64 @@
+// Nguon: DB qt_template_script — bieu 1e, phien ban PB-000016, script "Script 1"
+// Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1e · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
+// displayOrder = 1, enabled = true, gắn biểu reportType = "1e".
+// Nguồn: form-template/1e_DATA.xlsx (sheet '1e', A1:AD27). Tọa độ 0-based. Dòng dữ liệu = row 10.
+//
+// Biểu 1e (Phụ lục 01e — HS & trường PTDTBT) — BẢNG NGANG một dòng, nhiều thành phần:
+//   D(c3)=Số HS bán trú | E(c4)=Số HS hỗ trợ thêm tiền nghỉ trọ | F(c5)=Số trẻ nhà trẻ   ← NHẬP
+//   N(c13)=Mua sắm dụng cụ VH/TDTT | O(c14)=Lập tủ thuốc | P(c15)=Đồ dùng cá nhân trẻ    ← NHẬP (kinh phí NHẬP TAY)
+//   R(c17)=Ghi chú                                                                       ← NHẬP
+//   C,G,H,I,J,K,L,M,Q = CÔNG THỨC (số HS tổng, các kinh phí tính theo tham số).
+// Tham số C15:C18 (mức) và C19 (số tháng) là HẰNG SỐ CHÍNH SÁCH → KHOÁ, đơn vị không chỉnh.
+//   ‼ File Excel mẫu phải để sẵn C19 = 5 (số tháng), nếu không mọi công thức nhân số tháng ra 0.
+
+const SHEET = '1e';
+const DATA_ROW = 10;
+const INPUT_COLS = [3, 4, 5, 13, 14, 15, 17]; // D,E,F (số HS) · N,O,P (kinh phí nhập tay) · R (ghi chú)
+
+function isEditable(row, col) {
+  if (row === 0 && col === 0) return true;                       // A1 đơn vị (gộp A1:B1)
+  if (row === 2 && col === 1) return true;                       // B3 tháng/năm
+  return row === DATA_ROW && INPUT_COLS.indexOf(col) >= 0;
+}
+
+function unlockEditableCells(ctx) {
+  ctx.cell.lock(SHEET, 0, 0, false);
+  ctx.cell.lock(SHEET, 2, 1, false);
+  INPUT_COLS.forEach((col) => ctx.cell.lock(SHEET, DATA_ROW, col, false));
+}
+
+function containsOnlyEditableCells(range) {
+  if (range.sheetName !== SHEET) return false;
+  for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+    for (let col = range.col; col < range.col + range.colCount; col += 1) {
+      if (!isEditable(row, col)) return false;
+    }
+  }
+  return true;
+}
+
+return defineScript({
+  onLoad(ctx) {
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tên đơn vị của phiếu (app đưa vào ctx.shared.orgName): ghi vào ô "Chỉ tiêu / Đơn vị"
+    // của dòng nhập + dòng ĐƠN VỊ đầu biểu (A1), giống các biểu 1g–1s.
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
+    if (_org) {
+      ctx.cell.set(SHEET, DATA_ROW, 1, _org);
+      ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
+    }
+  },
+  beforeEdit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    return containsOnlyEditableCells(range);
+  },
+});

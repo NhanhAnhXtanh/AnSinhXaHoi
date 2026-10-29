@@ -1,0 +1,49 @@
+// Nguon: DB qt_template_script — bieu 1i, phien ban PB-000023, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1i · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1i".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// QUY TẮC: chỉ lưu SỐ ĐỐI TƯỢNG (C) của 5 dòng lá. Ô kinh phí F lưu VALUE (đã tính) để đối chiếu.
+//   Mức (D) và số tháng (E) là hằng số CHÍNH SÁCH khoá → không lưu. Tổng hợp tính lại kinh phí =
+//   số ĐT × mức template × số tháng × lương (C15). measureKind = NGUOI mặc định.
+
+const SHEET = '1i';
+const QTY_COL = 2, AMT_COL = 5, NOTE_COL = 7; // C số đối tượng · F kinh phí (công thức) · H ghi chú
+
+// row (0-based) + mã + tên của từng dòng đối tượng.
+const BINDINGS = [
+  { row: 7,  indicatorCode: '1I.TRE_MG',            indicatorName: 'Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › Trẻ mẫu giáo' },
+  { row: 8,  indicatorCode: '1I.HS_PHO_THONG',      indicatorName: 'Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HS tiểu học, THCS, THPT' },
+  { row: 9,  indicatorCode: '1I.HS_PTDT_BAN_TRU',   indicatorName: 'Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HS trường PTDT bán trú' },
+  { row: 10, indicatorCode: '1I.HS_PTDT_NOI_TRU',   indicatorName: 'Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HS trường PTDT nội trú' },
+  { row: 11, indicatorCode: '1I.HSSV_CAC_TRUONG',   indicatorName: 'Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HSSV tại các trường' },
+];
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+
+return defineScript({
+  getInputData(ctx) {
+    return BINDINGS
+      .map((b) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: num(ctx.cell.get(SHEET, b.row, QTY_COL)),
+        amount: num(ctx.cell.get(SHEET, b.row, AMT_COL)), // kinh phí (value công thức) — lưu để đối chiếu
+        note: optionalNote(ctx.cell.get(SHEET, b.row, NOTE_COL)),
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0) || r.note != null);
+  },
+});

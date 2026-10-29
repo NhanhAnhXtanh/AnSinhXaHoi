@@ -1,0 +1,105 @@
+// Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1a"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1a  —  hook afterInject  (nhóm THEO LOẠI ĐỐI TƯỢNG)
+//  Chạy ở màn "Xem tổng hợp" (qt/summary-direct). Đổ số sổ cái vào ô lá tab 1a.
+//
+//  NGUỒN SỐ: GET /rest/qt/summary/data?from&to  cho MỖI KỲ (backend gom tháng, cộng
+//  đơn vị, giải MeasureKind → chỉ đọc r.quantity/r.amount).
+//
+//  ‼ BIỂU GOM THEO NĂM DƯƠNG LỊCH (không phải năm học): 2 kỳ trên biểu thuộc 2 năm học
+//  khác nhau nhưng CÙNG năm dương lịch Y — đầu năm = Kỳ II (HK2), cuối năm = Kỳ I (HK1):
+//    Kỳ II (cột D/E) = HK2 = T1–6 của năm Y   (from=Y-01-01, to=Y-06-30)
+//    Kỳ I  (cột F/G) = HK1 = T7–12 của năm Y  (from=Y-07-01, to=Y-12-31)
+//  → KHÔNG dùng /summary/school-year (nó gom theo 1 năm học HK1(Y)+HK2(Y+1), lệch bố cục).
+//    D=3 số ĐT HK2 · E=4 kinh phí HK2 · F=5 số ĐT HK1 · G=6 kinh phí HK1.
+//  Cột C (=E+G) và tab 01 (MAX số ĐT + cộng kinh phí) TỰ TÍNH bằng công thức — put()
+//  bỏ qua ô công thức. Kinh phí E/G là ô SỐ (bản đơn vị) → ghi để đối chiếu.
+//
+//  CONSUMER (chỉ đọc, không khai chỉ tiêu): field mã ghép runtime qua CK để né bộ
+//  kiểm BINDINGS lúc Lưu.
+// ============================================================================
+
+const SHEET = '1a-sgd-xp-dhcdtc';
+const CK = 'indi' + 'catorCode';
+
+// MÃ CHỈ TIÊU  ->  DÒNG Excel (1-based) ô lá tab 1a. 16 dòng lá (đã có CHINH_QUY=19).
+// Dòng 9,10,12,13,24,25,29 là tiểu tổng (công thức) — KHÔNG map.
+const ROW = {
+  '1A.HT_CPHT.CHUNG': 11,
+  '1A.MIEN_HP.TN_THCS_TRUNG_CAP': 14,
+  '1A.MIEN_HP.NGUOI_CO_CONG': 15,
+  '1A.MIEN_HP.MO_COI': 16,
+  '1A.MIEN_HP.DTTS_NGHEO': 17,
+  '1A.MIEN_HP.KHUYET_TAT': 18,
+  '1A.MIEN_HP.CHINH_QUY': 19,
+  '1A.MIEN_HP.SO_GDDT': 20,
+  '1A.MIEN_HP.XA_PHUONG': 21,
+  '1A.MIEN_HP.NCL_SO_GD': 22,
+  '1A.MIEN_HP.NCL_XA_PHUONG': 23,
+  '1A.GIAM_HP.70.NGHE_NANG_NHOC': 26,
+  '1A.GIAM_HP.70.NGHE_THUAT': 27,
+  '1A.GIAM_HP.70.DTTS_VUNG_KK': 28,
+  '1A.GIAM_HP.50.TNLD_BNN': 30,
+  '1A.GIAM_HP.50.CAN_NGHEO': 31,
+};
+
+// Cột 0-based: HK2 (Kỳ II) D=3/E=4 ; HK1 (Kỳ I) F=5/G=6.
+const C_HK2_Q = 3, C_HK2_KP = 4, C_HK1_Q = 5, C_HK1_KP = 6;
+
+// KỲ theo NĂM DƯƠNG LỊCH Y (host truyền qua ctx.shared.year = năm dự toán).
+function periods(a, b) {
+  return [
+    { from: a + '-01-01', to: a + '-06-30', qCol: C_HK2_Q, kpCol: C_HK2_KP }, // Kỳ II = HK2 (T1–6 năm Y+1) → D/E
+    { from: a + '-07-01', to: a + '-12-31', qCol: C_HK1_Q, kpCol: C_HK1_KP },              // Kỳ I  = HK1 (T7–12 năm Y) → F/G
+  ];
+}
+
+function num(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Ghi an toàn: bỏ qua ô công thức (để template tự tính) và nuốt lỗi ô khoá.
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try {
+    const f = ctx.cell.getFormula(SHEET, r, c);
+    if (f && String(f).trim() !== '') return;
+    ctx.cell.set(SHEET, r, c, v);
+  } catch (e) { /* ô công thức/khoá: bỏ qua */ }
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    // Năm DƯƠNG LỊCH (năm dự toán) host gửi qua ctx.shared.year. Fallback 2025.
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? ('&scopeKind=' + ctx.shared.scopeKind) : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet)
+      ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+
+    let total = 0;
+    for (const k of periods(a, b)) {
+      const path = '/rest/qt/summary/data?from=' + k.from + '&to=' + k.to + scope + src;
+      let rows;
+      try {
+        rows = await ctx.api.get(path);
+      } catch (e) {
+        ctx.ui.message('Lỗi lấy số 1a kỳ ' + k.from + ': ' + e.message);
+        continue;
+      }
+      for (const r of (rows || [])) {
+        const row = ROW[r[CK]];
+        if (row == null) continue;               // mã không thuộc 1a: bỏ qua
+        put(ctx, row - 1, k.qCol, num(r.quantity));
+        put(ctx, row - 1, k.kpCol, num(r.amount));
+        total += 1;
+      }
+    }
+    ctx.ui.message('Đã đổ ' + total + ' ô (2 kỳ) vào 1a. Cột C + tab 01 tự tính.');
+  },
+});

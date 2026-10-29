@@ -42,6 +42,9 @@ type EditButtonProps = {
   iconOnly?: boolean;
 } & React.ComponentProps<typeof Button>;
 
+/** Refine's label is English with no i18n provider; the wording is fixed here. */
+const EDIT_LABEL = "Sửa";
+
 export const EditButton = React.forwardRef<
   React.ComponentRef<typeof Button>,
   EditButtonProps
@@ -59,13 +62,14 @@ export const EditButton = React.forwardRef<
     },
     ref
   ) => {
-    const { hidden, disabled, LinkComponent, to, label } = useEditButton({
+    const { hidden, disabled, LinkComponent, to } = useEditButton({
       resource,
       id: recordItemId,
       accessControl,
       meta,
     });
 
+    const label = EDIT_LABEL;
     const isDisabled = disabled || rest.disabled;
     const isHidden = hidden || rest.hidden;
 

@@ -1,6 +1,5 @@
-import { SignInForm } from "@/features/identity/components/sign-in-form";
-import React from "react";
+import { LoginForm } from "@/features/identity/components/login-form";
 
 export const Login = () => {
-  return <SignInForm />;
+  return <LoginForm />;
 };

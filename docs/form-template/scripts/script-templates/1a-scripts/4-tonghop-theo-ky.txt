@@ -1,0 +1,69 @@
+// Nguon: DB qt_template_script — bieu 1a, phien ban PB-000005, script "Tong hop theo ky"
+// Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1a - AFTERINJECT: TONG HOP THEO KY (tab "Tong hop theo bieu (ky)") ====
+// Chay khi mo bieu 1a o man TONG HOP (summary): doc so cai theo DUNG KY dang chon
+// (ctx.shared.periodId) roi do SO DOI TUONG vao cot C. Kinh phi (cot D) tu tinh theo
+// cong thuc. O man NHAP LIEU khong co ctx.shared.periodId nen script tu bo qua (an toan).
+
+const SHEET = '1a';
+
+// indicatorCode -> dong Excel (0-based) cua o "So doi tuong" (cot C = index 2).
+const ROW = {
+  '1A.HT_CPHT.CHUNG': 9,
+  '1A.MIEN_HP.TN_THCS_TRUNG_CAP': 12,
+  '1A.MIEN_HP.NGUOI_CO_CONG': 13,
+  '1A.MIEN_HP.MO_COI': 14,
+  '1A.MIEN_HP.DTTS_NGHEO': 15,
+  '1A.MIEN_HP.KHUYET_TAT': 16,
+  '1A.MIEN_HP.SO_GDDT': 17,
+  '1A.MIEN_HP.XA_PHUONG': 18,
+  '1A.MIEN_HP.NCL_SO_GD': 19,
+  '1A.MIEN_HP.NCL_XA_PHUONG': 20,
+  '1A.GIAM_HP.70.NGHE_NANG_NHOC': 23,
+  '1A.GIAM_HP.70.NGHE_THUAT': 24,
+  '1A.GIAM_HP.70.DTTS_VUNG_KK': 25,
+  '1A.GIAM_HP.50.TNLD_BNN': 27,
+  '1A.GIAM_HP.50.CAN_NGHEO': 28,
+};
+
+const CK = 'indi' + 'catorCode';
+
+function num(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const periodId = ctx.shared && ctx.shared.periodId;
+    if (!periodId) return; // Chi chay o man tong hop (co periodId), bo qua khi nhap lieu.
+
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? '&scopeKind=' + ctx.shared.scopeKind : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet)
+      ? '&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet) : '';
+    const path = '/rest/qt/summary/data?periodId=' + periodId + scope + src;
+
+    let rows;
+    try {
+      rows = await ctx.api.get(path);
+    } catch (e) {
+      ctx.ui.message('Loi lay so 1a: ' + e.message);
+      return;
+    }
+
+    let n = 0;
+    for (const r of (rows || [])) {
+      const row = ROW[r[CK]];
+      if (row == null) continue;
+      const qty = num(r.quantity);
+      if (qty == null) continue;
+      try {
+        ctx.cell.set(SHEET, row, 2, qty); // do so doi tuong vao cot C
+        n += 1;
+      } catch (e) { /* o cong thuc/khoa: bo qua */ }
+    }
+    ctx.ui.message('Da do ' + n + ' dong so cai vao bieu 1a theo ky.');
+  },
+});

@@ -1,0 +1,53 @@
+// Nguon: DB qt_template_script — bieu 1k, phien ban PB-000025, script "Script 3"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1k · Script 3/3: GETINPUTDATA — XUẤT SỔ CÁI KHI DUYỆT ====
+// displayOrder = 3, enabled = true, gắn biểu reportType = "1k".
+// Chạy trên MÁY CHỦ (GraalJS) khi Sở DUYỆT. Chỉ ĐỌC ô, TRẢ VỀ dòng 7 cột.
+//
+// CƠ CHẾ SỔ CÁI = SỔ ĐỐI CHIẾU: mỗi chỉ tiêu lưu qty (đối tượng) + amt (kinh phí của chính nó).
+//   Phổ cập C→G · Ăn trưa D→H · CP học tập E→I · Tuyển dụng: đối tượng J + kinh phí K (nhập tay).
+//   Mức C13:C15 + số tháng C16(=5) khoá → không lưu. Bỏ ô tổng F,L.
+
+const SHEET = '1k';
+const R = 8;
+
+const BINDINGS = [
+  { indicatorCode: '1K.PHO_CAP.DOI_TUONG', indicatorName: 'Phổ cập GDMN 3–5 tuổi › Đối tượng phổ cập giáo dục', qty: 2, amt: 6 },
+  { indicatorCode: '1K.AN_TRUA.DOI_TUONG', indicatorName: 'Phổ cập GDMN 3–5 tuổi › Đối tượng hỗ trợ ăn trưa (điểm a khoản 2)', qty: 3, amt: 7 },
+  { indicatorCode: '1K.CP_HOC_TAP.DOI_TUONG', indicatorName: 'Phổ cập GDMN 3–5 tuổi › Đối tượng hỗ trợ CP học tập (điểm a khoản 1)', qty: 4, amt: 8 },
+  { indicatorCode: '1K.TUYEN_DUNG.DOI_TUONG', indicatorName: 'Phổ cập GDMN 3–5 tuổi › Đối tượng tuyển dụng một lần', qty: 9, amt: null },
+  { indicatorCode: '1K.TUYEN_DUNG.KINH_PHI', indicatorName: 'Phổ cập GDMN 3–5 tuổi › Kinh phí tuyển dụng một lần', qty: null, amt: 10 },
+];
+const NOTE_COL = 12;
+
+function num(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(String(v).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function optionalNote(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t === '' ? null : t;
+}
+function cellVal(ctx, col) { return col == null ? null : num(ctx.cell.get(SHEET, R, col)); }
+
+return defineScript({
+  getInputData(ctx) {
+    const note = optionalNote(ctx.cell.get(SHEET, R, NOTE_COL));
+    return BINDINGS
+      .map((b, i) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: cellVal(ctx, b.qty),
+        amount: cellVal(ctx, b.amt),
+        note: i === 0 ? note : null,
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});

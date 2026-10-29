@@ -1,0 +1,62 @@
+// Nguon: DB qt_template_script — bieu 1a, phien ban PB-000005, script "Ledger"
+// Hook: getInputData. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+
+// ==== 1a · GETINPUTDATA — XUAT SO CAI KHI DUYET (ban moi: LUU CA KINH PHI) ====
+// Chay tren MAY CHU (GraalJS) khi So DUYET. Chi DOC o, TRA VE mang dong;
+// backend ghi thang QT_REPORT_LEDGER. organizationCode='' — backend gan don vi cua phieu.
+// LUU: quantity = cot C (So doi tuong, o nhap); amount = cot D (Kinh phi, doc GIA TRI da
+// tinh cua o cong thuc = So DT x tham so); note = cot E. KHONG dung getFormula (tranh loi).
+
+const SHEET = '1a';
+
+const BINDINGS = [
+  { indicatorCode: '1A.HT_CPHT.CHUNG', indicatorName: 'Hỗ trợ chi phí học tập', quantity: { row: 9, col: 2 }, amount: { row: 9, col: 3 }, note: { row: 9, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.TN_THCS_TRUNG_CAP', indicatorName: 'Miễn học phí › Tốt nghiệp THCS học lên trung cấp', quantity: { row: 12, col: 2 }, amount: { row: 12, col: 3 }, note: { row: 12, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.NGUOI_CO_CONG', indicatorName: 'Miễn học phí › Đối tượng theo Pháp lệnh Ưu đãi người có công', quantity: { row: 13, col: 2 }, amount: { row: 13, col: 3 }, note: { row: 13, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.MO_COI', indicatorName: 'Miễn học phí › HSSV mồ côi cả cha lẫn mẹ', quantity: { row: 14, col: 2 }, amount: { row: 14, col: 3 }, note: { row: 14, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.DTTS_NGHEO', indicatorName: 'Miễn học phí › HSSV dân tộc thiểu số hộ nghèo/cận nghèo', quantity: { row: 15, col: 2 }, amount: { row: 15, col: 3 }, note: { row: 15, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.KHUYET_TAT', indicatorName: 'Miễn học phí › HSSV khuyết tật', quantity: { row: 16, col: 2 }, amount: { row: 16, col: 3 }, note: { row: 16, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.SO_GDDT', indicatorName: 'Miễn học phí › Đối tượng thuộc Sở GD&ĐT', quantity: { row: 17, col: 2 }, amount: { row: 17, col: 3 }, note: { row: 17, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.XA_PHUONG', indicatorName: 'Miễn học phí › Đối tượng thuộc các xã, phường', quantity: { row: 18, col: 2 }, amount: { row: 18, col: 3 }, note: { row: 18, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.NCL_SO_GD', indicatorName: 'Miễn học phí › Hỗ trợ học phí HS ngoài công lập khối Sở GD', quantity: { row: 19, col: 2 }, amount: { row: 19, col: 3 }, note: { row: 19, col: 4 } },
+  { indicatorCode: '1A.MIEN_HP.NCL_XA_PHUONG', indicatorName: 'Miễn học phí › Hỗ trợ học phí HS ngoài công lập khối xã, phường', quantity: { row: 20, col: 2 }, amount: { row: 20, col: 3 }, note: { row: 20, col: 4 } },
+  { indicatorCode: '1A.GIAM_HP.70.NGHE_NANG_NHOC', indicatorName: 'Giảm 70% học phí › HSSV học nghề nặng nhọc, độc hại, nguy hiểm', quantity: { row: 23, col: 2 }, amount: { row: 23, col: 3 }, note: { row: 23, col: 4 } },
+  { indicatorCode: '1A.GIAM_HP.70.NGHE_THUAT', indicatorName: 'Giảm 70% học phí › HSSV học ngành nghệ thuật truyền thống, đặc thù', quantity: { row: 24, col: 2 }, amount: { row: 24, col: 3 }, note: { row: 24, col: 4 } },
+  { indicatorCode: '1A.GIAM_HP.70.DTTS_VUNG_KK', indicatorName: 'Giảm 70% học phí › Trẻ MG/HSSV dân tộc thiểu số vùng đặc biệt khó khăn', quantity: { row: 25, col: 2 }, amount: { row: 25, col: 3 }, note: { row: 25, col: 4 } },
+  { indicatorCode: '1A.GIAM_HP.50.TNLD_BNN', indicatorName: 'Giảm 50% học phí › Con cha/mẹ bị TNLĐ hoặc bệnh nghề nghiệp hưởng trợ cấp thường xuyên', quantity: { row: 27, col: 2 }, amount: { row: 27, col: 3 }, note: { row: 27, col: 4 } },
+  { indicatorCode: '1A.GIAM_HP.50.CAN_NGHEO', indicatorName: 'Giảm 50% học phí › Hộ cận nghèo theo quy định của Thủ tướng Chính phủ', quantity: { row: 28, col: 2 }, amount: { row: 28, col: 3 }, note: { row: 28, col: 4 } },
+];
+
+function num(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function optionalNote(value) {
+  const text = String(value == null ? '' : value).trim();
+  return text === '' ? null : text;
+}
+
+function cellNum(ctx, cell) {
+  return num(ctx.cell.get(SHEET, cell.row, cell.col));
+}
+
+return defineScript({
+  getInputData(ctx) {
+    return BINDINGS
+      .map((b) => ({
+        organizationCode: '',
+        organizationName: '',
+        indicatorCode: b.indicatorCode,
+        indicatorName: b.indicatorName,
+        quantity: cellNum(ctx, b.quantity),
+        amount: cellNum(ctx, b.amount),
+        note: optionalNote(ctx.cell.get(SHEET, b.note.row, b.note.col)),
+      }))
+      .filter((r) => (r.quantity != null && r.quantity !== 0)
+        || (r.amount != null && r.amount !== 0)
+        || r.note != null);
+  },
+});
