@@ -453,32 +453,42 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
     const issuesHere: SheetIssue[] = [];
     try {
       const provider = dataProvider();
-      const jobs: ValidationJob[] = [];
+      const contextOf = (code: string) => ({
+        ...scriptContext,
+        report: { ...scriptContext.report, sheetCode: code },
+      });
+      const others: typeof sheets = [];
       for (const s of sheets) {
         if (s.completion !== "COMPLETED") continue;
         const code = s.template.shortName;
-        const context = {
-          ...scriptContext,
-          report: { ...scriptContext.report, sheetCode: code },
-        };
         // Bảng đang hiện chỉ dùng được khi đã dựng xong ở đúng chế độ hiện tại; chưa xong
         // (bấm Nộp ngay sau Kiểm tra & hoàn tất) thì kiểm bản đã lưu như các biểu khác.
         if (s.id === sheetId && apiRef.current && apiEditableRef.current === sheetEditable) {
-          const result = await runClientScript(apiRef.current, scriptText, "validate", context);
+          const result = await runClientScript(apiRef.current, scriptText, "validate", contextOf(code));
           if (!result.ok) issuesHere.push(...result.messages.map((message) => ({ sheet: code, message })));
           continue;
         }
-        const { data } = await provider.getOne<InputReportSheetRecord>({ resource: SHEETS_RESOURCE, id: s.id });
+        others.push(s);
+      }
+      // Tải số liệu các biểu khác cùng lúc (trước đây tải lần lượt từng biểu); thứ tự kiểm
+      // và thứ tự lỗi vẫn theo thứ tự biểu.
+      const loaded = await Promise.all(
+        others.map((s) => provider.getOne<InputReportSheetRecord>({ resource: SHEETS_RESOURCE, id: s.id }))
+      );
+      const jobs: ValidationJob[] = [];
+      others.forEach((s, index) => {
+        const { data } = loaded[index];
         const script = data.scriptText ?? "";
-        if (script.trim() === "") continue;
+        if (script.trim() === "") return;
+        const code = s.template.shortName;
         jobs.push({
           sheetId: s.id,
           code,
           workbook: parseWorkbook(data.dataJson) ?? parseWorkbook(data.templateWorkbookJson),
           scriptText: script,
-          context,
+          context: contextOf(code),
         });
-      }
+      });
       if (jobs.length === 0) {
         finishValidation(issuesHere);
         return;

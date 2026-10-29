@@ -25,6 +25,12 @@ export interface SpreadAdapter extends ScriptWorkbookAdapter {
   resetView(sheetIndex: number): void;
   clearCellButtons(sheetIndex: number): void;
   /**
+   * Chế độ chỉ xem: mọi ô khoá và không còn nút trong ô — kết quả từng ô như
+   * `setAllCellsLocked(i, true)` + `clearCellButtons(i)`, nhưng chỉ ghi vào ô thật sự
+   * cần đổi (xem chú thích trong thân hàm).
+   */
+  lockForViewing(sheetIndex: number): void;
+  /**
    * Khoá cấu trúc tab (ẩn nút "+", chặn đổi tên/kéo tab) và đặt hiện/ẩn hàng tab.
    * Gọi lại sau mỗi fromJSON/import vì JSON có thể khôi phục option tab đã lưu.
    */
@@ -411,6 +417,47 @@ export function wrapSpreadWorkbook(
       style.locked = false;
       style.cellButtons = buildCellButtons(sheet, col, buttons);
       sheet.setStyle(row, col, style);
+    },
+    lockForViewing(sheetIndex) {
+      const sheet = sheetAt(sheetIndex);
+      // Đặt style cho CẢ vùng (getRange(0,0,hết dòng,hết cột).locked) làm SpreadJS nhân bản
+      // style từng ô: biểu tổng hợp năm (20 sheet, ~330 nghìn ô) mất vài giây chỉ để khoá.
+      // Ở đây: khoá style mặc định + style dòng + style cột (ô không có style riêng thừa
+      // hưởng từ đó), rồi chỉ sửa những ô có style riêng mà vẫn đang mở khoá / có nút.
+      const rowCount = sheet.getRowCount();
+      const colCount = sheet.getColumnCount();
+      const defaultStyle = sheet.getDefaultStyle();
+      defaultStyle.locked = true;
+      sheet.setDefaultStyle(defaultStyle);
+      if (colCount > 0) sheet.getRange(-1, 0, -1, colCount).locked(true);
+      if (rowCount > 0) sheet.getRange(0, -1, rowCount, -1).locked(true);
+
+      const used = sheet.getUsedRange(GC.Spread.Sheets.UsedRangeType.style);
+      if (!used) return;
+      const hasButtons = (style: GC.Spread.Sheets.Style | null | undefined) =>
+        (style?.cellButtons?.length ?? 0) > 0;
+      // Nút gắn ở style dòng/cột (hiếm): giữ đúng cách cũ — xoá nút trên cả vùng có style.
+      let inheritedButtons = false;
+      for (let row = 0; row < rowCount && !inheritedButtons; row += 1) {
+        inheritedButtons = hasButtons(sheet.getStyle(row, -1));
+      }
+      for (let col = 0; col < colCount && !inheritedButtons; col += 1) {
+        inheritedButtons = hasButtons(sheet.getStyle(-1, col));
+      }
+      if (inheritedButtons) {
+        sheet.getRange(used.row, used.col, used.rowCount, used.colCount).cellButtons([]);
+      }
+      for (let row = used.row; row < used.row + used.rowCount; row += 1) {
+        for (let col = used.col; col < used.col + used.colCount; col += 1) {
+          const style = sheet.getStyle(row, col);
+          if (!style) continue;
+          // locked chưa đặt nhưng kế thừa "mở khoá" từ style có tên → getActualStyle mới thấy.
+          if (style.locked !== true && sheet.getActualStyle(row, col).locked === false) {
+            sheet.getCell(row, col).locked(true);
+          }
+          if (!inheritedButtons && hasButtons(style)) sheet.getCell(row, col).cellButtons([]);
+        }
+      }
     },
     clearCellButtons(sheetIndex) {
       const sheet = sheetAt(sheetIndex);

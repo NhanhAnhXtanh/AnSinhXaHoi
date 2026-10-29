@@ -161,7 +161,9 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
 
     const load = async () => {
       const json = initial.workbook;
-      if (json != null) await adapter.fromJSON(json);
+      // Bảng ngầm không bao giờ vẽ: incrementalLoading trên workbook không vẽ có thể báo
+      // xong khi mới nạp sheet đang mở (xem spread-adapter) — phải nạp đồng bộ.
+      if (json != null) await adapter.fromJSON(json, initial.offscreen ? { incremental: false } : undefined);
       if (cancelled) return;
 
       applyTabs();
@@ -230,8 +232,7 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
       // gỡ nút trong ô, và chặn hẳn mọi thao tác sửa. Chọn/copy vẫn được.
       if (!editable) {
         for (let index = 0; index < adapter.getSheetCount(); index += 1) {
-          adapter.setAllCellsLocked(index, true);
-          adapter.clearCellButtons(index);
+          adapter.lockForViewing(index);
         }
         cleanups.push(adapter.blockAllEdits());
       }
@@ -277,9 +278,10 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
         console.error("Không mở được bảng tính:", error);
         setStatus("error");
       })
-      // Luôn vẽ lại, kể cả nhánh lỗi — bỏ sót là canvas trắng vĩnh viễn.
+      // Luôn vẽ lại, kể cả nhánh lỗi — bỏ sót là canvas trắng vĩnh viễn. Trừ bảng ngầm
+      // (offscreen): không ai nhìn nên giữ ngừng vẽ tới khi huỷ.
       .finally(() => {
-        if (!cancelled) {
+        if (!cancelled && !initial.offscreen) {
           try {
             adapter.resumePaint();
           } catch {

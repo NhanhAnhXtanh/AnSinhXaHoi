@@ -216,15 +216,12 @@ function rewriteSummaryDataPath(path: string, shared: Record<string, unknown>): 
 }
 
 function createScriptApi(shared: Record<string, unknown>): ScriptContext["api"] {
-  const request = async (path: string, init: RequestInit = {}): Promise<unknown> => {
-    const relative = resolveApiPath(rewriteSummaryDataPath(String(path ?? ""), shared));
-    const method = (init.method ?? "GET").toUpperCase();
-    if (!SCRIPT_API_METHODS.has(method)) {
-      throw new Error(
-        `ctx.api.fetch không hỗ trợ HTTP ${method}. Chỉ dùng GET, POST, PUT hoặc PATCH.`
-      );
-    }
-    let text: string;
+  // GET trùng đường dẫn trong CÙNG một ctx (một lần nạp bảng tính: onLoad + afterInject) chỉ
+  // gọi máy chủ một lần — script tổng hợp năm đọc lại cùng một nguồn cho từng sheet. Lưu CHỮ
+  // của response, mỗi lần gọi parse lại nên script sửa kết quả không ảnh hưởng lần gọi sau.
+  // Lỗi không được nhớ; mọi lệnh ghi xoá sạch bộ nhớ. GET có header riêng thì không nhớ.
+  const getCache = new Map<string, Promise<string>>();
+  const send = async (relative: string, method: string, init: RequestInit, path: string): Promise<string> => {
     try {
       const response = await kyInstance(relative, {
         method,
@@ -235,13 +232,35 @@ function createScriptApi(shared: Record<string, unknown>): ScriptContext["api"] 
       if (!response.ok) {
         throw { statusCode: response.status };
       }
-      text = await response.text();
+      return await response.text();
     } catch (error) {
       const status =
         error && typeof error === "object" && "statusCode" in error
           ? String((error as { statusCode?: unknown }).statusCode)
           : "?";
       throw new Error(`ctx.api ${method} ${path} thất bại (HTTP ${status}).`);
+    }
+  };
+  const request = async (path: string, init: RequestInit = {}): Promise<unknown> => {
+    const relative = resolveApiPath(rewriteSummaryDataPath(String(path ?? ""), shared));
+    const method = (init.method ?? "GET").toUpperCase();
+    if (!SCRIPT_API_METHODS.has(method)) {
+      throw new Error(
+        `ctx.api.fetch không hỗ trợ HTTP ${method}. Chỉ dùng GET, POST, PUT hoặc PATCH.`
+      );
+    }
+    let text: string;
+    if (method === "GET" && init.headers === undefined) {
+      let pending = getCache.get(relative);
+      if (!pending) {
+        pending = send(relative, method, init, path);
+        getCache.set(relative, pending);
+        pending.catch(() => getCache.delete(relative));
+      }
+      text = await pending;
+    } else {
+      if (method !== "GET") getCache.clear();
+      text = await send(relative, method, init, path);
     }
     if (text.trim() === "") return null;
     try {
