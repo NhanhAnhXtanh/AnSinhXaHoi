@@ -1,0 +1,48 @@
+# Dependabot: mỗi tuần mở PR cập nhật thư viện vào nhánh nhatanh (main chỉ nhận qua nhatanh).
+# Bản vá + bản nhỏ gom chung một PR mỗi hệ sinh thái để đỡ nhiễu; bản lớn tách riêng từng PR.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /backend
+    target-branch: nhatanh
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: nhatanh
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      frontend-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Giấy phép SpreadJS gắn với bản lớn: lên bản lớn phải mua key mới, làm tay.
+      - dependency-name: "@mescius/*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: nhatanh
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Ho_Chi_Minh
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
