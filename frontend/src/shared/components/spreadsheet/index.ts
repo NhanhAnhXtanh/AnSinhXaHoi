@@ -25,3 +25,7 @@ export {
 
 export { SCRIPT_HOOKS } from "./script/types";
 export type { ScriptHookName, ScriptRunMode } from "./script/types";
+
+// Ô soạn quy tắc nhập (Monaco) — chỉ tải khi vẽ, như bảng tính.
+export { ScriptEditor } from "./script-editor";
+export type { ScriptEditorProps } from "./script-editor";

@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { LoaderCircle, Play, X } from "lucide-react";
 
+import { ScriptEditor } from "@/shared/components/spreadsheet";
 import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import {
@@ -27,8 +28,8 @@ export const RUNNABLE_HOOKS: { value: string; label: string }[] = [
 
 /**
  * Khung "Công thức và quy tắc nhập" bên phải bảng thiết kế (khung 311:88923):
- * chọn bước chạy thử, vùng soạn nền tối (chữ đơn cách), nhật ký chạy thử.
- * Bản Jmix dùng Monaco; ở đây là ô soạn văn bản thường — không thêm gói mới.
+ * chọn bước chạy thử, vùng soạn nền tối (Monaco, JavaScript, có gợi ý `ctx`),
+ * nhật ký chạy thử. Monaco chỉ tải khi khung này mở (xem `ScriptEditor`).
  * Nội dung lưu cùng nút Lưu của màn (một lần với bảng tính, UC-11 / UC-12).
  */
 export function RulesPanel({
@@ -55,7 +56,6 @@ export function RulesPanel({
   className?: string;
 }) {
   const hookId = useId();
-  const codeId = useId();
 
   return (
     <aside
@@ -110,40 +110,17 @@ export function RulesPanel({
 
       {/* Vùng soạn nền tối: dùng tông của thanh bên để đọc tốt ở cả chế độ sáng và tối. */}
       <div className="bg-sidebar text-sidebar-foreground flex min-h-0 flex-1 flex-col">
-        <label htmlFor={codeId} className="sr-only">
-          Nội dung công thức và quy tắc nhập
-        </label>
-        <textarea
-          id={codeId}
+        <ScriptEditor
           value={script}
+          onChange={onChange}
           readOnly={readOnly}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
+          ariaLabel="Nội dung công thức và quy tắc nhập"
           placeholder={
             readOnly
               ? "Phiên bản này chưa có quy tắc nhập."
               : "return defineScript({\n  onLoad(ctx) {\n    // …\n  },\n})"
           }
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            // Tab chèn hai dấu cách thay vì nhảy khỏi ô soạn.
-            if (e.key !== "Tab" || readOnly || e.shiftKey) return;
-            e.preventDefault();
-            const el = e.currentTarget;
-            const { selectionStart, selectionEnd, value } = el;
-            const next = `${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`;
-            onChange(next);
-            requestAnimationFrame(() => {
-              el.selectionStart = el.selectionEnd = selectionStart + 2;
-            });
-          }}
-          className={cn(
-            "min-h-0 flex-1 resize-none bg-transparent px-4 py-3",
-            "font-mono text-xs leading-5 whitespace-pre outline-none",
-            "placeholder:text-sidebar-foreground/50",
-            "focus-visible:ring-sidebar-ring/60 focus-visible:ring-2 focus-visible:ring-inset"
-          )}
+          className="flex-1"
         />
 
         <div className="border-sidebar-border border-t px-4 py-3">

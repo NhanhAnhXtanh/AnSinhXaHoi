@@ -30,6 +30,10 @@ export default defineConfig({
         // chúng chỉ được import từ module nạp động nên không làm nặng trang đầu.
         manualChunks(id) {
           const normalized = id.replace(/\\/g, "/");
+          // Monaco (ô soạn quy tắc) cố ý KHÔNG có nhóm riêng ở đây: nó chỉ được nạp động
+          // từ shared/components/spreadsheet/script-editor/, Rollup tự tách chunk. Đặt tên
+          // nhóm cho nó thì Rollup dồn cả helper dùng chung (react, __vitePreload) vào
+          // chunk Monaco và trang đầu phải tải luôn 3 MB Monaco.
           if (!normalized.includes("/node_modules/@mescius/")) return undefined;
           if (
             /\/@mescius\/spread-sheets-(designer|print|shapes|datacharts-addon|slicers|pivot-addon|tablesheet|ganttsheet|reportsheet-addon|formula-panel)/.test(
