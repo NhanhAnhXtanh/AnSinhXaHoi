@@ -2,6 +2,7 @@ package com.dth.frw.module.asxh.summary.api;
 
 import com.dth.frw.module.asxh.annual.security.AnnualReportPermissions;
 import com.dth.frw.module.asxh.summary.security.SummaryPermissions;
+import com.dth.frw.module.asxh.unit.security.ReportUnitPermissions;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService.UnitOption;
 import java.util.List;
@@ -17,7 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code /rest/qt/master/organization-units}, phía trình duyệt đổi thành đường dẫn này).
  *
  * <p>{@code orgType} trả mã kiểu bản Jmix ({@code TINH, SO, XA, HUYEN, TRUONG, KHAC}). Chỉ đọc, quyền
- * {@code summary:read} hoặc {@code annual_reports:read} — các màn khác dùng {@code /api/report_units}.
+ * {@code summary:read}, {@code annual_reports:read} hoặc {@code report_units:read} — các màn khác dùng
+ * {@code /api/report_units}.
  */
 @RestController
 @RequestMapping("/api/master")
@@ -30,9 +32,10 @@ public class SummaryMasterDataController {
     }
 
     // Cả người xem báo cáo năm (UBND): script biểu năm tra tên / loại đơn vị ở đây — chỉ danh mục, không số liệu.
+    // Cả cán bộ đơn vị (report_units:read): script nhập hộ 1g kiểu Jmix nạp ô chọn đơn vị từ đường này.
     @GetMapping("/organization-units")
     @PreAuthorize("hasAnyAuthority('" + SummaryPermissions.SUMMARY_READ + "', '"
-            + AnnualReportPermissions.ANNUAL_READ + "')")
+            + AnnualReportPermissions.ANNUAL_READ + "', '" + ReportUnitPermissions.READ + "')")
     public List<UnitOption> organizationUnits(@RequestParam(required = false) List<String> orgType) {
         return reportService.organizationUnits(orgType);
     }
