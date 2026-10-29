@@ -4,8 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
  * E2E 4 luồng chính ASXH (ASX-159..162). Xem e2e/README.md để dựng môi trường.
  *
  * - Frontend: bản build `vite build` với VITE_API_URL trỏ backend e2e và VITE_E2E_HOOKS=1,
- *   phục vụ bằng `vite preview` ở E2E_PORT (mặc định 4180). `webServer` dưới đây tự bật
- *   preview nếu cổng chưa có ai nghe — nó KHÔNG build, build trước.
+ *   phục vụ bằng `vite preview` ở E2E_PORT (mặc định 4180). Trên Linux `webServer` dưới đây
+ *   tự bật preview nếu cổng chưa có ai nghe; nó KHÔNG build, build trước.
  * - Backend: chạy riêng (cổng E2E_API_URL, mặc định http://localhost:8090/api) trên CSDL
  *   thử (E2E_DATABASE_URL) — không bao giờ trên CSDL thật.
  *
@@ -37,10 +37,17 @@ export default defineConfig({
     navigationTimeout: 60_000,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1600, height: 900 } } }],
-  webServer: {
-    command: `npx vite preview --port ${port} --strictPort`,
-    url: baseURL,
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  // Tự bật `vite preview` (CI Linux). Trên Windows KHÔNG tự bật: Playwright bọc lệnh trong
+  // cmd.exe và lúc kết thúc không dừng được tiến trình vite con — test xong vẫn treo tới khi
+  // ai đó tắt preview (đo được: 4 test ~1 phút, cả lượt 6–8 phút). Ở Windows hãy tự chạy
+  // `npx vite preview --port 4180 --strictPort` trước (xem e2e/README.md).
+  webServer:
+    process.platform === "win32"
+      ? undefined
+      : {
+          command: `node node_modules/vite/bin/vite.js preview --port ${port} --strictPort`,
+          url: baseURL,
+          reuseExistingServer: true,
+          timeout: 60_000,
+        },
 });

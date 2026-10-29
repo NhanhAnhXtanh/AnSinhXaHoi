@@ -30,8 +30,12 @@ nộp, kỳ đã chốt…) dựng qua REST (`support/api.ts`). Mỗi spec giữ
    ```bash
    VITE_API_URL=http://localhost:8090/api VITE_E2E_HOOKS=1 npx vite build
    npx playwright install chromium   # lần đầu
-   npm run e2e                       # tự bật `vite preview` ở :4180 nếu chưa có
+   npx vite preview --port 4180 --strictPort   # Windows: tự bật ở cửa sổ khác
+   npm run e2e                       # Linux / CI: tự bật preview ở :4180 nếu chưa có
    ```
+
+   Trên Windows `playwright.config.ts` không tự bật preview: Playwright không dừng được
+   tiến trình vite con qua cmd.exe nên lượt chạy treo sau khi test xong.
 
 Biến môi trường: `E2E_API_URL` (mặc định `http://localhost:8090/api`), `E2E_DATABASE_URL`
 (mặc định `postgresql://postgres:123456@localhost:5432/dth-framework`), `E2E_PORT` (4180).
