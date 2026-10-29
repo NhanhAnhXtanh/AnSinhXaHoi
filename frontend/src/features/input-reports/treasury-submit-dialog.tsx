@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useId, useRef, useState, type DragEvent } from "react";
-import { FileText, LoaderCircle, Upload } from "lucide-react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { LoadingState } from "@/shared/components/asxh";
-import { cn } from "@/shared/lib/utils";
+import { FileUpload, type FileUploadItem } from "@/shared/components/file-upload";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import {
@@ -33,18 +31,11 @@ const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 const DEFAULT_MAX_FILES = 10;
 const ACCEPTED = ["jpg", "jpeg", "png", "pdf", "doc", "docx", "xls", "xlsx"];
 const OFFICE = ["doc", "docx", "xls", "xlsx"];
+const ACCEPT_LABEL = "ảnh JPG, PNG, tệp PDF, Word hoặc Excel";
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf(".");
   return dot < 0 ? "" : name.slice(dot + 1).toLowerCase();
-}
-
-/** "1,2 MB" / "850 KB" */
-function formatFileSize(bytes: number): string {
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} MB`;
-  }
-  return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("vi-VN")} KB`;
 }
 
 /**
@@ -67,8 +58,6 @@ export function TreasurySubmitDialog({
   onOpenChange: (open: boolean) => void;
   onSubmit: () => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
   const checkboxId = useId();
 
   const [files, setFiles] = useState<AttachmentRecord[]>([]);
@@ -102,30 +91,16 @@ export function TreasurySubmitDialog({
   const confirmed = confirmation?.confirmed ?? false;
   const required = confirmation?.required ?? true;
 
-  const addFiles = async (list: FileList | null) => {
-    if (!list || list.length === 0 || uploading) return;
+  /** Tệp đã qua kiểm tra loại / cỡ / số lượng ở `FileUpload`; gửi lần lượt, lỗi tệp nào báo tệp đó. */
+  const addFiles = async (picked: File[]) => {
+    if (uploading) return;
     setUploading(true);
-    let count = files.length;
     try {
-      for (const f of Array.from(list)) {
-        const ext = extOf(f.name);
-        if (!ACCEPTED.includes(ext)) {
-          toast.error(`Chưa tải lên được tệp ${f.name}: chỉ nhận ảnh JPG, PNG, tệp PDF, Word hoặc Excel.`);
-          continue;
-        }
-        if (f.size > maxBytes) {
-          toast.error(`Chưa tải lên được tệp ${f.name} vì lớn hơn ${maxMb} MB. Bạn hãy thu nhỏ hoặc chụp lại rồi tải lên.`);
-          continue;
-        }
-        if (count >= maxFiles) {
-          toast.error(`Mỗi phiếu đính kèm tối đa ${maxFiles} tệp. Bạn hãy gỡ bớt tệp cũ rồi tải lên lại.`);
-          break;
-        }
+      for (const f of picked) {
         try {
           const saved = await uploadAttachment(reportId, f);
-          count += 1;
           setFiles((prev) => [...prev, saved]);
-          if (OFFICE.includes(ext)) {
+          if (OFFICE.includes(extOf(f.name))) {
             toast.info(
               `Tệp ${f.name} là Word/Excel nên không xem trước được trên trình duyệt — Sở sẽ phải tải về mới mở được.`
             );
@@ -172,11 +147,8 @@ export function TreasurySubmitDialog({
     }
   };
 
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragging(false);
-    void addFiles(e.dataTransfer.files);
-  };
+  const byId = (item: FileUploadItem) => files.find((f) => f.id === item.id);
+  const items: FileUploadItem[] = files.map((f) => ({ id: f.id, name: f.fileName, size: f.fileSize }));
 
   const ready = !required || (files.length > 0 && confirmed);
   const missing = !required
@@ -197,95 +169,50 @@ export function TreasurySubmitDialog({
           <DialogDescription>Đơn vị cần gửi kèm xác nhận của Kho bạc.</DialogDescription>
         </DialogHeader>
 
-        {loading && !confirmation ? (
-          <LoadingState label="Đang tải tệp đã đính kèm…" />
-        ) : loadFailed ? (
-          <div className="flex flex-col items-center gap-2 rounded-lg border px-4 py-6 text-center text-sm">
-            <p className="text-muted-foreground">Chưa tải được tệp đã đính kèm của phiếu.</p>
-            <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
-              Thử lại
-            </Button>
+        <FileUpload
+          files={items}
+          loading={loading && !confirmation}
+          loadingLabel="Đang tải tệp đã đính kèm…"
+          loadError={loadFailed ? "Chưa tải được tệp đã đính kèm của phiếu." : undefined}
+          onRetry={() => void load()}
+          uploading={uploading}
+          accept={ACCEPTED}
+          acceptLabel={ACCEPT_LABEL}
+          maxFiles={maxFiles}
+          maxFileBytes={maxBytes}
+          hint={`Tối đa ${maxMb} MB mỗi tệp. Nhận ảnh JPG, PNG, PDF, Word hoặc Excel.`}
+          onReject={(rejections) => {
+            for (const r of rejections) {
+              toast.error(
+                r.reason === "count"
+                  ? `Mỗi phiếu đính kèm tối đa ${maxFiles} tệp. Bạn hãy gỡ bớt tệp cũ rồi tải lên lại.`
+                  : r.message
+              );
+            }
+          }}
+          onAdd={addFiles}
+          onDownload={(item) => {
+            const f = byId(item);
+            if (f) return download(f);
+          }}
+          onRemove={(item) => {
+            const f = byId(item);
+            if (f) return remove(f);
+          }}
+        />
+
+        {!(loading && !confirmation) && !loadFailed && (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={checkboxId}
+              checked={confirmed}
+              disabled={saving}
+              onCheckedChange={(v) => void toggleConfirmed(v === true)}
+            />
+            <Label htmlFor={checkboxId} className="font-normal">
+              Đã có phiếu xác nhận của Kho bạc
+            </Label>
           </div>
-        ) : (
-          <>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors",
-                dragging ? "border-primary bg-accent" : "bg-surface-subtle"
-              )}
-            >
-              <span className="flex size-9 items-center justify-center rounded-full border bg-card text-muted-foreground">
-                {uploading ? <LoaderCircle className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              </span>
-              <p className="text-sm font-medium">{uploading ? "Đang tải tệp lên…" : "Kéo thả tệp vào đây"}</p>
-              <p className="text-xs text-muted-foreground">
-                Tối đa {maxMb} MB mỗi tệp. Nhận ảnh JPG, PNG, PDF, Word hoặc Excel.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={uploading}
-                onClick={() => inputRef.current?.click()}
-              >
-                <Upload />
-                Chọn tệp
-              </Button>
-              <input
-                ref={inputRef}
-                type="file"
-                multiple
-                hidden
-                accept={ACCEPTED.map((x) => `.${x}`).join(",")}
-                onChange={(e) => {
-                  const picked = e.target.files;
-                  void addFiles(picked).finally(() => {
-                    e.target.value = "";
-                  });
-                }}
-              />
-            </div>
-
-            {files.length > 0 && (
-              <ul className="flex flex-col gap-2">
-                {files.map((f) => (
-                  <li key={f.id} className="flex items-center gap-3 rounded-md border px-3 py-2">
-                    <FileText className="size-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium" title={f.fileName}>
-                        {f.fileName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{formatFileSize(f.fileSize)}</p>
-                    </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => void download(f)}>
-                      Tải về
-                    </Button>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => void remove(f)}>
-                      Gỡ
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={checkboxId}
-                checked={confirmed}
-                disabled={saving}
-                onCheckedChange={(v) => void toggleConfirmed(v === true)}
-              />
-              <Label htmlFor={checkboxId} className="font-normal">
-                Đã có phiếu xác nhận của Kho bạc
-              </Label>
-            </div>
-          </>
         )}
 
         <DialogFooter className="items-center">

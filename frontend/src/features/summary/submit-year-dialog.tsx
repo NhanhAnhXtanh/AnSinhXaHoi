@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Calendar, CircleAlert, CircleX, FileText, LoaderCircle, Upload, X } from "lucide-react";
+import { Calendar, CircleAlert, CircleX, LoaderCircle } from "lucide-react";
 
 import { API_URL } from "@/shared/api/constants";
 import { getAccessToken, refreshSession } from "@/shared/api/session";
-import { formatNumber } from "@/shared/components/asxh";
+import { FileUpload } from "@/shared/components/file-upload";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import {
@@ -22,8 +22,8 @@ import { cn } from "@/shared/lib/utils";
 import { parseViDate, todayVi } from "./utils";
 
 const MAX_FILES = 10;
-const MAX_FILE_KB = 10 * 1024;
-const ACCEPT = ".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx";
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const ACCEPT = ["jpg", "jpeg", "png", "pdf", "doc", "docx", "xls", "xlsx"];
 
 // ---------------------------------------------------------------- báo cáo năm (API)
 
@@ -105,7 +105,7 @@ export async function submitAnnualReport(year: number, input: SubmitYearInput): 
 
 // ---------------------------------------------------------------- hộp nộp
 
-type Errors = Partial<Record<"docNo" | "docDate" | "files" | "confirm", string>>;
+type Errors = Partial<Record<"docNo" | "docDate" | "confirm", string>>;
 
 /**
  * Hộp "Nộp báo cáo năm N lên UBND?" — chỉ giữ đúng thứ phải điền: số văn bản,
@@ -139,7 +139,6 @@ export function SubmitYearDialog({
   const [errors, setErrors] = useState<Errors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
   const docNoInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -154,23 +153,6 @@ export function SubmitYearDialog({
   }, [open]);
 
   const verb = resubmit ? "Gửi lại" : "Nộp";
-
-  const addFiles = (list: FileList | null) => {
-    if (!list) return;
-    const picked = Array.from(list);
-    const tooBig = picked.filter((f) => f.size / 1024 > MAX_FILE_KB);
-    const ok = picked.filter((f) => f.size / 1024 <= MAX_FILE_KB);
-    const merged = [...files, ...ok];
-    let message: string | undefined;
-    if (tooBig.length > 0) {
-      message = `File ${tooBig.map((f) => f.name).join(", ")} lớn hơn 10 MB nên chưa được thêm.`;
-    }
-    if (merged.length > MAX_FILES) {
-      message = `Chỉ đính kèm được tối đa ${MAX_FILES} file. Hãy bỏ bớt file rồi thêm lại.`;
-    }
-    setFiles(merged.slice(0, MAX_FILES));
-    setErrors((e) => ({ ...e, files: message }));
-  };
 
   const submit = async () => {
     const next: Errors = {};
@@ -277,58 +259,19 @@ export function SubmitYearDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label>File phiếu nộp (bản ký, đóng dấu)</Label>
-            <div>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => fileInput.current?.click()}
-              >
-                <Upload aria-hidden />
-                Tải file lên
-              </Button>
-              <input
-                ref={fileInput}
-                type="file"
-                multiple
-                accept={ACCEPT}
-                className="hidden"
-                onChange={(e) => {
-                  addFiles(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-            <FieldNote error={errors.files}>
-              Không bắt buộc. Tối đa 10 file, mỗi file không quá 10 MB (ảnh, PDF, Word, Excel).
-            </FieldNote>
-            {files.length > 0 && (
-              <ul className="flex flex-col gap-1.5">
-                {files.map((f, i) => (
-                  <li
-                    key={`${f.name}-${i}`}
-                    className="bg-surface-subtle flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                  >
-                    <FileText aria-hidden className="text-muted-foreground size-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                    <span className="text-muted-foreground shrink-0 text-xs">
-                      {formatNumber(Math.max(1, Math.round(f.size / 1024)))} KB
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="size-6"
-                      disabled={busy}
-                      aria-label={`Bỏ file ${f.name}`}
-                      onClick={() => setFiles((list) => list.filter((_, j) => j !== i))}
-                    >
-                      <X aria-hidden />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <FileUpload
+              variant="button"
+              pickLabel="Tải file lên"
+              disabled={busy}
+              accept={ACCEPT}
+              acceptLabel="ảnh, PDF, Word hoặc Excel"
+              maxFiles={MAX_FILES}
+              maxFileBytes={MAX_FILE_BYTES}
+              hint="Không bắt buộc. Tối đa 10 file, mỗi file không quá 10 MB (ảnh, PDF, Word, Excel)."
+              files={files.map((f, i) => ({ id: i, name: f.name, size: f.size }))}
+              onAdd={(picked) => setFiles((list) => [...list, ...picked])}
+              onRemove={(item) => setFiles((list) => list.filter((_, j) => j !== item.id))}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
