@@ -13,8 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code scriptText} ghép từ nhiều bản ghi {@code qt_template_script} của bản Jmix (script chuyển dữ
- * liệu {@code backend/scripts/migrate-jmix}) phải chạy được ở máy chủ y như frontend
+ * {@code scriptText} ghép từ nhiều bản ghi {@code qt_template_script} của bản Jmix (dữ liệu đã chuyển
+ * sang một lần ngày 17/10/2026) phải chạy được ở máy chủ y như frontend
  * ({@code compile.ts → parseScriptText / compileRecord}): dạng nhiều lần gọi {@code defineScript}
  * (mỗi bản ghi bọc trong một hàm) và dạng mảng JSON các bản ghi.
  */
