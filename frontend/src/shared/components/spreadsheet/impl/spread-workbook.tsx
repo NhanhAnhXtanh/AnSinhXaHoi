@@ -232,8 +232,7 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
       // gỡ nút trong ô, và chặn hẳn mọi thao tác sửa. Chọn/copy vẫn được.
       if (!editable) {
         for (let index = 0; index < adapter.getSheetCount(); index += 1) {
-          adapter.setAllCellsLocked(index, true);
-          adapter.clearCellButtons(index);
+          adapter.lockForViewing(index);
         }
         cleanups.push(adapter.blockAllEdits());
       }
