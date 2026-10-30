@@ -15,9 +15,11 @@ import {
  * sandbox cứng. Script ngang mức tin cậy với công thức của mẫu: chỉ quản trị
  * soạn được và đóng băng khi ban hành.
  *
- * Khác bản Jmix: bản React lưu MỘT `scriptText` cho cả phiên bản mẫu (Jmix lưu
- * nhiều bản ghi qt_template_script). Để script cũ chạy được, `parseScriptText`
- * nhận cả ba dạng:
+ * Phiên bản mẫu có NHIỀU kịch bản (bảng `asxh_template_scripts`, như
+ * `qt_template_script` của bản Jmix); máy chủ gửi các kịch bản đang bật trong
+ * `scriptText` dạng mảng JSON (dạng 3 dưới đây) và mỗi kịch bản được biên dịch
+ * riêng — một kịch bản lỗi cú pháp không kéo các kịch bản khác. `parseScriptText`
+ * vẫn nhận cả ba dạng:
  *  1. Mã JS kết thúc bằng `return defineScript({...})` (đúng dạng một bản ghi cũ).
  *  2. Mã JS gọi `defineScript({...})` NHIỀU lần — mỗi lần là một khối script,
  *     chạy theo thứ tự gọi (tương đương nhiều bản ghi xếp theo displayOrder).
@@ -175,4 +177,22 @@ export function parseScriptText(scriptText: string): ScriptRecord[] {
       enabled: true,
     },
   ];
+}
+
+/**
+ * Tên các hook một kịch bản khai (theo thứ tự `SCRIPT_HOOKS`) — màn soạn gửi kèm khi lưu để hiển
+ * thị, như `declaredHooks` của bản Jmix. Mã lỗi cú pháp → `null`.
+ */
+export function declaredHooksOf(code: string): string | null {
+  const outcome = compileRecord({
+    id: "khai-bao",
+    name: "khai-bao",
+    sheetCode: null,
+    code,
+    displayOrder: 0,
+    enabled: true,
+  });
+  if (outcome.errors.length > 0 || outcome.scripts.length === 0) return null;
+  const names = new Set(outcome.scripts.flatMap((script) => script.declaredHooks));
+  return SCRIPT_HOOKS.filter((name) => names.has(name)).join(",") || null;
 }

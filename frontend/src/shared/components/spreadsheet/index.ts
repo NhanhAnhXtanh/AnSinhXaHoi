@@ -24,7 +24,12 @@ export {
 } from "./workbook-json";
 
 export { SCRIPT_HOOKS } from "./script/types";
-export type { ScriptHookName, ScriptRunMode } from "./script/types";
+export type { ScriptHookName, ScriptRecord, ScriptReportInfo, ScriptRunMode } from "./script/types";
+
+// Màn soạn kịch bản trong Thiết kế mẫu: chạy thử từng kịch bản, đọc danh sách hook khai.
+export { runScriptInDesigner } from "./script/designer-run";
+export type { DesignerScriptRun, DesignerScriptRunOptions } from "./script/designer-run";
+export { declaredHooksOf } from "./script/compile";
 
 // Ô soạn quy tắc nhập (Monaco) — chỉ tải khi vẽ, như bảng tính.
 export { ScriptEditor } from "./script-editor";
