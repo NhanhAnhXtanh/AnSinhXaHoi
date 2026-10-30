@@ -116,29 +116,20 @@ export function useTemplateVersion(id: string | undefined) {
   };
 }
 
-/** Các biểu của bộ mẫu (cho hàng tab biểu ở màn thiết kế) và chuỗi phiên bản của một biểu. */
-export function useDesignerContext(setId: string | null, formId: string | null) {
-  const formsQuery = useList<ApiTemplate>({
-    resource: RESOURCE.forms,
-    pagination: { pageSize: 500 },
-    sorters: [{ field: "sortOrder", order: "asc" }],
-    filters: [{ field: "set.id", operator: "eq", value: setId ?? "" }],
-    queryOptions: { enabled: Boolean(setId) },
-  });
+/** Chuỗi phiên bản của một biểu (màn thiết kế chỉ mở đúng một biểu). */
+export function useDesignerContext(formId: string | null) {
   const chainQuery = useList<ApiTemplateVersion>({
     resource: RESOURCE.versions,
     pagination: { pageSize: 200 },
     filters: [{ field: "template.id", operator: "eq", value: formId ?? "" }],
     queryOptions: { enabled: Boolean(formId) },
   });
-  const formData = formsQuery.result?.data;
   const chainData = chainQuery.result?.data;
-  const forms = useMemo(() => (formData ?? []).map(toForm), [formData]);
   const chain = useMemo(
     () => (chainData ?? []).map(toVersion).sort((a, b) => b.number - a.number),
     [chainData]
   );
-  return { forms, chain };
+  return { chain };
 }
 
 /* ------------------------------------------------------------------ */

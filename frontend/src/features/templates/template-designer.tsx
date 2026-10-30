@@ -26,7 +26,6 @@ import {
   EmptyState,
   HeaderActions,
   LoadingState,
-  SheetTabs,
   StatusBadge,
   formatDate,
   type ActionItem,
@@ -141,7 +140,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
   const setName = data.template.set.name;
   const editable = canWrite && isEditable(version.status);
 
-  const context = useDesignerContext(form.setId, form.id);
+  const context = useDesignerContext(form.id);
   const chain = context.chain.length > 0 ? context.chain : [version];
 
   /* ---------------- bảng tính ---------------- */
@@ -455,26 +454,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
           .filter(Boolean)
           .join(" · ");
 
-  /* ---------------- tab biểu ---------------- */
-
-  const tabs = context.forms.length > 0
-    ? context.forms.map((f) => ({ key: f.id, label: f.name }))
-    : [{ key: form.id, label: form.name }];
-
-  function switchForm(formId: string) {
-    if (formId === form.id) return;
-    if (dirty) {
-      toast.warning("Hãy lưu thay đổi trước khi chuyển sang biểu khác.");
-      return;
-    }
-    const target = context.forms.find((f) => f.id === formId)?.latestVersionId;
-    if (!target) {
-      toast.info("Biểu này chưa có phiên bản nào.");
-      return;
-    }
-    navigate(`/templates/designer/${target}`);
-  }
-
   const fullscreenButton = (
     <IconTool
       icon={fullscreen ? Minimize : Maximize}
@@ -565,14 +544,8 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col">{sheetArea}</div>
 
-          <div className="shrink-0 border-t px-2 py-1.5">
-            <SheetTabs
-              tabs={tabs}
-              value={form.id}
-              onChange={switchForm}
-              trailing={fullscreenButton}
-            />
-          </div>
+          {/* Màn thiết kế chỉ mở đúng một biểu; đổi biểu thì quay về Bộ biểu mẫu. */}
+          <div className="flex shrink-0 justify-end border-t px-2 py-1.5">{fullscreenButton}</div>
         </div>
 
         {mode === "design" && rulesOpen && (
