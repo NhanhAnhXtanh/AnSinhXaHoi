@@ -72,37 +72,49 @@ export const resources: ResourceProps[] = [
   //   report_units        → report_units:read       (trùng tên, suy ra thẳng)
   // Màn nào mang tên khác resource backend thì khai trong SCREEN_PERMISSIONS ở
   // `shared/lib/permissions.ts` — đổi một bên phải đổi bên kia.
-  { name: "bao_cao", meta: { label: "Báo cáo", group: true } },
+  // Menu xếp theo việc của từng vai: đơn vị nhập; Sở mở đợt rồi duyệt, tổng hợp,
+  // nộp năm lên UBND; cấu hình đầu năm; quản trị. Nhóm không còn mục nào người
+  // dùng được mở thì ẩn cả nhóm (`useAccessibleMenuItems` trong `sidebar.tsx`).
+  { name: "nhap_lieu", meta: { label: "Nhập liệu", group: true } },
   {
     name: "input_reports",
     list: "/input-reports",
     show: "/input-reports/:id",
-    meta: { label: "Nhập liệu báo cáo", icon: <SquarePen className="h-4 w-4" />, parent: "bao_cao" },
+    meta: { label: "Nhập liệu báo cáo", icon: <SquarePen className="h-4 w-4" />, parent: "nhap_lieu" },
   },
+
+  { name: "dot_bao_cao", meta: { label: "Đợt báo cáo", group: true } },
+  {
+    name: "period_setup",
+    list: "/period-setup",
+    meta: { label: "Thiết lập & điều hành", icon: <ListTodo className="h-4 w-4" />, parent: "dot_bao_cao" },
+  },
+  {
+    name: "publication_history",
+    list: "/publication-history",
+    meta: { label: "Lịch sử mở đợt", icon: <RotateCcwClock className="h-4 w-4" />, parent: "dot_bao_cao" },
+  },
+
+  { name: "duyet_tong_hop", meta: { label: "Duyệt & tổng hợp", group: true } },
   {
     name: "report_review",
     list: "/report-review",
     show: "/report-review/:id",
-    meta: { label: "Duyệt phiếu nhập", icon: <ClipboardCheck className="h-4 w-4" />, parent: "bao_cao" },
-  },
-  {
-    name: "period_setup",
-    list: "/period-setup",
-    meta: { label: "Thiết lập & điều hành", icon: <ListTodo className="h-4 w-4" />, parent: "bao_cao" },
+    meta: { label: "Duyệt phiếu nhập", icon: <ClipboardCheck className="h-4 w-4" />, parent: "duyet_tong_hop" },
   },
   {
     name: "summary",
     list: "/summary",
-    meta: { label: "Tổng hợp báo cáo", icon: <ChartColumn className="h-4 w-4" />, parent: "bao_cao" },
+    meta: { label: "Tổng hợp báo cáo", icon: <ChartColumn className="h-4 w-4" />, parent: "duyet_tong_hop" },
   },
   {
     name: "annual_review",
     list: "/annual-review",
     show: "/annual-review/:id",
-    meta: { label: "Duyệt báo cáo năm", icon: <SquareCheckBig className="h-4 w-4" />, parent: "bao_cao" },
+    meta: { label: "Duyệt báo cáo năm", icon: <SquareCheckBig className="h-4 w-4" />, parent: "duyet_tong_hop" },
   },
 
-  { name: "bieu_mau", meta: { label: "Biểu mẫu", group: true } },
+  { name: "bieu_mau", meta: { label: "Biểu mẫu & lịch", group: true } },
   {
     name: "templates",
     list: "/templates",
@@ -113,11 +125,6 @@ export const resources: ResourceProps[] = [
     list: "/report-calendar",
     meta: { label: "Lịch và kỳ báo cáo", icon: <CalendarDays className="h-4 w-4" />, parent: "bieu_mau" },
   },
-  {
-    name: "publication_history",
-    list: "/publication-history",
-    meta: { label: "Lịch sử mở đợt", icon: <RotateCcwClock className="h-4 w-4" />, parent: "bieu_mau" },
-  },
   // Bản chất chỉ tiêu tạm ẩn khỏi menu theo yêu cầu người dùng; route và mã màn
   // vẫn giữ, bật lại chỉ cần bỏ `hide`.
   {
@@ -126,17 +133,15 @@ export const resources: ResourceProps[] = [
     meta: { label: "Bản chất chỉ tiêu", hide: true, icon: <Scale className="h-4 w-4" />, parent: "bieu_mau" },
   },
 
-  // Administration. The whole section disappears for anyone without the
-  // matching permissions -- but not by itself: `useMenu` does not consult
-  // access control, so `sidebar.tsx` filters the tree it returns. See
-  // `useAccessibleMenuItems` there.
-  { name: "administration", meta: { label: "Danh mục & quản trị", group: true } },
+  // Quản trị. `useMenu` không tự xét quyền, nên `sidebar.tsx` lọc lại cây menu
+  // (`useAccessibleMenuItems`): ai không có quyền thì không thấy hai nhóm này.
+  { name: "don_vi_tai_khoan", meta: { label: "Đơn vị & tài khoản", group: true } },
   {
     name: "report_units",
     list: "/report-units",
     create: "/report-units/create",
     edit: "/report-units/edit/:id",
-    meta: { label: "Danh sách đơn vị", icon: <BuildingComplex className="h-4 w-4" />, parent: "administration" },
+    meta: { label: "Danh sách đơn vị", icon: <BuildingComplex className="h-4 w-4" />, parent: "don_vi_tai_khoan" },
   },
   {
     name: "users",
@@ -144,15 +149,17 @@ export const resources: ResourceProps[] = [
     create: "/users/create",
     edit: "/users/edit/:id",
     show: "/users/show/:id",
-    meta: { label: "Người dùng", canDelete: true, icon: <Users className="h-4 w-4" />, parent: "administration" },
+    meta: { label: "Người dùng", canDelete: true, icon: <Users className="h-4 w-4" />, parent: "don_vi_tai_khoan" },
   },
+
+  { name: "phan_quyen", meta: { label: "Phân quyền", group: true } },
   {
     name: "roles",
     list: "/roles",
     create: "/roles/create",
     edit: "/roles/edit/:id",
     show: "/roles/show/:id",
-    meta: { label: "Vai trò", canDelete: true, icon: <ShieldCheck className="h-4 w-4" />, parent: "administration" },
+    meta: { label: "Vai trò", canDelete: true, icon: <ShieldCheck className="h-4 w-4" />, parent: "phan_quyen" },
   },
   {
     name: "row_level_policies",
@@ -160,7 +167,7 @@ export const resources: ResourceProps[] = [
     create: "/row-level-policies/create",
     edit: "/row-level-policies/edit/:id",
     show: "/row-level-policies/show/:id",
-    meta: { label: "Phạm vi dữ liệu", canDelete: true, icon: <ShieldHalf className="h-4 w-4" />, parent: "administration" },
+    meta: { label: "Phạm vi dữ liệu", canDelete: true, icon: <ShieldHalf className="h-4 w-4" />, parent: "phan_quyen" },
   },
 
   // Thông báo không có mục menu nhưng chuông trên thanh đầu mở tới đây
