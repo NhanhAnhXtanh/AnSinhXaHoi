@@ -30,6 +30,7 @@ import {
   EmptyState,
   HeaderActions,
   LoadingState,
+  Pager,
   RowActions,
   StatusBadge,
   TwoLineCell,
@@ -56,7 +57,6 @@ import {
   TableRow,
 } from "@/shared/ui/table";
 import { cn } from "@/shared/lib/utils";
-import { Pager } from "@/features/report-review/components/pager";
 
 import {
   BLOCKS,

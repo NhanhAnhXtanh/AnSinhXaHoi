@@ -18,6 +18,7 @@ import {
   AsxhPage,
   EmptyState,
   LoadingState,
+  Pager,
   ProgressCell,
   QuickFilterCards,
   RowActions,
@@ -50,7 +51,6 @@ import {
   type FilterOption,
   type MoreFilterValue,
 } from "./components/more-filters";
-import { Pager } from "./components/pager";
 import { VersionHistoryDialog } from "./components/version-history-dialog";
 import {
   BLOCK_OPTIONS,
