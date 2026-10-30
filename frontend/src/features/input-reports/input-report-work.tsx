@@ -756,7 +756,6 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
             }))}
             value={String(sheetId)}
             onChange={selectSheet}
-            maxVisible={6}
             trailing={fullscreenButton}
           />
         ) : undefined

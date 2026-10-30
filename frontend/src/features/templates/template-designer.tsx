@@ -570,7 +570,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
               tabs={tabs}
               value={form.id}
               onChange={switchForm}
-              maxVisible={6}
               trailing={fullscreenButton}
             />
           </div>

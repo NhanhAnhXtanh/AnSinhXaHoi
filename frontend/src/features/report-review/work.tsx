@@ -407,7 +407,6 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
             }))}
             value={String(sheetId)}
             onChange={(k) => setSheetId(Number(k))}
-            maxVisible={8}
             trailing={
               <Button
                 type="button"
