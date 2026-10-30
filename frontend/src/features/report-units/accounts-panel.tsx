@@ -85,9 +85,6 @@ export function UnitAccountsPanel({ unit }: { unit: ReportUnit }) {
       <header className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-4">
         <div className="flex min-w-0 flex-1 flex-col">
           <h2 className="text-base leading-6 font-semibold">Tài khoản của đơn vị</h2>
-          <p className="text-muted-foreground text-xs leading-4">
-            Những người dùng được gắn với đơn vị này và đăng nhập để báo cáo.
-          </p>
         </div>
         <HeaderActions
           secondary={[
