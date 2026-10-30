@@ -37,15 +37,6 @@ export function toDraft(script: ApiTemplateScript): DraftScript {
   };
 }
 
-/**
- * Kịch bản tổng hợp = mã (bỏ chú thích) khai hàm getSummaryData — khớp
- * `TemplateScriptService.isSummaryScript` phía máy chủ.
- */
-export function isSummaryScript(code: string): boolean {
-  const stripped = code.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
-  return /\bgetSummaryData\s*[(:]/.test(stripped);
-}
-
 /** Danh sách gửi lên khi lưu — thứ tự chạy là thứ tự trong danh sách. */
 export function toPayloads(
   drafts: readonly DraftScript[],
@@ -142,28 +133,6 @@ return defineScript({
   //   return [{ organizationCode: '', indicatorCode: '1A.01', indicatorName: 'Chỉ tiêu',
   //             quantity: ctx.cell.get(SHEET, 9, 2), amount: ctx.cell.get(SHEET, 9, 3) }];
   // },
-});
-`;
-}
-
-/** Khung cho kịch bản tổng hợp mới — thêm được cả khi phiên bản đã ban hành. */
-export function newSummaryScriptTemplate(sheetName: string): string {
-  return `// Kịch bản tổng hợp — Sở sửa số trên bảng tổng hợp rồi bấm Lưu: máy chủ chạy getSummaryData.
-const SHEET = ${JSON.stringify(sheetName)}; // tên trang trong bảng tính
-return defineScript({
-  // Ô nào Sở sửa được trên bảng tổng hợp — trả false để chặn.
-  beforeEdit(ctx, cell) {
-    if (ctx.mode !== 'summary-edit') return;
-    // return cell.sheetName === SHEET && cell.col === 2;
-  },
-
-  // Đọc ô, TRẢ VỀ số Sở chốt. organizationCode rỗng = dòng gộp các đơn vị.
-  getSummaryData(ctx) {
-    return [
-      // { organizationCode: '', indicatorCode: '1A.01', indicatorName: 'Chỉ tiêu',
-      //   quantity: ctx.cell.get(SHEET, 9, 2), amount: ctx.cell.get(SHEET, 9, 3) },
-    ];
-  },
 });
 `;
 }
