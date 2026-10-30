@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useCustomMutation, useInvalidate, useList, useOne } from "@refinedev/core";
 import {
   CircleCheck,
@@ -53,6 +53,14 @@ import { NO_DATA_REASON, badgeOf, hasNoData, reviewStatus } from "./model";
 import { useReportExport } from "./use-report-export";
 
 const LIST_PATH = "/report-review";
+
+/**
+ * Màn khác mở thẳng một phiếu (Lịch sử mở đợt): `?from=` là trang để nút quay lại trở về, chỉ
+ * nhận đường dẫn trong ứng dụng; `?bieu=` là id biểu mở sẵn.
+ */
+function backPathOf(from: string | null): string {
+  return from && from.startsWith("/") && !from.startsWith("//") ? from : LIST_PATH;
+}
 const MAX_SHEETS = 200;
 
 /** Dòng phụ đầu thẻ của phiếu đang xem. */
@@ -143,6 +151,9 @@ export function ReviewWork() {
 
 function ReviewScreen({ report }: { report: InputReportRecord }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const backTo = backPathOf(searchParams.get("from"));
+  const linkedTemplateId = searchParams.get("bieu");
   const invalidate = useInvalidate();
   const { mutateAsync: postAction } = useCustomMutation<InputReportRecord>();
   const { exportReport, exporting } = useReportExport();
@@ -157,7 +168,8 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
   const sheets = sheetsResult.data;
 
   const [sheetId, setSheetId] = useState<number | undefined>(undefined);
-  if (sheetId === undefined && sheets.length > 0) setSheetId(sheets[0].id);
+  if (sheetId === undefined && sheets.length > 0)
+    setSheetId((sheets.find((s) => String(s.template.id) === linkedTemplateId) ?? sheets[0]).id);
   const sheet = sheets.find((s) => s.id === sheetId);
 
   const { result: content, query: contentQuery } = useOne<InputReportSheetRecord>({
@@ -355,7 +367,7 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
 
   const card = (
     <WorkCard
-      backTo={LIST_PATH}
+      backTo={backTo}
       className={fullscreen ? "h-full" : undefined}
       title={`${report.period.name} — ${report.unit.name}`}
       badge={

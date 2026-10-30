@@ -44,10 +44,9 @@ const InputReportWork = lazyNamed(loadInputReports, "InputReportWork");
 const ReviewList = lazyNamed(loadReportReview, "ReviewList");
 const ReviewWork = lazyNamed(loadReportReview, "ReviewWork");
 const PeriodSetup = lazyNamed(() => import("@/features/period-setup"), "PeriodSetup");
-const PublicationHistoryList = lazyNamed(
-  () => import("@/features/publication-history"),
-  "PublicationHistoryList"
-);
+const loadPublicationHistory = () => import("@/features/publication-history");
+const PublicationHistoryList = lazyNamed(loadPublicationHistory, "PublicationHistoryList");
+const PublicationDetailPage = lazyNamed(loadPublicationHistory, "PublicationDetailPage");
 const MeasureKindList = lazyNamed(() => import("@/features/measure-kinds"), "MeasureKindList");
 const SummaryPage = lazyNamed(() => import("@/features/summary"), "SummaryPage");
 const AnnualReviewList = lazyNamed(loadAnnualReview, "AnnualReviewList");
@@ -212,10 +211,13 @@ export function AppRoutes() {
           path="/publication-history"
           element={
             <CanAccess resource="publication_history" action="list" fallback={<Forbidden />}>
-              <PublicationHistoryList />
+              <Outlet />
             </CanAccess>
           }
-        />
+        >
+          <Route index element={<PublicationHistoryList />} />
+          <Route path=":id" element={<PublicationDetailPage />} />
+        </Route>
         <Route
           path="/measure-kinds"
           element={

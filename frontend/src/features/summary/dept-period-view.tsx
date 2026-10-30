@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useCustomMutation, useWarnAboutChange } from "@refinedev/core";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router";
 import {
   CheckCheck,
   Download,
@@ -76,7 +77,9 @@ export function DeptPeriodView({
   const detail = detailState.data;
   const sheets = useMemo(() => detail?.sheets ?? [], [detail]);
 
-  const [sheetKey, setSheetKey] = useState<string>("");
+  // Biểu mở sẵn khi màn khác dẫn tới (`?bieu=`); không khớp biểu nào thì về biểu đầu.
+  const [params] = useSearchParams();
+  const [sheetKey, setSheetKey] = useState<string>(() => params.get("bieu") ?? "");
   const sheet = sheets.find((s) => String(s.templateId) === sheetKey) ?? sheets[0];
   const runtimeState = useApiObject<DeptSheetRuntime>(
     sheet ? deptSheetUrl(reportId, sheet.templateId) : null,
