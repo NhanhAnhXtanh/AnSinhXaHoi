@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
-  ArrowDown,
-  ArrowUp,
   Circle,
   EllipsisVertical,
   LoaderCircle,
@@ -11,7 +9,6 @@ import {
   Play,
   Plus,
   RotateCw,
-  Save,
   Square,
   Trash2,
   X,
@@ -37,7 +34,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
@@ -58,9 +54,7 @@ import { Switch } from "@/shared/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 import {
-  isSummaryScript,
   newScriptTemplate,
-  newSummaryScriptTemplate,
   nextDraftUid,
   type DraftScript,
 } from "../script-drafts";
@@ -70,12 +64,12 @@ const LOG_LIMIT = 150;
 const ALL_SHEETS = "__moi_bieu__";
 
 /**
- * - `edit`: phiên bản Nháp / Đang thử nghiệm — sửa mọi kịch bản, lưu cùng nút Lưu của màn.
- * - `summary`: phiên bản đã ban hành / đang khoá — chỉ kịch bản tổng hợp (có getSummaryData) sửa,
- *   thêm, xoá được; lưu riêng bằng nút "Lưu kịch bản tổng hợp".
- * - `read`: chỉ xem (vẫn Chạy / Dừng để xem hiệu lực).
+ * - `edit`: phiên bản Nháp / Đang thử nghiệm — thêm, xoá, sửa mọi kịch bản, lưu cùng nút Lưu.
+ * - `read`: mọi trạng thái khác (đã ban hành, đang khoá, đã thu hồi) — chỉ xem, vẫn Chạy / Dừng
+ *   để xem hiệu lực. Khác Jmix: bản đã ban hành KHÔNG còn sửa riêng kịch bản tổng hợp; muốn đổi
+ *   thì tạo phiên bản kế tiếp rồi ban hành lại.
  */
-export type ScriptPanelMode = "edit" | "summary" | "read";
+export type ScriptPanelMode = "edit" | "read";
 
 type LogLine = { text: string };
 
@@ -83,8 +77,10 @@ type LogLine = { text: string };
  * Màn soạn kịch bản trong Thiết kế mẫu — dựng lại `ScriptEditorPanel.tsx` của bản Jmix bằng
  * thành phần giao diện của bản React:
  *
- * - danh sách kịch bản (tên, phạm vi, chấm "đang chạy", đang tắt), Thêm, menu ⋮ Chuyển lên /
- *   Chuyển xuống / Xoá;
+ * - danh sách kịch bản (tên, phạm vi, chấm "đang chạy", đang tắt), Thêm, menu ⋮ Xoá. Không có
+ *   Chuyển lên / Chuyển xuống như Jmix: máy chỉ gọi hàm kịch bản nào có, thứ tự chỉ đổi kết quả
+ *   khi hai kịch bản cùng một hàm — người dùng khó hiểu nên bỏ. Thứ tự vẫn lưu theo danh sách
+ *   (kịch bản cũ giữ thứ tự Jmix, kịch bản mới thêm vào cuối);
  * - ô Tên, Phạm vi (Mọi biểu / Riêng biểu đang mở), Bật, Mô tả, nút Xoá;
  * - Chạy / Dừng TỪNG kịch bản trên bảng đang thiết kế (gắn bộ chặn sửa ô của riêng kịch bản đó,
  *   chạy kiểm tra, chạy thử lấy số tổng hợp); khi mở khung tự chạy lần lượt các kịch bản đang bật;
@@ -102,9 +98,6 @@ export function ScriptEditorPanel({
   sheetCode,
   sheetLabel,
   workbook,
-  summaryDirty,
-  savingSummary,
-  onSaveSummary,
   onClose,
   className,
 }: {
@@ -120,9 +113,6 @@ export function ScriptEditorPanel({
   sheetLabel: string;
   /** Bảng tính đang thiết kế; null khi chưa mở xong. */
   workbook: SpreadWorkbookApi | null;
-  summaryDirty: boolean;
-  savingSummary: boolean;
-  onSaveSummary: () => void;
   onClose: () => void;
   className?: string;
 }) {
@@ -222,11 +212,8 @@ export function ScriptEditorPanel({
 
   /* ---------------- sửa danh sách ---------------- */
 
-  const canEdit = (draft: DraftScript | null) =>
-    mode === "edit" ||
-    (mode === "summary" && (draft == null || draft.id == null || isSummaryScript(draft.code)));
-  const canAdd = mode === "edit" || mode === "summary";
-  const locked = !canEdit(current) || currentRunning;
+  const canEdit = mode === "edit";
+  const locked = !canEdit || currentRunning;
 
   function update(uid: string, patch: Partial<DraftScript>) {
     onChange(list.map((d) => (d.uid === uid ? { ...d, ...patch } : d)));
@@ -238,23 +225,14 @@ export function ScriptEditorPanel({
     const draft: DraftScript = {
       uid: nextDraftUid(),
       id: null,
-      name: mode === "summary" ? `Kịch bản tổng hợp ${list.length + 1}` : `Kịch bản ${list.length + 1}`,
+      name: `Kịch bản ${list.length + 1}`,
       description: "",
       sheetCode,
-      code: mode === "summary" ? newSummaryScriptTemplate(sheetLabel) : newScriptTemplate(sheetLabel),
+      code: newScriptTemplate(sheetLabel),
       enabled: true,
     };
     onChange([...list, draft]);
     setSelectedUid(draft.uid);
-  }
-
-  function move(uid: string, delta: -1 | 1) {
-    const index = list.findIndex((d) => d.uid === uid);
-    const target = index + delta;
-    if (index < 0 || target < 0 || target >= list.length) return;
-    const next = [...list];
-    [next[index], next[target]] = [next[target], next[index]];
-    onChange(next);
   }
 
   function remove(draft: DraftScript) {
@@ -273,11 +251,7 @@ export function ScriptEditorPanel({
 
   /* ---------------- vẽ ---------------- */
 
-  const saveLabel = mode === "summary" ? "Lưu kịch bản tổng hợp" : "Lưu";
-  const removeHint =
-    mode === "summary"
-      ? `Kịch bản chỉ mất hẳn khi bấm "${saveLabel}".`
-      : "Kịch bản chỉ mất hẳn khi bấm Lưu ở đầu trang.";
+  const removeHint = "Kịch bản chỉ mất hẳn khi bấm Lưu ở đầu trang.";
 
   const header = (
     <div className="flex items-center gap-2 border-b px-4 py-2.5">
@@ -293,22 +267,9 @@ export function ScriptEditorPanel({
       <div className="bg-warning-subtle text-warning-text flex shrink-0 items-center gap-2 border-b px-4 py-2 text-xs">
         <Lock aria-hidden className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1">
-          {mode === "summary"
-            ? "Phiên bản đã ban hành — chỉ kịch bản tổng hợp (có hàm getSummaryData) sửa được; kịch bản khác chỉ xem."
-            : "Phiên bản này chỉ xem được. Vẫn Chạy / Dừng để xem hiệu lực; muốn sửa hãy tạo phiên bản kế tiếp."}
+          Phiên bản này chỉ xem được. Vẫn Chạy / Dừng để xem hiệu lực; muốn thêm, sửa, xoá kịch bản hãy
+          tạo phiên bản kế tiếp.
         </span>
-        {mode === "summary" && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!summaryDirty || savingSummary}
-            onClick={onSaveSummary}
-          >
-            {savingSummary ? <LoaderCircle aria-hidden className="animate-spin" /> : <Save aria-hidden />}
-            {saveLabel}
-          </Button>
-        )}
       </div>
     );
 
@@ -340,15 +301,15 @@ export function ScriptEditorPanel({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span className="min-w-0 flex-1 truncate text-sm font-medium">Kịch bản ({list.length})</span>
-        {canAdd && (
+        {canEdit && (
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={addScript}>
             <Plus aria-hidden />
-            {mode === "summary" ? "Thêm tổng hợp" : "Thêm"}
+            Thêm
           </Button>
         )}
       </div>
       <ul aria-label="Danh sách kịch bản" className="min-h-0 flex-1 overflow-y-auto p-1.5">
-        {list.map((item, index) => {
+        {list.map((item) => {
           const running = runningUids.includes(item.uid);
           const selected = current?.uid === item.uid;
           return (
@@ -388,7 +349,7 @@ export function ScriptEditorPanel({
                   </span>
                 </span>
               </button>
-              {canEdit(item) && (
+              {canEdit && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -401,18 +362,6 @@ export function ScriptEditorPanel({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem disabled={running || index === 0} onSelect={() => move(item.uid, -1)}>
-                      <ArrowUp aria-hidden />
-                      Chuyển lên
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={running || index === list.length - 1}
-                      onSelect={() => move(item.uid, 1)}
-                    >
-                      <ArrowDown aria-hidden />
-                      Chuyển xuống
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       variant="destructive"
                       disabled={running}
@@ -502,7 +451,7 @@ export function ScriptEditorPanel({
           <Switch
             id={enabledId}
             checked={current.enabled}
-            disabled={!canEdit(current)}
+            disabled={!canEdit}
             onCheckedChange={(checked) => {
               if (!checked && currentRunning) stopSelected();
               update(current.uid, { enabled: checked });
@@ -525,7 +474,7 @@ export function ScriptEditorPanel({
               disabled={locked}
               onChange={(e) => update(current.uid, { description: e.target.value })}
             />
-            {canEdit(current) && (
+            {canEdit && (
               <Button
                 type="button"
                 variant="outline"
@@ -541,7 +490,7 @@ export function ScriptEditorPanel({
           </div>
         </div>
       </div>
-      {currentRunning && canEdit(current) && (
+      {currentRunning && canEdit && (
         <div className="bg-success-subtle text-success-text shrink-0 border-b px-3 py-1 text-xs">
           Kịch bản đang chạy trên bảng — bị khoá để giữ nguyên trạng thái. Bấm <strong>Dừng</strong> để sửa.
         </div>
@@ -554,9 +503,7 @@ export function ScriptEditorPanel({
           readOnlyMessage={
             currentRunning
               ? "Kịch bản đang chạy — bấm Dừng để sửa."
-              : mode === "summary"
-                ? "Phiên bản đã ban hành — chỉ kịch bản tổng hợp sửa được."
-                : "Phiên bản này chỉ xem được, không sửa được."
+              : "Phiên bản này chỉ xem được — muốn sửa hãy tạo phiên bản kế tiếp."
           }
           ariaLabel={`Mã kịch bản ${current.name}`}
           onChange={(code) => update(current.uid, { code })}
