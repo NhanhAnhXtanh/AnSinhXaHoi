@@ -9,7 +9,6 @@ import {
   type HttpError,
 } from "@refinedev/core";
 import {
-  ChevronLeft,
   ChevronRight,
   FunnelX,
   Pencil,
@@ -57,6 +56,7 @@ import {
   TableRow,
 } from "@/shared/ui/table";
 import { cn } from "@/shared/lib/utils";
+import { Pager } from "@/features/report-review/components/pager";
 
 import {
   BLOCKS,
@@ -89,8 +89,6 @@ type FlatRow = {
 type PendingConfirm =
   | { kind: "delete"; unit: ReportUnit }
   | { kind: "deactivate"; unit: ReportUnit; activeDescendants: number };
-
-const PAGE_SIZES = [10, 20, 50];
 
 const LOAD_ERROR = "Không kết nối được máy chủ. Bạn kiểm tra mạng rồi thử lại.";
 
@@ -391,9 +389,6 @@ export function ReportUnitList() {
     });
   }
 
-  const from = rows.length === 0 ? 0 : safePage * pageSize + 1;
-  const to = Math.min(rows.length, (safePage + 1) * pageSize);
-
   return (
     <AsxhPage
       title="Danh sách đơn vị"
@@ -671,66 +666,17 @@ export function ReportUnitList() {
 
         {/* Phân trang */}
         {!loading && !loadError && rows.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-            <p className="text-muted-foreground text-sm tabular-nums">
-              Hiển thị {formatNumber(from)}–{formatNumber(to)} trong{" "}
-              {formatNumber(rows.length)} đơn vị
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Trang trước"
-                disabled={safePage === 0}
-                onClick={() => setPage(safePage - 1)}
-              >
-                <ChevronLeft aria-hidden />
-              </Button>
-              {Array.from({ length: pageCount }, (_, i) => (
-                <Button
-                  key={i}
-                  type="button"
-                  variant={i === safePage ? "default" : "ghost"}
-                  size="icon-sm"
-                  aria-label={`Trang ${i + 1}`}
-                  aria-current={i === safePage ? "page" : undefined}
-                  onClick={() => setPage(i)}
-                  className="tabular-nums"
-                >
-                  {i + 1}
-                </Button>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Trang sau"
-                disabled={safePage >= pageCount - 1}
-                onClick={() => setPage(safePage + 1)}
-              >
-                <ChevronRight aria-hidden />
-              </Button>
-              <Select
-                value={String(pageSize)}
-                onValueChange={(v) => {
-                  setPageSize(Number(v));
-                  setPage(0);
-                }}
-              >
-                <SelectTrigger size="sm" className="ms-2 min-w-28" aria-label="Số dòng mỗi trang">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {PAGE_SIZES.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n} / trang
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <Pager
+            page={safePage + 1}
+            pageSize={pageSize}
+            total={rows.length}
+            unit="đơn vị"
+            onPageChange={(p) => setPage(p - 1)}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
+          />
         )}
       </div>
 
