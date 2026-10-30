@@ -43,6 +43,9 @@ updates:
       # Giấy phép SpreadJS gắn với bản lớn: lên bản lớn phải mua key mới, làm tay.
       - dependency-name: "@mescius/*"
         update-types: ["version-update:semver-major"]
+      # Monaco còn ở 0.x nên bản "nhỏ" cũng đổi cấu trúc gói (0.57 bỏ đường dẫn esm/vs/... mà
+      # script-editor/monaco-setup.ts import): lên Monaco là việc riêng, làm tay.
+      - dependency-name: "monaco-editor"
 
   - package-ecosystem: github-actions
     directory: /
@@ -95,6 +98,9 @@ updates:
       # Giấy phép SpreadJS gắn với bản lớn: lên bản lớn phải mua key mới, làm tay.
       - dependency-name: "@mescius/*"
         update-types: ["version-update:semver-major"]
+      # Monaco còn ở 0.x nên bản "nhỏ" cũng đổi cấu trúc gói (0.57 bỏ đường dẫn esm/vs/... mà
+      # script-editor/monaco-setup.ts import): lên Monaco là việc riêng, làm tay.
+      - dependency-name: "monaco-editor"
 
   - package-ecosystem: github-actions
     directory: /

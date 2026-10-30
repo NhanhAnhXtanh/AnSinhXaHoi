@@ -59,8 +59,11 @@ export function Layout({ children }: PropsWithChildren) {
 
         <main
           id="main-content"
+          // Không đặt `container-type` ở đây: nó biến <main> thành khung chứa của mọi
+          // phần tử `position: fixed` bên trong, nên chế độ toàn màn hình của các màn
+          // (Nhập liệu, Duyệt phiếu, Tổng hợp, Báo cáo năm, Thiết kế mẫu) chỉ phủ được
+          // vùng nội dung, menu và thanh đầu vẫn lộ.
           className={cn(
-            "@container/main",
             "mx-auto flex w-full max-w-(--shell-max-w) flex-1 flex-col",
             // Gutters come from `styles/theme.css` so the header sits on the
             // same column and the spacing tracks the density setting.

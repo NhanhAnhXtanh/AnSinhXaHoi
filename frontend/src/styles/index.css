@@ -355,9 +355,11 @@
    exactly when a screen opens — so this needs no route keys and never forces a
    remount that would drop table filters or form state.
 
-   Tuned by the motion tokens in `styles/theme.css`. Both animations end on
-   `transform: none`, so nothing is left behind that could trap a `position:
-   fixed` descendant.
+   Tuned by the motion tokens in `styles/theme.css`. Fill mode is `backwards`,
+   not `both`: a finished animation that keeps filling leaves an identity
+   `transform` on the element, which still makes it the containing block of
+   every `position: fixed` descendant — the fullscreen modes then cover only the
+   content area. With `backwards` nothing is left once the animation ends.
    -------------------------------------------------------------------------- */
 
 @keyframes screen-enter {
@@ -384,7 +386,7 @@
 
 /* The frame: a fade and a hair of scale, no travel. */
 @utility screen-enter {
-  animation: screen-enter var(--screen-duration) var(--ease-settle) both;
+  animation: screen-enter var(--screen-duration) var(--ease-settle) backwards;
 }
 
 /* Its direct children lift into place one after another. Anything past the
@@ -393,7 +395,7 @@
 @utility screen-enter-stagger {
   & > * {
     animation: screen-enter-child var(--screen-child-duration)
-      var(--ease-settle) both;
+      var(--ease-settle) backwards;
     animation-delay: calc(var(--screen-child-step) * 3);
   }
   & > *:nth-child(1) {
