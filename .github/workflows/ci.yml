@@ -4,8 +4,9 @@
 # `if:`, GitHub tính là đạt — nên "CI ok" dùng làm check bắt buộc khi bảo vệ main mà PR chỉ đổi một
 # phần (hay chỉ đổi tài liệu) không bị kẹt chờ.
 #
-# Thứ tự: kiểm nhanh trước (biên dịch backend; kiểu / lint / kiến trúc frontend), nặng sau (test
-# backend trên Postgres, build frontend). Phần rất nặng (E2E) ở workflow riêng, chỉ chạy trên main.
+# Mọi job kiểm chạy SONG SONG ngay sau "Thay đổi": biên dịch backend và kiểu / lint / kiến trúc
+# frontend vẫn báo lỗi sớm, nhưng test backend và build frontend không đợi chúng (trước đây đợi,
+# mất thêm ~45 giây mỗi nhánh). Phần rất nặng (E2E) ở workflow riêng, chỉ chạy trên main.
 name: CI
 
 on:
@@ -77,7 +78,8 @@ jobs:
 
   backend-test:
     name: Backend · Test (${{ matrix.title }})
-    needs: [changes, backend-compile]
+    # Không đợi "Biên dịch": gradle test tự biên dịch; job đó chỉ để báo lỗi biên dịch sớm.
+    needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -202,7 +204,8 @@ jobs:
 
   frontend-build:
     name: Frontend · Build & dung lượng
-    needs: [changes, frontend-check]
+    # Không đợi kiểu / lint / kiến trúc — build là job lâu nhất, chạy song song với chúng.
+    needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -227,8 +230,10 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      # `npm run build` = `tsc && refine build`; job "Kiểu (TypeScript)" đã chạy tsc nên ở đây
+      # chỉ đóng gói.
       - name: Build
-        run: npm run build
+        run: npx refine build
       - name: Trang đầu không tải SpreadJS / Designer / Monaco
         run: npm run verify:bundle
 
