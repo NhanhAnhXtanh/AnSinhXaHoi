@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
-  ArrowDown,
-  ArrowUp,
   Circle,
   EllipsisVertical,
   LoaderCircle,
@@ -37,7 +35,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
@@ -83,8 +80,10 @@ type LogLine = { text: string };
  * Màn soạn kịch bản trong Thiết kế mẫu — dựng lại `ScriptEditorPanel.tsx` của bản Jmix bằng
  * thành phần giao diện của bản React:
  *
- * - danh sách kịch bản (tên, phạm vi, chấm "đang chạy", đang tắt), Thêm, menu ⋮ Chuyển lên /
- *   Chuyển xuống / Xoá;
+ * - danh sách kịch bản (tên, phạm vi, chấm "đang chạy", đang tắt), Thêm, menu ⋮ Xoá. Không có
+ *   Chuyển lên / Chuyển xuống như Jmix: máy chỉ gọi hàm kịch bản nào có, thứ tự chỉ đổi kết quả
+ *   khi hai kịch bản cùng một hàm — người dùng khó hiểu nên bỏ. Thứ tự vẫn lưu theo danh sách
+ *   (kịch bản cũ giữ thứ tự Jmix, kịch bản mới thêm vào cuối);
  * - ô Tên, Phạm vi (Mọi biểu / Riêng biểu đang mở), Bật, Mô tả, nút Xoá;
  * - Chạy / Dừng TỪNG kịch bản trên bảng đang thiết kế (gắn bộ chặn sửa ô của riêng kịch bản đó,
  *   chạy kiểm tra, chạy thử lấy số tổng hợp); khi mở khung tự chạy lần lượt các kịch bản đang bật;
@@ -248,15 +247,6 @@ export function ScriptEditorPanel({
     setSelectedUid(draft.uid);
   }
 
-  function move(uid: string, delta: -1 | 1) {
-    const index = list.findIndex((d) => d.uid === uid);
-    const target = index + delta;
-    if (index < 0 || target < 0 || target >= list.length) return;
-    const next = [...list];
-    [next[index], next[target]] = [next[target], next[index]];
-    onChange(next);
-  }
-
   function remove(draft: DraftScript) {
     stopScript(draft.uid);
     const index = list.findIndex((d) => d.uid === draft.uid);
@@ -348,7 +338,7 @@ export function ScriptEditorPanel({
         )}
       </div>
       <ul aria-label="Danh sách kịch bản" className="min-h-0 flex-1 overflow-y-auto p-1.5">
-        {list.map((item, index) => {
+        {list.map((item) => {
           const running = runningUids.includes(item.uid);
           const selected = current?.uid === item.uid;
           return (
@@ -401,18 +391,6 @@ export function ScriptEditorPanel({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem disabled={running || index === 0} onSelect={() => move(item.uid, -1)}>
-                      <ArrowUp aria-hidden />
-                      Chuyển lên
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={running || index === list.length - 1}
-                      onSelect={() => move(item.uid, 1)}
-                    >
-                      <ArrowDown aria-hidden />
-                      Chuyển xuống
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       variant="destructive"
                       disabled={running}
