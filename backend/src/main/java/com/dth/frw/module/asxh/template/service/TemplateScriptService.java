@@ -1,7 +1,6 @@
 package com.dth.frw.module.asxh.template.service;
 
 import com.dth.frw.domain.asxh.template.TemplateScript;
-import com.dth.frw.domain.asxh.template.TemplateStatus;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.script.ServerScriptRunner;
 import com.dth.frw.module.asxh.template.api.dto.TemplateScriptPayload;
@@ -11,7 +10,6 @@ import com.dth.frw.module.asxh.template.repo.TemplateVersionRepository;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.security.CurrentUser;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -176,57 +174,6 @@ public class TemplateScriptService {
             toSave.add(script);
         }
         repository.deleteAll(existing.values());
-        repository.flush();
-        repository.saveAll(toSave);
-        return repository.findByTemplateVersionIdOrderByDisplayOrderAscIdAsc(version.getId());
-    }
-
-    /**
-     * Thay TOÀN BỘ kịch bản TỔNG HỢP (khai {@code getSummaryData}) của phiên bản — được cả khi đã
-     * ban hành / đang khoá; chỉ chặn bản đã thu hồi. Kịch bản không khai hook đó giữ nguyên;
-     * danh sách gửi lên có kịch bản không khai hook, hoặc id trỏ tới kịch bản không thuộc nhóm
-     * tổng hợp, thì bị từ chối — không đường nào ghi đè kịch bản đơn vị qua đây.
-     *
-     * <p>Kịch bản tổng hợp xếp SAU mọi kịch bản còn lại, giữ thứ tự trong danh sách gửi lên.
-     */
-    @Transactional
-    public List<TemplateScript> replaceSummaryScripts(Long versionId, List<TemplateScriptPayload> payloads) {
-        TemplateVersion version = lockedVersion(versionId);
-        if (version.getStatus() == TemplateStatus.REVOKED) {
-            throw new ConflictException("Phiên bản này đã thu hồi nên không sửa được kịch bản.");
-        }
-        List<TemplateScriptPayload> safe = payloads == null ? List.of() : payloads;
-        validate(version, safe);
-        List<TemplateScript> all = repository.findByTemplateVersionIdOrderByDisplayOrderAscIdAsc(version.getId());
-        Map<Long, TemplateScript> summaryById = new HashMap<>();
-        int nextOrder = 0;
-        for (TemplateScript script : all) {
-            if (isSummaryScript(script.getCode())) {
-                summaryById.put(script.getId(), script);
-            } else {
-                nextOrder = Math.max(nextOrder, script.getDisplayOrder() + 1);
-            }
-        }
-        for (TemplateScriptPayload payload : safe) {
-            if (!isSummaryScript(payload.code())) {
-                throw new IllegalArgumentException("Chỉ sửa được kịch bản tổng hợp (có hàm getSummaryData); kịch bản \""
-                        + payload.name() + "\" không có hàm đó.");
-            }
-            if (payload.id() != null && !summaryById.containsKey(payload.id())) {
-                throw new IllegalArgumentException("Kịch bản \"" + payload.name()
-                        + "\" không phải kịch bản tổng hợp của phiên bản này hoặc đã bị xoá.");
-            }
-        }
-        List<TemplateScript> toSave = new ArrayList<>();
-        for (TemplateScriptPayload payload : safe) {
-            TemplateScript script = payload.id() == null ? null : summaryById.remove(payload.id());
-            if (script == null) {
-                script = newScript(version);
-            }
-            apply(script, payload, nextOrder++);
-            toSave.add(script);
-        }
-        repository.deleteAll(summaryById.values());
         repository.flush();
         repository.saveAll(toSave);
         return repository.findByTemplateVersionIdOrderByDisplayOrderAscIdAsc(version.getId());
