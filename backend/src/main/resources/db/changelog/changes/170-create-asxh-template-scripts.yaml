@@ -1,0 +1,99 @@
+# Kịch bản (script) theo phiên bản mẫu — port QT_TEMPLATE_SCRIPT của bản Jmix.
+#
+# 110 đã gộp script vào một cột asxh_template_versions.script_text; người dùng chốt quay về mô
+# hình của Jmix: một phiên bản có NHIỀU kịch bản, mỗi kịch bản bật/tắt, xếp thứ tự, phạm vi biểu
+# riêng, và máy chạy biên dịch TỪNG kịch bản (một kịch bản lỗi không kéo kịch bản khác chết theo).
+#
+# Dữ liệu cũ được tách sang bảng này ở 171. Cột script_text CỐ Ý GIỮ LẠI (không đọc / ghi nữa)
+# làm đường lùi; sẽ xoá ở một changeset sau khi bản mới chạy ổn trên máy chủ.
+databaseChangeLog:
+  - changeSet:
+      id: 170-create-asxh-template-scripts
+      author: dth
+      changes:
+        - createTable:
+            tableName: asxh_template_scripts
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_asxh_template_scripts
+              - column:
+                  name: template_version_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              # null = mọi biểu của phiên bản; BM-xxxxxx = riêng biểu đó (asxh_templates.code).
+              - column:
+                  name: sheet_code
+                  type: varchar(32)
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(500)
+              - column:
+                  name: code
+                  type: text
+                  defaultValue: ''
+                  constraints:
+                    nullable: false
+              # Chỉ để hiển thị trong màn soạn; nguồn sự thật là kết quả biên dịch lúc chạy.
+              - column:
+                  name: declared_hooks
+                  type: varchar(500)
+              - column:
+                  name: display_order
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              # SHA-256 của code lúc lưu.
+              - column:
+                  name: script_hash
+                  type: varchar(64)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(255)
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+              - column:
+                  name: updated_by
+                  type: varchar(255)
+        # CASCADE: kịch bản thuộc hẳn về phiên bản — xoá phiên bản (UC-16) thì xoá theo.
+        - addForeignKeyConstraint:
+            baseTableName: asxh_template_scripts
+            baseColumnNames: template_version_id
+            constraintName: fk_asxh_template_scripts_version
+            referencedTableName: asxh_template_versions
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: asxh_template_scripts
+            indexName: idx_asxh_template_scripts_version
+            columns:
+              - column:
+                  name: template_version_id
+              - column:
+                  name: display_order
+      rollback:
+        - dropTable:
+            tableName: asxh_template_scripts

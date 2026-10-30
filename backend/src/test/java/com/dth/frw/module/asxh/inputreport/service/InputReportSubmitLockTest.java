@@ -30,6 +30,7 @@ import com.dth.frw.module.asxh.inputreport.repo.InputReportRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.ledger.service.InputReportWorkflowHooks;
 import com.dth.frw.module.asxh.ledger.service.ReportSubmitValidationService;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
@@ -135,7 +136,7 @@ class InputReportSubmitLockTest {
         when(sheetRepository.findOne(sheetSpec())).thenReturn(Optional.of(sheet));
 
         InputReportSheetService sheets = new InputReportSheetService(sheetRepository, mock(RowLevelSecurity.class),
-                mock(ReportSubmitValidationService.class), yearLockService);
+                mock(ReportSubmitValidationService.class), yearLockService, mock(TemplateScriptService.class));
 
         ConflictException save = assertThrows(ConflictException.class,
                 () -> sheets.saveData(90L, "{\"sheets\":{}}", null));
@@ -154,7 +155,7 @@ class InputReportSubmitLockTest {
     void sheetMissingIsNotFound() {
         when(sheetRepository.lockReportOfSheet(91L)).thenReturn(Optional.empty());
         InputReportSheetService sheets = new InputReportSheetService(sheetRepository, mock(RowLevelSecurity.class),
-                mock(ReportSubmitValidationService.class), yearLockService);
+                mock(ReportSubmitValidationService.class), yearLockService, mock(TemplateScriptService.class));
 
         assertThrows(ResourceNotFoundException.class, () -> sheets.saveData(91L, "{}", null));
     }

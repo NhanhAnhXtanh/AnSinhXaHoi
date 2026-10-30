@@ -24,6 +24,7 @@ import com.dth.frw.module.asxh.summary.query.YearRollupRow;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries.ReportRow;
 import com.dth.frw.module.asxh.summary.security.SummaryPermissions;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.module.asxh.template.service.TemplateService;
 import com.dth.frw.module.asxh.template.service.TemplateVersionService;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
@@ -71,6 +72,8 @@ public class SummaryReportService {
     private final DeptYearDataQuery deptYearData;
     private final DeptYearLockService yearLockService;
 
+    private final TemplateScriptService scriptService;
+
     public SummaryReportService(SummaryAggregationService aggregation,
                                 SummaryQueries queries,
                                 ReportPeriodService periodService,
@@ -78,7 +81,9 @@ public class SummaryReportService {
                                 TemplateVersionService templateVersionService,
                                 DeptPeriodService deptPeriodService,
                                 DeptYearDataQuery deptYearData,
-                                DeptYearLockService yearLockService) {
+                                DeptYearLockService yearLockService,
+                                TemplateScriptService scriptService) {
+        this.scriptService = scriptService;
         this.aggregation = aggregation;
         this.queries = queries;
         this.periodService = periodService;
@@ -220,7 +225,7 @@ public class SummaryReportService {
         int periodCount = rows.stream().mapToInt(SummaryRow::periodCount).max().orElse(0);
         return new PeriodSheet(period.getId(), period.getName(), template.getId(), template.getCode(),
                 template.getShortName(), template.getName(), template.getShortName(), version.getId(),
-                version.getVersionNo(), borrowed, version.getWorkbookJson(), version.getScriptText(), perUnit,
+                version.getVersionNo(), borrowed, version.getWorkbookJson(), scriptService.runtimeScriptText(version), perUnit,
                 periodCount, LIVE_DATA_URL, rows);
     }
 
@@ -293,7 +298,7 @@ public class SummaryReportService {
                 && ledgerVersion > 0;
         List<Map<String, Object>> rows = dept ? deptRollupRows(year, ledgerVersion) : liveRollupRows(year);
         return new YearSheet(year, template.getId(), template.getCode(), template.getShortName(), template.getName(),
-                version.getId(), version.getVersionNo(), borrowed, version.getWorkbookJson(), version.getScriptText(),
+                version.getId(), version.getVersionNo(), borrowed, version.getWorkbookJson(), scriptService.runtimeScriptText(version),
                 dept ? "DEPT" : "LIVE", ledgerVersion,
                 dept ? "/api/dept_years/" + year + "/data" : LIVE_DATA_URL, year, year, rows);
     }

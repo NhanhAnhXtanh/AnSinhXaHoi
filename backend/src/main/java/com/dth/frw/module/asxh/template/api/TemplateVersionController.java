@@ -2,12 +2,15 @@ package com.dth.frw.module.asxh.template.api;
 
 import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.template.api.dto.PublishRequest;
+import com.dth.frw.module.asxh.template.api.dto.TemplateScriptPayload;
+import com.dth.frw.module.asxh.template.api.dto.TemplateScriptResponse;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionPatchRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionResponse;
 import com.dth.frw.module.asxh.template.repo.TemplateVersionRow;
 import com.dth.frw.module.asxh.template.security.TemplatePermissions;
 import com.dth.frw.module.asxh.template.service.TemplateDates;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.module.asxh.template.service.TemplateVersionService;
 import com.dth.frw.shared.web.ListParams;
 import com.dth.frw.shared.web.ListResponse;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -35,17 +39,21 @@ import org.springframework.web.bind.annotation.RestController;
  * mẫu), kèm các thao tác {@code POST /{id}/publish|lock|unlock|revoke}
  * (UC-13, UC-15, UC-17) và {@code GET /resolve} (UC-19).
  *
- * <p>Danh sách trả dạng gọn (không kèm workbook / script); {@code getOne} và
- * các thao tác trả dạng đầy đủ.
+ * <p>Danh sách trả dạng gọn (không kèm workbook); {@code getOne} và các thao tác
+ * trả dạng đầy đủ. Kịch bản của phiên bản: {@code GET / PUT /{id}/scripts} (port REST kịch bản
+ * của bản Jmix). Khác Jmix: không có {@code PUT /{id}/scripts/summary} — bản đã ban hành không sửa
+ * được kịch bản nào, kể cả kịch bản tổng hợp.
  */
 @RestController
 @RequestMapping("/api/template_versions")
 public class TemplateVersionController {
 
     private final TemplateVersionService service;
+    private final TemplateScriptService scriptService;
 
-    public TemplateVersionController(TemplateVersionService service) {
+    public TemplateVersionController(TemplateVersionService service, TemplateScriptService scriptService) {
         this.service = service;
+        this.scriptService = scriptService;
     }
 
     @GetMapping
@@ -154,5 +162,25 @@ public class TemplateVersionController {
     @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
     public TemplateVersionResponse revoke(@PathVariable Long id) {
         return TemplateVersionResponse.full(service.revoke(id));
+    }
+
+    // ------------------------------------------------------------- kịch bản
+
+    /** Mọi kịch bản của phiên bản (kể cả đang tắt), theo thứ tự chạy — màn soạn trong Designer. */
+    @GetMapping("/{id}/scripts")
+    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_READ + "')")
+    public List<TemplateScriptResponse> scripts(@PathVariable Long id) {
+        return scriptService.list(id).stream().map(TemplateScriptResponse::from).toList();
+    }
+
+    /**
+     * Thay CẢ danh sách kịch bản của phiên bản Nháp / Đang thử nghiệm (kịch bản không còn trong
+     * danh sách bị xoá; thứ tự chạy = thứ tự gửi lên). Bản đã ban hành / khoá / thu hồi → 409.
+     */
+    @PutMapping("/{id}/scripts")
+    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
+    public List<TemplateScriptResponse> replaceScripts(
+            @PathVariable Long id, @RequestBody List<TemplateScriptPayload> payloads) {
+        return scriptService.replaceAll(id, payloads).stream().map(TemplateScriptResponse::from).toList();
     }
 }

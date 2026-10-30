@@ -23,6 +23,7 @@ import com.dth.frw.module.asxh.summary.service.SummaryAggregationService;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService.SheetOption;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService.YearOverview;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +58,7 @@ class AnnualSubmitCheckTest {
         when(repository.findByYear(anyInt())).thenReturn(List.of());
         service = new AnnualReportService(repository, mock(AnnualReportSheetRepository.class),
                 mock(AnnualReportAttachmentRepository.class), summaryReports, mock(SummaryAggregationService.class),
-                mock(DeptYearDataQuery.class), mock(AttachmentStorage.class));
+                mock(DeptYearDataQuery.class), mock(AttachmentStorage.class), mock(TemplateScriptService.class));
     }
 
     private static DeptYearPeriod period(Long id, String name, Long deptReportId, List<String> unsaved) {

@@ -149,10 +149,8 @@ export function useVersionCommands({
       },
       {
         key: "rules",
-        label: "Soạn công thức và quy tắc nhập",
+        label: editable ? "Soạn kịch bản của biểu" : "Xem kịch bản của biểu",
         icon: CodeXml,
-        disabled: !editable,
-        reason: editable ? undefined : "Chỉ sửa được ở phiên bản nháp.",
         onSelect: () => onOpenDesigner?.(version, true),
       },
     ];

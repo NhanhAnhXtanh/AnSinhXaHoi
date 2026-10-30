@@ -22,12 +22,10 @@ import java.util.Objects;
  * Một phiên bản của một biểu — giữ workbook và script của biểu tại một thời
  * điểm áp dụng.
  *
- * <p>Gộp {@code QtTemplateVersion} + {@code QtTemplateSheet} +
- * {@code QtTemplateScript} của bản Jmix: bản cũ đã chốt "một phiên bản đúng một
- * biểu" (BR-11.1) nên tách ba bảng không còn lý do. Workbook SpreadJS và script
- * lưu nguyên dạng văn bản (JSON / mã JS).
- * TODO: chưa port máy chạy script phía máy chủ (GraalJS) và chuẩn hoá workbook
- * (cắt dòng trống, gỡ sheet "Evaluation Version") — hiện chỉ lưu và trả lại.
+ * <p>Gộp {@code QtTemplateVersion} + {@code QtTemplateSheet} của bản Jmix: bản cũ
+ * đã chốt "một phiên bản đúng một biểu" (BR-11.1). Kịch bản ({@code QtTemplateScript})
+ * vẫn là bảng riêng như bản Jmix — {@link TemplateScript}, nhiều kịch bản mỗi phiên bản.
+ * Workbook SpreadJS lưu nguyên dạng JSON.
  *
  * <p>{@link #previousVersion} là bản nguồn khi tạo bằng "phiên bản kế tiếp";
  * phiên bản đầu chuỗi để trống. Quan hệ này là thứ giữ chuỗi thẳng (không rẽ
@@ -77,7 +75,12 @@ public class TemplateVersion {
     @Column(name = "workbook_json", nullable = false, columnDefinition = "text")
     private String workbookJson = "{}";
 
-    /** Script của biểu (mã JS theo các hook onLoad, validate, getInputData…). */
+    /**
+     * CỘT CŨ, không còn đọc / ghi: script gộp của phiên bản trước khi tách thành các kịch bản
+     * {@link TemplateScript} (changeset 171). Giữ ánh xạ để còn đường lùi; xoá cùng cột ở một
+     * changeset sau khi bản mới chạy ổn trên máy chủ.
+     */
+    @Deprecated
     @Column(name = "script_text", nullable = false, columnDefinition = "text")
     private String scriptText = "";
 
@@ -169,10 +172,12 @@ public class TemplateVersion {
         this.workbookJson = workbookJson;
     }
 
+    @Deprecated
     public String getScriptText() {
         return scriptText;
     }
 
+    @Deprecated
     public void setScriptText(String scriptText) {
         this.scriptText = scriptText;
     }

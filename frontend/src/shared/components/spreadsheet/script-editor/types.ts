@@ -12,5 +12,9 @@ export type ScriptEditorProps = {
   ariaLabel: string;
   /** Tên mô hình trong Monaco (giữ lịch sử hoàn tác riêng cho từng ô). */
   path?: string;
+  /** Báo vị trí con trỏ (dòng, cột — đếm từ 1) mỗi khi đổi; dùng cho thanh trạng thái. */
+  onCursorChange?: (position: { line: number; column: number }) => void;
+  /** Cỡ chữ của ô soạn (mặc định 12). */
+  fontSize?: number;
   className?: string;
 };

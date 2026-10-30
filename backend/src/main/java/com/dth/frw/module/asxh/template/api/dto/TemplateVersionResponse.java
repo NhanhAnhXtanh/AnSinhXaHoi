@@ -11,8 +11,9 @@ import java.time.LocalDate;
 /**
  * Phiên bản mẫu trên dây.
  *
- * <p>{@code workbookJson} và {@code scriptText} chỉ có ở {@code getOne} (và các
- * thao tác trả về một phiên bản); trong danh sách để {@code null} cho nhẹ.
+ * <p>{@code workbookJson} chỉ có ở {@code getOne} (và các thao tác trả về một
+ * phiên bản); trong danh sách để {@code null} cho nhẹ. Kịch bản đọc riêng qua
+ * {@code GET /template_versions/{id}/scripts}.
  * {@code previousVersionId} là bản nguồn khi tạo bằng "phiên bản kế tiếp".
  */
 public record TemplateVersionResponse(
@@ -28,7 +29,6 @@ public record TemplateVersionResponse(
         Instant revokedAt,
         String revokedBy,
         String workbookJson,
-        String scriptText,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -69,7 +69,6 @@ public record TemplateVersionResponse(
                 row.revokedAt(),
                 row.revokedBy(),
                 null,
-                null,
                 row.createdAt(),
                 row.updatedAt());
     }
@@ -95,7 +94,6 @@ public record TemplateVersionResponse(
                 version.getRevokedAt(),
                 version.getRevokedBy(),
                 withContent ? version.getWorkbookJson() : null,
-                withContent ? version.getScriptText() : null,
                 version.getCreatedAt(),
                 version.getUpdatedAt());
     }

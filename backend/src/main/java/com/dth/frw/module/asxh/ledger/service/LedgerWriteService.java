@@ -15,6 +15,7 @@ import com.dth.frw.module.asxh.script.ScriptRow;
 import com.dth.frw.module.asxh.script.ServerScriptException;
 import com.dth.frw.module.asxh.script.ServerScriptRunner;
 import com.dth.frw.module.asxh.script.WorkbookJsonCellReader;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.shared.exception.ConflictException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -55,15 +56,18 @@ public class LedgerWriteService {
     private final LedgerReplaceService replaceService;
     private final LedgerAuditService auditService;
     private final ServerScriptRunner scriptRunner;
+    private final TemplateScriptService scriptService;
 
     public LedgerWriteService(LedgerEntryRepository entryRepository,
                               LedgerReplaceService replaceService,
                               LedgerAuditService auditService,
-                              ServerScriptRunner scriptRunner) {
+                              ServerScriptRunner scriptRunner,
+                              TemplateScriptService scriptService) {
         this.entryRepository = entryRepository;
         this.replaceService = replaceService;
         this.auditService = auditService;
         this.scriptRunner = scriptRunner;
+        this.scriptService = scriptService;
     }
 
     // ------------------------------------------------------------------ kiểu kết quả
@@ -325,15 +329,16 @@ public class LedgerWriteService {
             return new SheetRun(RunStatus.SKIP, List.of());
         }
         TemplateVersion version = sheet.getTemplateVersion();
-        String scriptText = version == null ? null : version.getScriptText();
+        // Mọi kịch bản đang bật của phiên bản, theo thứ tự chạy — mỗi kịch bản biên dịch riêng.
+        List<ServerScriptRunner.ScriptSource> scripts = scriptService.runtimeSources(version);
         // Biểu ĐÃ CÓ số liệu mà mẫu không có script: KHÔNG được duyệt với số liệu rỗng.
-        if (scriptText == null || scriptText.isBlank()) {
+        if (scripts.isEmpty()) {
             return new SheetRun(RunStatus.NO_HOOK, null);
         }
         Template template = sheet.getTemplate();
         ServerScriptRunner.GetInputDataResult result = scriptRunner.runGetInputData(
                 workbookJson,
-                List.of(new ServerScriptRunner.ScriptSource(sheetLabel(template), scriptText)),
+                scripts,
                 reportInfo(report, template, ReportStatus.APPROVED));
         // Hook xác định bằng việc THỰC SỰ chạy được, không bằng tìm chuỗi "getInputData" trong mã.
         if (result.executedHookCount() == 0) {

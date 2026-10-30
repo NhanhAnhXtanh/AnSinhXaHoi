@@ -9,6 +9,7 @@ import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.attachment.service.InputReportAttachmentService;
 import com.dth.frw.module.asxh.script.ServerScriptRunner;
 import com.dth.frw.module.asxh.script.WorkbookJsonCellReader;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.shared.exception.ConflictException;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,12 +39,15 @@ public class ReportSubmitValidationService {
     private static final int MAX_REPORTED_ISSUES = 10;
 
     private final ServerScriptRunner scriptRunner;
+    private final TemplateScriptService scriptService;
     private final InputReportAttachmentService attachmentService;
 
     public ReportSubmitValidationService(ServerScriptRunner scriptRunner,
-                                         InputReportAttachmentService attachmentService) {
+                                         InputReportAttachmentService attachmentService,
+                                         TemplateScriptService scriptService) {
         this.scriptRunner = scriptRunner;
         this.attachmentService = attachmentService;
+        this.scriptService = scriptService;
     }
 
     /**
@@ -88,14 +92,16 @@ public class ReportSubmitValidationService {
             return List.of();
         }
         TemplateVersion version = sheet.getTemplateVersion();
-        String scriptText = version == null ? null : version.getScriptText();
-        if (scriptText == null || scriptText.isBlank()) {
+        // Mỗi kịch bản biên dịch / chạy riêng: một kịch bản lỗi chỉ thành một dòng nhật ký, các
+        // kịch bản khác vẫn kiểm (như bản Jmix).
+        List<ServerScriptRunner.ScriptSource> scripts = scriptService.runtimeSources(version);
+        if (scripts.isEmpty()) {
             return List.of();
         }
         Template template = sheet.getTemplate();
         ServerScriptRunner.ValidateResult result = scriptRunner.runValidate(
                 workbookJson,
-                List.of(new ServerScriptRunner.ScriptSource(LedgerWriteService.sheetLabel(template), scriptText)),
+                scripts,
                 LedgerWriteService.reportInfo(report, template, ReportStatus.SUBMITTED));
         for (String failure : result.scriptFailures()) {
             log.warn("Hook validate của {} (phiếu {}) không chạy được trên máy chủ, bỏ qua: {}",
