@@ -9,6 +9,8 @@ import { Label } from "@/shared/ui/label";
 import { cn } from "@/shared/lib/utils";
 import { vietnameseOr } from "@/shared/lib/user-message";
 
+import { DevQuickLogin } from "./dev-quick-login";
+
 const WRONG_CREDENTIALS = "Tên đăng nhập hoặc mật khẩu không đúng.";
 
 /**
@@ -44,8 +46,7 @@ export const LoginForm = () => {
   const { mutate: login, isPending } = useLogin<{ username: string; password: string }>();
   const { close } = useNotification();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const signIn = (username: string, password: string) => {
     setError(null);
     login(
       { username, password },
@@ -64,6 +65,11 @@ export const LoginForm = () => {
         },
       }
     );
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    signIn(username, password);
   };
 
   return (
@@ -168,6 +174,15 @@ export const LoginForm = () => {
               {isPending ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
           </form>
+
+          <DevQuickLogin
+            disabled={isPending}
+            onPick={(u, p) => {
+              setUsername(u);
+              setPassword(p);
+              signIn(u, p);
+            }}
+          />
 
           <p className="text-muted-foreground border-t pt-5 text-xs">
             Tài khoản do quản trị viên cấp. Nếu chưa đăng nhập được, bạn hãy liên hệ
