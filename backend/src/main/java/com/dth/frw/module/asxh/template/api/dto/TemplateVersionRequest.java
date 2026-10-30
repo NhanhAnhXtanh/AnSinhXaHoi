@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * {@code POST /template_versions} — chỉ dùng để tạo lại phiên bản đầu cho một
@@ -21,6 +22,6 @@ public record TemplateVersionRequest(
         @Size(max = 20_971_520, message = "Bảng tính quá lớn (tối đa 20MB)")
         String workbookJson,
 
-        @Size(max = 2_000_000, message = "Script quá dài")
-        String scriptText) {
+        @Size(max = 500, message = "Quá nhiều kịch bản (tối đa 500)")
+        List<TemplateScriptPayload> scripts) {
 }

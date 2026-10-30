@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * ({@code compile.ts → parseScriptText / compileRecord}): dạng nhiều lần gọi {@code defineScript}
  * (mỗi bản ghi bọc trong một hàm) và dạng mảng JSON các bản ghi.
  */
-class ServerScriptRunnerMultiBlockTest {
+public class ServerScriptRunnerMultiBlockTest {
 
     static ServerScriptRunner runner;
 
@@ -33,7 +33,7 @@ class ServerScriptRunnerMultiBlockTest {
     }
 
     /** Đúng khuôn script chuyển từ Jmix: mỗi bản ghi một khối "(function () { ... })();". */
-    static final String MIGRATED = """
+    public static final String MIGRATED = """
             // Script chuyển từ bản Jmix: 3 bản ghi qt_template_script, mỗi khối dưới đây là một bản ghi,
             // chạy theo thứ tự (displayOrder). Mỗi khối gọi defineScript({...}) đúng một lần.
 
