@@ -18,9 +18,9 @@ import com.dth.frw.module.asxh.dept.repo.DeptReportSheetRepository;
 import com.dth.frw.module.asxh.summary.query.PeriodCell;
 import com.dth.frw.module.asxh.summary.query.SummaryRow;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
-import com.dth.frw.module.asxh.summary.service.ScriptHooks;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregationService;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregator;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -57,6 +57,8 @@ public class DeptYearDataService implements DeptYearDataQuery {
     private final SummaryAggregationService aggregation;
     private final SummaryQueries queries;
 
+    private final TemplateScriptService scriptService;
+
     public DeptYearDataService(DeptPeriodService periodService,
                                DeptReportSheetRepository sheetRepository,
                                DeptLedgerLineRepository lineRepository,
@@ -64,7 +66,9 @@ public class DeptYearDataService implements DeptYearDataQuery {
                                DeptLedgerVersionService versionService,
                                DeptYearLockService yearLockService,
                                SummaryAggregationService aggregation,
-                               SummaryQueries queries) {
+                               SummaryQueries queries,
+                               TemplateScriptService scriptService) {
+        this.scriptService = scriptService;
         this.periodService = periodService;
         this.sheetRepository = sheetRepository;
         this.lineRepository = lineRepository;
@@ -123,7 +127,7 @@ public class DeptYearDataService implements DeptYearDataQuery {
                     .toList();
             List<String> open = sheets.stream()
                     .filter(sheet -> sheet.getCompletion() != DeptSheetCompletion.COMPLETED
-                            && ScriptHooks.hasSummaryHook(sheet.getTemplateVersion().getScriptText()))
+                            && scriptService.hasSummaryHook(sheet.getTemplateVersion()))
                     .map(sheet -> sheet.getTemplate().getShortName())
                     .toList();
             List<String> pending = sheets.stream().filter(DeptReportSheet::hasPendingDraft)

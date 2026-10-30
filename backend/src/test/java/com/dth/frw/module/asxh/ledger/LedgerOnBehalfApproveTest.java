@@ -16,6 +16,7 @@ import com.dth.frw.module.asxh.inputreport.service.InputReportService;
 import com.dth.frw.module.asxh.ledger.service.InputReportLedgerService;
 import com.dth.frw.module.asxh.ledger.service.LedgerWriteService.DataUnit;
 import com.dth.frw.module.asxh.ledger.service.LedgerWriteService.DataUnitsResult;
+import com.dth.frw.module.asxh.template.TemplateScriptFixtures;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.List;
@@ -172,7 +173,7 @@ class LedgerOnBehalfApproveTest {
         InputReportSheet target = sheets.getFirst();
         target.getTemplate().setShortName("1g");
         target.setCompletion(SheetCompletion.COMPLETED);
-        target.getTemplateVersion().setScriptText(SCRIPT);
+        TemplateScriptFixtures.useOnly(entityManager, target.getTemplateVersion(), "Ledger", SCRIPT);
         for (InputReportSheet other : sheets.subList(1, sheets.size())) {
             other.setCompletion(SheetCompletion.NO_DATA);
         }
