@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 
 import { AsxhPage, YearSelect, useReportYear } from "@/shared/components/asxh";
@@ -13,6 +14,9 @@ type Mode = "ky" | "nam";
  * Tổng hợp báo cáo (UC-50..56) — số liệu tổng hợp từ các phiếu đã được duyệt,
  * theo từng kỳ hoặc cả năm. Chế độ giữ trên đường dẫn (`?xem=nam`), năm dùng
  * chung với các màn khác.
+ *
+ * Màn khác mở thẳng một biểu của một kỳ (Lịch sử mở đợt): `?nam=` chọn năm một lần khi vào rồi
+ * bỏ khỏi đường dẫn, `?ky=` (id kỳ) và `?bieu=` (id biểu) là lựa chọn ban đầu của chế độ Theo kỳ.
  */
 export function SummaryPage() {
   const [params, setParams] = useSearchParams();
@@ -36,6 +40,20 @@ export function SummaryPage() {
   };
 
   const { year, setYear } = useReportYear();
+
+  const linkedYear = Number(params.get("nam"));
+  useEffect(() => {
+    if (!Number.isInteger(linkedYear) || linkedYear <= 0) return;
+    if (linkedYear !== year) setYear(linkedYear);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("nam");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [linkedYear, year, setYear, setParams]);
 
   return (
     <AsxhPage

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useCan, useCustomMutation } from "@refinedev/core";
+import { useSearchParams } from "react-router";
 import { CalendarClock, Inbox, Lock, RotateCw, Save, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,12 +62,16 @@ export function PeriodMode({ year }: { year: number }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Đổi kỳ dựng lại panel phải: số tổng hợp đang sửa chưa lưu sẽ mất — hỏi trước.
   const confirmDiscard = useConfirmDiscard();
+  // Kỳ mở sẵn khi màn khác dẫn tới (`?ky=`), chỉ dùng cho lần chọn đầu tiên.
+  const [params] = useSearchParams();
+  const linkedPeriodId = Number(params.get("ky"));
 
   useEffect(() => {
     if (periodsState.data && (selectedId === null || !periodsState.data.some((p) => p.id === selectedId))) {
-      setSelectedId(defaultPeriodId(periodsState.data));
+      const linked = selectedId === null && periodsState.data.some((p) => p.id === linkedPeriodId);
+      setSelectedId(linked ? linkedPeriodId : defaultPeriodId(periodsState.data));
     }
-  }, [periodsState.data, selectedId]);
+  }, [periodsState.data, selectedId, linkedPeriodId]);
 
   const items = useMemo<PeriodItem[]>(
     () =>
