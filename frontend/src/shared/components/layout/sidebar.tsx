@@ -77,6 +77,7 @@ function navRowClass({
     "group/nav relative flex w-full items-center gap-3 rounded-md",
     "text-sm font-medium transition-colors duration-150",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+    "cursor-pointer",
     isCollapsed ? "h-10 justify-center px-0" : "px-3 py-2",
     isSelected
       ? [
@@ -287,22 +288,73 @@ function SidebarGroup({ item, selectedKey, isCollapsed }: MenuItemProps) {
     );
   }
 
+  return <SidebarGroupSection item={item} selectedKey={selectedKey} />;
+}
+
+/** Nhóm đang đóng, nhớ theo trình duyệt — chỉ là tiện lợi, đọc/ghi hỏng thì coi như mở hết. */
+const CLOSED_GROUPS_KEY = "dth-sidebar-closed-groups";
+
+function readClosedGroups(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(CLOSED_GROUPS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeClosedGroups(names: string[]) {
+  try {
+    window.localStorage.setItem(CLOSED_GROUPS_KEY, JSON.stringify(names));
+  } catch {
+    // Không lưu được thì lần sau nhóm mở lại — không sao.
+  }
+}
+
+/**
+ * Nhóm menu ở sidebar mở rộng: một dòng menu có icon như mục thường, bấm để đóng/mở
+ * các mục con. Mặc định mở. Khi đi tới một màn
+ * nằm trong nhóm đang đóng (gõ đường dẫn, bấm liên kết) thì nhóm tự mở để thấy mục đang chọn.
+ */
+function SidebarGroupSection({ item, selectedKey }: { item: TreeMenuItem; selectedKey?: string }) {
+  const children = item.children ?? [];
+  const groupKey = item.name;
+  const hasSelectedChild = children.some((child) => child.key === selectedKey);
+  const [open, setOpen] = React.useState(() => !readClosedGroups().includes(groupKey));
+
+  const toggle = (next: boolean) => {
+    setOpen(next);
+    const closed = readClosedGroups().filter((name) => name !== groupKey);
+    writeClosedGroups(next ? closed : [...closed, groupKey]);
+  };
+
+  React.useEffect(() => {
+    if (hasSelectedChild) setOpen(true);
+  }, [hasSelectedChild, selectedKey]);
+
   return (
-    <div className="flex flex-col">
-      <span className="text-overline px-3 pb-1.5 text-sidebar-foreground/60">
-        {getDisplayName(item)}
-      </span>
-      <div className="flex flex-col gap-0.5">
-        {children.map((child) => (
-          <SidebarItem
-            key={child.key || child.name}
-            item={child}
-            selectedKey={selectedKey}
-            isCollapsed={false}
-          />
-        ))}
-      </div>
-    </div>
+    <Collapsible open={open} onOpenChange={toggle} className="group/section">
+      <CollapsibleTrigger className={navRowClass({ isCollapsed: false })}>
+        <NavIcon item={item} />
+        <span className="flex-1 truncate text-left">{getDisplayName(item)}</span>
+        <ChevronRight
+          aria-hidden
+          className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/section:rotate-90"
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="ms-4 mt-0.5 flex flex-col gap-0.5 border-s border-sidebar-border ps-2">
+          {children.map((child) => (
+            <SidebarItem
+              key={child.key || child.name}
+              item={child}
+              selectedKey={selectedKey}
+              isCollapsed={false}
+            />
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

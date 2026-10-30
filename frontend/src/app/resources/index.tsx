@@ -2,11 +2,17 @@ import type { ResourceProps } from "@refinedev/core";
 import {
   Bell,
   BuildingComplex,
+  CalendarClock,
   CalendarDays,
   ChartColumn,
   ClipboardCheck,
+  ClipboardList,
+  Contact,
+  FilePenLine,
   FileSpreadsheet,
   House,
+  KeyRound,
+  LayoutTemplate,
   ListTodo,
   RotateCcwClock,
   Scale,
@@ -75,7 +81,7 @@ export const resources: ResourceProps[] = [
   // Menu xếp theo việc của từng vai: đơn vị nhập; Sở mở đợt rồi duyệt, tổng hợp,
   // nộp năm lên UBND; cấu hình đầu năm; quản trị. Nhóm không còn mục nào người
   // dùng được mở thì ẩn cả nhóm (`useAccessibleMenuItems` trong `sidebar.tsx`).
-  { name: "nhap_lieu", meta: { label: "Nhập liệu", group: true } },
+  { name: "nhap_lieu", meta: { label: "Nhập liệu", group: true, icon: <FilePenLine className="h-4 w-4" /> } },
   {
     name: "input_reports",
     list: "/input-reports",
@@ -83,7 +89,7 @@ export const resources: ResourceProps[] = [
     meta: { label: "Nhập liệu báo cáo", icon: <SquarePen className="h-4 w-4" />, parent: "nhap_lieu" },
   },
 
-  { name: "dot_bao_cao", meta: { label: "Đợt báo cáo", group: true } },
+  { name: "dot_bao_cao", meta: { label: "Đợt báo cáo", group: true, icon: <CalendarClock className="h-4 w-4" /> } },
   {
     name: "period_setup",
     list: "/period-setup",
@@ -95,7 +101,7 @@ export const resources: ResourceProps[] = [
     meta: { label: "Lịch sử mở đợt", icon: <RotateCcwClock className="h-4 w-4" />, parent: "dot_bao_cao" },
   },
 
-  { name: "duyet_tong_hop", meta: { label: "Duyệt & tổng hợp", group: true } },
+  { name: "duyet_tong_hop", meta: { label: "Duyệt & tổng hợp", group: true, icon: <ClipboardList className="h-4 w-4" /> } },
   {
     name: "report_review",
     list: "/report-review",
@@ -114,7 +120,7 @@ export const resources: ResourceProps[] = [
     meta: { label: "Duyệt báo cáo năm", icon: <SquareCheckBig className="h-4 w-4" />, parent: "duyet_tong_hop" },
   },
 
-  { name: "bieu_mau", meta: { label: "Biểu mẫu & lịch", group: true } },
+  { name: "bieu_mau", meta: { label: "Biểu mẫu & lịch", group: true, icon: <LayoutTemplate className="h-4 w-4" /> } },
   {
     name: "templates",
     list: "/templates",
@@ -135,7 +141,7 @@ export const resources: ResourceProps[] = [
 
   // Quản trị. `useMenu` không tự xét quyền, nên `sidebar.tsx` lọc lại cây menu
   // (`useAccessibleMenuItems`): ai không có quyền thì không thấy hai nhóm này.
-  { name: "don_vi_tai_khoan", meta: { label: "Đơn vị & tài khoản", group: true } },
+  { name: "don_vi_tai_khoan", meta: { label: "Đơn vị & tài khoản", group: true, icon: <Contact className="h-4 w-4" /> } },
   {
     name: "report_units",
     list: "/report-units",
@@ -152,7 +158,7 @@ export const resources: ResourceProps[] = [
     meta: { label: "Người dùng", canDelete: true, icon: <Users className="h-4 w-4" />, parent: "don_vi_tai_khoan" },
   },
 
-  { name: "phan_quyen", meta: { label: "Phân quyền", group: true } },
+  { name: "phan_quyen", meta: { label: "Phân quyền", group: true, icon: <KeyRound className="h-4 w-4" /> } },
   {
     name: "roles",
     list: "/roles",
