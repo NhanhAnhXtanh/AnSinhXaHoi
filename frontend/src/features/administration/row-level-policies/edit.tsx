@@ -17,6 +17,7 @@ import { PolicyForm, type PolicyFormValues } from "./policy-form";
 import { DEFAULT_POLICY, normalize } from "./policy-values";
 import { useManagedResources } from "./use-managed-resources";
 import { EMPTY_SCOPE, type RowLevelPolicy } from "@/domains/row-level-policy/types";
+import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
 
 export const RowLevelPolicyEdit = () => {
   const navigate = useNavigate();
@@ -26,6 +27,8 @@ export const RowLevelPolicyEdit = () => {
     refineCore: { onFinish, query },
     ...form
   } = useForm({
+    // Cảnh báo chưa lưu do useWarnWhenChanged lo (so với giá trị lúc mở).
+    warnWhenUnsavedChanges: false,
     // Defaults as well as the reset below: they are what types the form (see
     // create.tsx), and they give the condition builder something coherent to
     // render in the moment before the record arrives.
@@ -42,6 +45,7 @@ export const RowLevelPolicyEdit = () => {
     },
     defaultValues: DEFAULT_POLICY,
   });
+  useWarnWhenChanged(form, form.formState.defaultValues);
 
   const policy = query?.data?.data as RowLevelPolicy | undefined;
 

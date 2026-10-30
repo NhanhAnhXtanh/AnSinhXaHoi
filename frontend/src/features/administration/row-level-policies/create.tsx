@@ -12,6 +12,7 @@ import { DEFAULT_POLICY, normalize } from "./policy-values";
 import { useManagedResources } from "./use-managed-resources";
 import { AdminPageHeader } from "../record-actions";
 import { errorDescription } from "../labels";
+import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
 
 export const RowLevelPolicyCreate = () => {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ export const RowLevelPolicyCreate = () => {
     refineCore: { onFinish },
     ...form
   } = useForm({
+    // Cảnh báo chưa lưu do useWarnWhenChanged lo (so với giá trị lúc mở).
+    warnWhenUnsavedChanges: false,
     refineCoreProps: {
       successNotification: () => ({
         type: "success",
@@ -34,6 +37,7 @@ export const RowLevelPolicyCreate = () => {
     },
     defaultValues: DEFAULT_POLICY,
   });
+  useWarnWhenChanged(form, form.formState.defaultValues);
 
   function onSubmit(values: PolicyFormValues) {
     onFinish(normalize(values));

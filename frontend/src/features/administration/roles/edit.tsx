@@ -34,6 +34,7 @@ import { PermissionMatrix, type PermissionRef } from "./permission-matrix";
 import { RoleDataScopes } from "./data-scopes";
 import { AdminPageHeader, RecordHeaderActions } from "../record-actions";
 import { errorDescription } from "../labels";
+import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
 
 /**
  * What the tab band says beside each tab, in one line.
@@ -83,6 +84,8 @@ export const RoleEdit = () => {
     refineCore: { onFinish, query },
     ...form
   } = useForm({
+    // Cảnh báo chưa lưu do useWarnWhenChanged lo (so với giá trị lúc mở).
+    warnWhenUnsavedChanges: false,
     refineCoreProps: {
       successNotification: () => ({
         type: "success",
@@ -95,6 +98,7 @@ export const RoleEdit = () => {
       }),
     },
   });
+  useWarnWhenChanged(form, query?.data?.data);
 
   const record = query?.data?.data;
   const isSystemRole = record?.systemRole === true;

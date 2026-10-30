@@ -354,6 +354,9 @@ function PolicyDialog({
     refineCore: { onFinish, query },
     ...form
   } = useForm({
+    // Hộp thoại đóng là bỏ, không qua cảnh báo rời trang; để cờ của Refine bật ở đây thì
+    // sau khi đóng, rời màn vai trò vẫn bị hỏi oan.
+    warnWhenUnsavedChanges: false,
     refineCoreProps: {
       resource: POLICY_RESOURCE,
       action: isEdit ? "edit" : "create",

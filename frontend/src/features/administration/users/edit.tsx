@@ -35,6 +35,7 @@ import {
 import { AdminPageHeader } from "../record-actions";
 import { errorDescription, formatDateTimeVi } from "../labels";
 import type { User } from "@/domains/user/types";
+import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
 
 /**
  * Rút đơn vị báo cáo về dạng `{ id }` API đọc, giữ nguyên ba trạng thái API phân biệt.
@@ -64,6 +65,8 @@ export const UserEdit = () => {
     refineCore: { onFinish, query },
     ...form
   } = useForm({
+    // Cảnh báo chưa lưu do useWarnWhenChanged lo (so với giá trị lúc mở).
+    warnWhenUnsavedChanges: false,
     refineCoreProps: {
       successNotification: () => ({
         type: "success",
@@ -76,6 +79,7 @@ export const UserEdit = () => {
       }),
     },
   });
+  useWarnWhenChanged(form, form.formState.defaultValues);
 
   const user = query?.data?.data as User | undefined;
   const userId = user?.id;

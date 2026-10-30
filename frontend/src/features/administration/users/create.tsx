@@ -33,6 +33,7 @@ import {
   type RoleSummary,
   type UserStatus,
 } from "@/domains/user/types";
+import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
 
 /**
  * Giá trị của form tạo. `familyName` / `givenName` / `confirmPassword` chỉ sống
@@ -100,6 +101,8 @@ export const UserCreate = () => {
     refineCore: { onFinish },
     ...form
   } = useForm({
+    // Cảnh báo chưa lưu do useWarnWhenChanged lo (so với giá trị lúc mở).
+    warnWhenUnsavedChanges: false,
     refineCoreProps: {
       // Cấp từ màn Đơn vị thì quay lại đúng đơn vị đó thay vì sang danh sách người dùng.
       redirect: presetUnit ? false : "list",
@@ -120,6 +123,7 @@ export const UserCreate = () => {
     },
     defaultValues: defaultValues(presetUnit?.id ?? null),
   });
+  useWarnWhenChanged(form, form.formState.defaultValues);
 
   // Vai trò cán bộ đơn vị chọn sẵn khi cấp tài khoản cho đơn vị (UC-70). Cùng truy vấn với ô
   // chọn vai trò bên dưới (cùng khoá), nên không tốn thêm yêu cầu.
