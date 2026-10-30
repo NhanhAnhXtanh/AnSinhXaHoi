@@ -367,7 +367,6 @@ function WorkScreen({ report: s, backTo }: { report: AnnualReportRecord; backTo:
                 apiRef.current = null;
                 setSheetKey(key);
               }}
-              maxVisible={6}
               overflowLabel={(n) => `+${n} biểu khác`}
               trailing={<FullscreenButton full={full} onToggle={() => setFull((f) => !f)} />}
             />

@@ -47,7 +47,6 @@ export function SheetFrame({
               tabs={tabs}
               value={tab}
               onChange={onTabChange}
-              maxVisible={6}
               overflowLabel={(n) => `+${n} biểu khác`}
               trailing={<FullscreenButton full={full} onToggle={() => setFull((f) => !f)} />}
             />

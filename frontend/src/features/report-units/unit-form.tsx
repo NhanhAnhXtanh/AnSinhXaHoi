@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useWarnAboutChange } from "@refinedev/core";
@@ -17,7 +16,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  useFormField,
 } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import {
@@ -151,13 +149,6 @@ function buildSchema(units: ReportUnit[], editing: ReportUnit | undefined) {
     });
 }
 
-/** Gợi ý dưới ô; khi ô có lỗi thì nhường chỗ cho dòng lỗi (như Figma). */
-function FieldHint({ children }: { children: ReactNode }) {
-  const { error } = useFormField();
-  if (error) return null;
-  return <p className="text-muted-foreground text-xs leading-4">{children}</p>;
-}
-
 function RequiredMark() {
   return (
     <span aria-hidden className="text-destructive">
@@ -168,7 +159,9 @@ function RequiredMark() {
 
 const LABEL_CLASS = "data-[error=true]:text-foreground";
 const MESSAGE_CLASS = "text-destructive-text text-xs leading-4";
-const ITEM_CLASS = "gap-1.5";
+// content-start: ô thấp hơn ô cùng hàng (vd. ô bên cạnh đang hiện dòng lỗi)
+// không bị lưới kéo giãn các hàng bên trong, nên nhãn và ô nhập vẫn thẳng hàng.
+const ITEM_CLASS = "content-start gap-1.5";
 
 /**
  * Form Đơn vị, dùng chung cho Thêm và Sửa. Lưới 3 cột đều theo Figma
@@ -289,11 +282,6 @@ export function UnitForm({
                         }
                       />
                     </FormControl>
-                    <FieldHint>
-                      {editing
-                        ? "Mã đã lưu nên không đổi được."
-                        : "Nhập tay, không đổi được sau khi lưu."}
-                    </FieldHint>
                     <FormMessage className={MESSAGE_CLASS} />
                   </FormItem>
                 )}
@@ -335,9 +323,7 @@ export function UnitForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={NO_PARENT}>
-                          Không có — đây là đơn vị cao nhất
-                        </SelectItem>
+                        <SelectItem value={NO_PARENT}>Không có</SelectItem>
                         {parentOptions.map(({ unit, level }) => (
                           <SelectItem
                             key={unit.id}
@@ -351,7 +337,6 @@ export function UnitForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FieldHint>Để trống nếu đây là đơn vị cao nhất.</FieldHint>
                     <FormMessage className={MESSAGE_CLASS} />
                   </FormItem>
                 )}
