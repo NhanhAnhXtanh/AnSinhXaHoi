@@ -118,10 +118,12 @@ export const resources: ResourceProps[] = [
     list: "/publication-history",
     meta: { label: "Lịch sử mở đợt", icon: <RotateCcwClock className="h-4 w-4" />, parent: "bieu_mau" },
   },
+  // Bản chất chỉ tiêu tạm ẩn khỏi menu theo yêu cầu người dùng; route và mã màn
+  // vẫn giữ, bật lại chỉ cần bỏ `hide`.
   {
     name: "measure_kinds",
     list: "/measure-kinds",
-    meta: { label: "Bản chất chỉ tiêu", icon: <Scale className="h-4 w-4" />, parent: "bieu_mau" },
+    meta: { label: "Bản chất chỉ tiêu", hide: true, icon: <Scale className="h-4 w-4" />, parent: "bieu_mau" },
   },
 
   // Administration. The whole section disappears for anyone without the
