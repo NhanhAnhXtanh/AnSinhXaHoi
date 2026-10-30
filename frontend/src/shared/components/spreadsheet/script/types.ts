@@ -79,7 +79,10 @@ export interface ScriptRangeRef extends ScriptCellRef {
   colCount: number;
 }
 
-/** Một khối script cần biên dịch (bản React lưu MỘT `scriptText` cho cả phiên bản). */
+/**
+ * Một kịch bản cần biên dịch — một dòng `asxh_template_scripts` (như `qt_template_script` của bản
+ * Jmix). Máy chủ gửi các kịch bản đang bật của phiên bản dưới dạng mảng JSON trong `scriptText`.
+ */
 export interface ScriptRecord {
   id: string;
   name: string;
@@ -134,6 +137,10 @@ export interface ScriptWorkbookAdapter {
       command: (clickedRow: number, clickedCol: number) => void;
     }[]
   ): void;
+  /** Gắn bộ chặn sửa ô; trả hàm gỡ. Chỉ adapter thật có — màn soạn kịch bản dùng để "Chạy" từng kịch bản. */
+  onBeforeEdit?(guard: (cell: ScriptCellRef) => boolean | void): () => void;
+  onBeforeCommit?(guard: (cell: ScriptCellRef, newValue: unknown) => boolean | void): () => void;
+  onBeforePaste?(guard: (range: ScriptRangeRef) => boolean | void): () => void;
 }
 
 export interface ScriptContext {

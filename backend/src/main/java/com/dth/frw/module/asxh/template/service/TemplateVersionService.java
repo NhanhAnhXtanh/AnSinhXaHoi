@@ -45,12 +45,13 @@ import tools.jackson.databind.node.ObjectNode;
  * ({@link TemplateService#lock}), nên hai người thao tác cùng một biểu cùng lúc
  * không cùng lọt qua các luật "bản mới nhất", "không rẽ nhánh".
  *
- * <p>TODO: chưa port — chạy script phía máy chủ (validate / getInputData /
- * getSummaryData bằng GraalJS), tự đăng ký chỉ tiêu khi lưu script (UC-05),
- * chuẩn hoá workbook cắt dòng trống thừa (BR-11.3; sheet "Evaluation Version"
- * thì đã cắt khi lưu), ngoại lệ
- * thay riêng script getSummaryData sau ban hành (UC-12 4b, chờ BA). Đếm phiếu
- * trong hộp cảnh báo thu hồi cũng chưa có — cần slice phiếu nhập cung cấp.
+ * <p>Kịch bản của phiên bản nằm ở {@link TemplateScriptService} (nhiều kịch bản
+ * như bản Jmix, kể cả ngoại lệ thay riêng kịch bản getSummaryData sau ban hành).
+ *
+ * <p>TODO: chưa port — tự đăng ký chỉ tiêu khi lưu kịch bản (UC-05), chuẩn hoá
+ * workbook cắt dòng trống thừa (BR-11.3; sheet "Evaluation Version" thì đã cắt
+ * khi lưu). Đếm phiếu trong hộp cảnh báo thu hồi cũng chưa có — cần slice phiếu
+ * nhập cung cấp.
  */
 @Service
 @Transactional(readOnly = true)
@@ -70,15 +71,18 @@ public class TemplateVersionService {
     private final TemplateVersionRepository repository;
     private final TemplateVersionSummaryQuery summaryQuery;
     private final TemplateService templateService;
+    private final TemplateScriptService scriptService;
     private final ObjectMapper mapper;
 
     public TemplateVersionService(TemplateVersionRepository repository,
                                   TemplateVersionSummaryQuery summaryQuery,
                                   TemplateService templateService,
+                                  TemplateScriptService scriptService,
                                   ObjectMapper mapper) {
         this.repository = repository;
         this.summaryQuery = summaryQuery;
         this.templateService = templateService;
+        this.scriptService = scriptService;
         this.mapper = mapper;
     }
 
@@ -178,14 +182,15 @@ public class TemplateVersionService {
         if (request.workbookJson() != null) {
             version.setWorkbookJson(requireWorkbook(request.workbookJson()));
         }
-        if (request.scriptText() != null) {
-            version.setScriptText(request.scriptText());
+        TemplateVersion saved = repository.save(version);
+        if (request.scripts() != null) {
+            scriptService.replace(saved, request.scripts());
         }
-        return repository.save(version);
+        return saved;
     }
 
     /**
-     * Lưu từ Designer (workbook + script cùng lúc, UC-11 / UC-12) hoặc đổi ngày
+     * Lưu từ Designer (workbook + danh sách kịch bản cùng lúc, UC-11 / UC-12) hoặc đổi ngày
      * áp dụng. Chỉ bản Nháp / Đang thử nghiệm (BR-11.2, BR-12.4, BR-13.2).
      */
     @Transactional
@@ -208,10 +213,12 @@ public class TemplateVersionService {
         if (workbook != null) {
             version.setWorkbookJson(workbook);
         }
-        if (request.scriptText() != null) {
-            version.setScriptText(request.scriptText());
+        TemplateVersion saved = repository.save(version);
+        if (request.scripts() != null) {
+            // Thay cả danh sách kịch bản trong cùng giao dịch với bảng tính (nút Lưu của Designer).
+            scriptService.replace(saved, request.scripts());
         }
-        return repository.save(version);
+        return saved;
     }
 
     // --------------------------------------------------------------- thao tác
@@ -435,11 +442,12 @@ public class TemplateVersionService {
         int nextNo = chain.stream().mapToInt(TemplateVersion::getVersionNo).max().orElse(0) + 1;
         TemplateVersion copy = new TemplateVersion(template, nextNo, source);
         copy.setWorkbookJson(source.getWorkbookJson());
-        // Mang theo script — không phải dán lại thủ công. Không đăng ký lại chỉ
-        // tiêu (BR-14.3).
-        copy.setScriptText(source.getScriptText());
         copy.setEffectiveFrom(null);
-        return repository.save(copy);
+        TemplateVersion saved = repository.save(copy);
+        // Mang theo mọi kịch bản — không phải dán lại thủ công. Không đăng ký lại chỉ
+        // tiêu (BR-14.3).
+        scriptService.copyScripts(source, saved);
+        return saved;
     }
 
     /**

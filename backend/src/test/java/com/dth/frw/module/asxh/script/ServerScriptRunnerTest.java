@@ -19,10 +19,10 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Không cần Spring hay CSDL — dựng {@link ServerScriptRunner} trực tiếp.
  */
-class ServerScriptRunnerTest {
+public class ServerScriptRunnerTest {
 
     /** Workbook SpreadJS tối thiểu: sheet "Biểu 1a", hàng 2–3 có mã, tên, số đối tượng, kinh phí. */
-    static final String WORKBOOK = """
+    public static final String WORKBOOK = """
             {"version":"16.0","sheets":{"Biểu 1a":{"name":"Biểu 1a","index":0,"data":{"dataTable":{
               "0":{"0":{"value":"BIỂU 1A"}},
               "2":{"0":{"value":"I.1"},"1":{"value":"Trợ cấp xã hội hằng tháng"},"2":{"value":10},"3":{"value":1500000.5}},
@@ -60,7 +60,7 @@ class ServerScriptRunnerTest {
             });
             """;
 
-    static final ServerScriptRunner.ReportInfo REPORT = new ServerScriptRunner.ReportInfo(
+    public static final ServerScriptRunner.ReportInfo REPORT = new ServerScriptRunner.ReportInfo(
             "1", "BM-000001", "APPROVED", "1051103", "UBND xã A", "1a", "Quý I/2026", 2026);
 
     static ServerScriptRunner runner;

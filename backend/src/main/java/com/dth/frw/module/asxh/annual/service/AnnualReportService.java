@@ -19,6 +19,7 @@ import com.dth.frw.module.asxh.summary.service.SummaryAggregationService;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService.SheetOption;
 import com.dth.frw.module.asxh.summary.service.SummaryReportService.YearOverview;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.CurrentUser;
 import java.io.InputStream;
@@ -99,13 +100,17 @@ public class AnnualReportService {
     private final DeptYearDataQuery yearData;
     private final AttachmentStorage storage;
 
+    private final TemplateScriptService scriptService;
+
     public AnnualReportService(AnnualReportRepository repository,
                                AnnualReportSheetRepository sheetRepository,
                                AnnualReportAttachmentRepository attachmentRepository,
                                SummaryReportService summaryReports,
                                SummaryAggregationService aggregation,
                                DeptYearDataQuery yearData,
-                               AttachmentStorage storage) {
+                               AttachmentStorage storage,
+                               TemplateScriptService scriptService) {
+        this.scriptService = scriptService;
         this.repository = repository;
         this.sheetRepository = sheetRepository;
         this.attachmentRepository = attachmentRepository;
@@ -256,7 +261,7 @@ public class AnnualReportService {
         int year = report.getReportYear();
         return new SheetRuntime(report.getId(), year, report.getRevisionNo(), template.getId(), template.getCode(),
                 template.getShortName(), template.getName(), version.getId(), version.getVersionNo(),
-                version.getWorkbookJson(), version.getScriptText(), report.getLedgerVersion(),
+                version.getWorkbookJson(), scriptService.runtimeScriptText(version), report.getLedgerVersion(),
                 dataUrl(report.getId()), year, year, rollupRows(year, report.getLedgerVersion()));
     }
 

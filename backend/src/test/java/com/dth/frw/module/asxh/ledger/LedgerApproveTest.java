@@ -14,6 +14,7 @@ import com.dth.frw.module.asxh.ledger.query.EffectiveLedgerQuery;
 import com.dth.frw.module.asxh.ledger.query.EffectiveLedgerRow;
 import com.dth.frw.module.asxh.ledger.query.LedgerCriteria;
 import com.dth.frw.module.asxh.ledger.query.LedgerTotal;
+import com.dth.frw.module.asxh.template.TemplateScriptFixtures;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.List;
@@ -89,7 +90,7 @@ class LedgerApproveTest {
         for (InputReportSheet sheet : sheets) {
             sheet.setDataJson(WORKBOOK);
             sheet.setCompletion(SheetCompletion.COMPLETED);
-            sheet.getTemplateVersion().setScriptText(SCRIPT);
+            TemplateScriptFixtures.useOnly(entityManager, sheet.getTemplateVersion(), "Ledger", SCRIPT);
         }
         entityManager.flush();
 

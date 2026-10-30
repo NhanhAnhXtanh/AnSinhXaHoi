@@ -3,6 +3,7 @@ import {
   type BaseRecord,
   type HttpError,
   useCreate,
+  useCustom,
   useCustomMutation,
   useDelete,
   useInvalidate,
@@ -22,9 +23,11 @@ import {
 } from "./model";
 import type {
   ApiTemplate,
+  ApiTemplateScript,
   ApiTemplateSet,
   ApiTemplateVersion,
   FormKind,
+  TemplateScriptPayload,
 } from "./types";
 
 /**
@@ -33,9 +36,10 @@ import type {
  * - `GET/POST/PATCH/DELETE /api/templates` + `POST /api/templates/{id}/next_version`
  * - `GET/PATCH/DELETE /api/template_versions` + `POST /api/template_versions/{id}/
  *   publish|lock|unlock|revoke|start_testing|stop_testing`
+ * - `GET /api/template_versions/{id}/scripts` + `PUT …/scripts/summary` (kịch bản)
  *
- * Danh sách phiên bản không có workbook / script (máy chủ không đọc hai cột đó);
- * chỉ `getOne` của một phiên bản mới trả về — màn Thiết kế mẫu nạp khi mở.
+ * Danh sách phiên bản không có workbook (máy chủ không đọc cột đó); chỉ `getOne`
+ * của một phiên bản mới trả về — màn Thiết kế mẫu nạp khi mở. Kịch bản đọc riêng.
  */
 export const RESOURCE = {
   sets: "template_sets",
@@ -130,6 +134,26 @@ export function useDesignerContext(formId: string | null) {
     [chainData]
   );
   return { chain };
+}
+
+/**
+ * Mọi kịch bản của phiên bản (kể cả đang tắt), theo thứ tự chạy — màn soạn kịch bản trong
+ * Thiết kế mẫu. `scripts` là `undefined` khi chưa tải xong.
+ */
+export function useTemplateScripts(versionId: string) {
+  const { result, query } = useCustom<ApiTemplateScript[]>({
+    url: `${API_URL}/${RESOURCE.versions}/${versionId}/scripts`,
+    method: "get",
+    queryOptions: { staleTime: 0, gcTime: 0 },
+  });
+  // Chưa có dữ liệu thì useCustom trả một object rỗng (không phải mảng) — xem use-custom-result.ts.
+  const data = result?.data as unknown;
+  const scripts = Array.isArray(data) ? (data as ApiTemplateScript[]) : undefined;
+  return {
+    scripts,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,13 +307,13 @@ export function useTemplateActions() {
       }, "Không xoá được phiên bản. Hãy thử lại."),
 
     /**
-     * Lưu từ màn Thiết kế mẫu (workbook và/hoặc script) — PATCH một lần. Không
+     * Lưu từ màn Thiết kế mẫu (workbook và/hoặc cả danh sách kịch bản) — PATCH một lần. Không
      * nạp lại chi tiết phiên bản sau khi lưu (sẽ kéo lại cả workbook vài MB
      * về đúng thứ vừa gửi đi).
      */
     saveVersion: (
       versionId: string,
-      values: { workbookJson?: string; scriptText?: string }
+      values: { workbookJson?: string; scripts?: TemplateScriptPayload[] }
     ) =>
       run(async () => {
         const res = await update({
@@ -302,6 +326,22 @@ export function useTemplateActions() {
         });
         return toVersion(res.data as unknown as ApiTemplateVersion);
       }, "Không lưu được thiết kế. Hãy thử lại."),
+
+    /**
+     * Phiên bản đã ban hành: thay riêng nhóm kịch bản tổng hợp (có hàm getSummaryData) —
+     * `PUT /template_versions/{id}/scripts/summary`. Kịch bản khác của phiên bản giữ nguyên.
+     */
+    saveSummaryScripts: (versionId: string, scripts: TemplateScriptPayload[]) =>
+      run(async () => {
+        const res = await custom({
+          url: `${API_URL}/${RESOURCE.versions}/${versionId}/scripts/summary`,
+          method: "put",
+          values: scripts as unknown as Values,
+          config: JSON_HEADERS,
+          ...quiet,
+        });
+        return res.data as unknown as ApiTemplateScript[];
+      }, "Không lưu được kịch bản tổng hợp. Hãy thử lại."),
   };
 }
 

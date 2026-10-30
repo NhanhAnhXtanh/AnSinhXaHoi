@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import Editor from "@monaco-editor/react";
 
 import { LoadingState } from "@/shared/components/asxh";
@@ -19,9 +20,14 @@ export default function ScriptEditorImpl({
   placeholder,
   ariaLabel,
   path = "asxh-script.js",
+  onCursorChange,
+  fontSize = 12,
   className,
 }: ScriptEditorProps) {
   const { resolvedMode, sidebarTone } = useTheme();
+  // Ref: Monaco chỉ gọi onMount một lần, còn hàm người gọi truyền có thể đổi mỗi lần vẽ.
+  const cursorRef = useRef(onCursorChange);
+  cursorRef.current = onCursorChange;
   // Vùng soạn nằm trên nền tông thanh bên: thanh bên sáng chỉ khi chọn "sáng" ở chế độ sáng.
   const theme = resolvedMode === "light" && sidebarTone === "light" ? "asxh-light" : "asxh-dark";
 
@@ -34,6 +40,11 @@ export default function ScriptEditorImpl({
         theme={theme}
         value={value}
         loading={<LoadingState label="Đang mở ô soạn quy tắc…" />}
+        onMount={(editor) => {
+          editor.onDidChangeCursorPosition((event) =>
+            cursorRef.current?.({ line: event.position.lineNumber, column: event.position.column })
+          );
+        }}
         onChange={(next) => {
           // Khi chỉ xem, Monaco vẫn báo đổi lúc nạp nội dung — bỏ qua để không báo "chưa lưu".
           if (readOnly) return;
@@ -45,7 +56,7 @@ export default function ScriptEditorImpl({
           readOnlyMessage: { value: readOnlyMessage },
           ariaLabel,
           minimap: { enabled: false },
-          fontSize: 12,
+          fontSize,
           lineHeight: 20,
           tabSize: 2,
           insertSpaces: true,

@@ -74,9 +74,39 @@ export type ApiTemplateVersion = {
   revokedBy: string | null;
   /** Chỉ có ở getOne và các thao tác; danh sách để null. */
   workbookJson: string | null;
-  scriptText: string | null;
   createdAt: string;
   updatedAt: string | null;
+};
+
+/** Một kịch bản của phiên bản mẫu — `GET /template_versions/{id}/scripts`. */
+export type ApiTemplateScript = {
+  id: number;
+  templateVersionId: number;
+  /** null = mọi biểu; BM-xxxxxx = riêng biểu đó. */
+  sheetCode: string | null;
+  name: string;
+  description: string | null;
+  code: string;
+  declaredHooks: string | null;
+  displayOrder: number;
+  enabled: boolean;
+  scriptHash: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+/** Một kịch bản gửi lên khi lưu (cả danh sách, theo thứ tự chạy). `id` null = kịch bản mới. */
+export type TemplateScriptPayload = {
+  id: number | null;
+  sheetCode: string | null;
+  name: string;
+  description: string | null;
+  code: string;
+  declaredHooks: string | null;
+  displayOrder: number;
+  enabled: boolean;
 };
 
 /* ------------------------------------------------------------------ */

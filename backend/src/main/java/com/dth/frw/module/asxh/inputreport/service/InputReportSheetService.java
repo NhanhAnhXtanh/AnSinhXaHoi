@@ -9,6 +9,7 @@ import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetRepository;
 import com.dth.frw.module.asxh.inputreport.repo.InputReportSheetSpecifications;
 import com.dth.frw.module.asxh.ledger.service.ReportSubmitValidationService;
 import com.dth.frw.module.asxh.script.WorkbookJsonCellReader;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.module.security.rowlevel.service.RowLevelSecurity;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
@@ -47,9 +48,13 @@ public class InputReportSheetService {
     // Khoá năm theo báo cáo năm (slice dept, UC-60).
     private final DeptYearLockService yearLockService;
 
+    private final TemplateScriptService scriptService;
+
     public InputReportSheetService(InputReportSheetRepository repository, RowLevelSecurity rowLevel,
                                    ReportSubmitValidationService validation,
-                                   DeptYearLockService yearLockService) {
+                                   DeptYearLockService yearLockService,
+                                   TemplateScriptService scriptService) {
+        this.scriptService = scriptService;
         this.repository = repository;
         this.rowLevel = rowLevel;
         this.validation = validation;
@@ -76,7 +81,8 @@ public class InputReportSheetService {
      * {@code open-in-view=false}).
      *
      * @param templateWorkbookJson workbook khung — chỉ khi tờ biểu chưa có số liệu
-     * @param scriptText           script của phiên bản mẫu (rỗng nếu mẫu không có script)
+     * @param scriptText           kịch bản đang bật của phiên bản mẫu, dạng mảng JSON (rỗng nếu
+     *                             mẫu không có kịch bản nào)
      */
     public record SheetContent(InputReportSheet sheet, String templateWorkbookJson, String scriptText) {
     }
@@ -89,7 +95,7 @@ public class InputReportSheetService {
         return new SheetContent(
                 sheet,
                 hasData ? null : version.getWorkbookJson(),
-                version.getScriptText());
+                scriptService.runtimeScriptText(version));
     }
 
     /**

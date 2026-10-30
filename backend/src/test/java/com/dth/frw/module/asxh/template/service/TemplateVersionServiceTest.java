@@ -13,6 +13,7 @@ import com.dth.frw.domain.asxh.template.TemplateSet;
 import com.dth.frw.domain.asxh.template.TemplateStatus;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.template.api.dto.TemplateRequest;
+import com.dth.frw.module.asxh.template.api.dto.TemplateScriptPayload;
 import com.dth.frw.module.asxh.template.api.dto.TemplateSetRef;
 import com.dth.frw.module.asxh.template.api.dto.TemplateSetRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateVersionPatchRequest;
@@ -110,7 +111,8 @@ class TemplateVersionServiceTest {
         assertEquals(JAN_2026, published.getEffectiveFrom());
         assertNotNull(published.getPublishedAt());
         assertThrows(ConflictException.class,
-                () -> service.update(v1.getId(), new TemplateVersionPatchRequest(null, WORKBOOK, "// sửa")));
+                () -> service.update(v1.getId(), new TemplateVersionPatchRequest(null, WORKBOOK, List.of(
+                        new TemplateScriptPayload(null, null, "Sửa", null, "// sửa", null, null, true)))));
         assertThrows(ConflictException.class, () -> service.publish(v1.getId(), JAN_2026));
     }
 

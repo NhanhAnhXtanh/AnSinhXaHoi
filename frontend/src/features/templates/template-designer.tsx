@@ -34,7 +34,7 @@ import {
 import {
   SpreadDesigner,
   SpreadWorkbook,
-  runClientScript,
+  declaredHooksOf,
   type SpreadWorkbookApi,
   type WorkbookJson,
 } from "@/shared/components/spreadsheet";
@@ -45,6 +45,7 @@ import { cn } from "@/shared/lib/utils";
 import {
   useDesignerContext,
   useTemplateActions,
+  useTemplateScripts,
   useTemplateVersion,
 } from "./api";
 import type { ApiTemplateVersion } from "./types";
@@ -62,8 +63,16 @@ import {
   toVersion,
   versionLabel,
 } from "./model";
-import { RulesPanel } from "./components/rules-panel";
+import { ScriptEditorPanel, type ScriptPanelMode } from "./components/script-editor-panel";
 import { useVersionCommands } from "./components/use-version-commands";
+import {
+  applySavedIds,
+  isSummaryScript,
+  runtimeScriptText,
+  toDraft,
+  toPayloads,
+  type DraftScript,
+} from "./script-drafts";
 
 const TITLE = "Thiết kế mẫu";
 
@@ -72,8 +81,10 @@ const TITLE = "Thiết kế mẫu";
  * 311:88923). Đường dẫn /templates/designer/:id với id là phiên bản mẫu.
  *
  * Phiên bản nháp / đang thử nghiệm: SpreadJS Designer (ribbon) sửa được, Lưu
- * (workbook + quy tắc trong một lần), Xem trước, nhập file Excel, Ban hành.
- * Phiên bản đã ban hành / khoá / thu hồi: chỉ xem (BR-11.2, BR-12.4).
+ * (workbook + cả danh sách kịch bản trong một lần, như bản Jmix), Xem trước,
+ * nhập file Excel, Ban hành. Phiên bản đã ban hành / khoá / thu hồi: chỉ xem
+ * (BR-11.2, BR-12.4) — riêng kịch bản tổng hợp (getSummaryData) của bản đã ban
+ * hành / đang khoá vẫn sửa được và lưu riêng, như bản Jmix.
  */
 export function TemplateDesigner() {
   const { id } = useParams<{ id: string }>();
@@ -124,12 +135,6 @@ export function TemplateDesigner() {
 
 type Mode = "design" | "preview";
 
-const pad = (n: number) => String(n).padStart(2, "0");
-const clock = () => {
-  const d = new Date();
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-
 function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWrite: boolean }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -152,6 +157,8 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
   const [saved, setSaved] = useState<WorkbookJson | null>(seed);
   const [previewJson, setPreviewJson] = useState<WorkbookJson | null>(null);
   const spreadRef = useRef<SpreadWorkbookApi | null>(null);
+  // Bảng đang thiết kế cho khung kịch bản (Chạy / Dừng) — state để khung biết khi nào bảng sẵn sàng.
+  const [designApi, setDesignApi] = useState<SpreadWorkbookApi | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [mode, setMode] = useState<Mode>("design");
@@ -161,16 +168,24 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
   const editSeq = useRef(0);
   const [saving, setSaving] = useState(false);
 
-  /* ---------------- quy tắc nhập ---------------- */
+  /* ---------------- kịch bản ---------------- */
 
   const [rulesOpen, setRulesOpen] = useState(params.get("rules") === "1");
-  const [script, setScript] = useState(data.scriptText ?? "");
-  const [scriptDirty, setScriptDirty] = useState(false);
-  const [hook, setHook] = useState("onLoad");
-  const [log, setLog] = useState<{ time: string; text: string; error?: boolean }[]>([]);
-  const [running, setRunning] = useState(false);
+  const scriptsQuery = useTemplateScripts(String(data.id));
+  // Bản soạn tại chỗ — null tới khi tải xong. Chỉ nạp một lần; sau khi lưu chỉ ghép id mới vào.
+  const [drafts, setDrafts] = useState<DraftScript[] | null>(null);
+  const [scriptsDirty, setScriptsDirty] = useState(false);
+  const [savingSummary, setSavingSummary] = useState(false);
+  useEffect(() => {
+    if (drafts == null && scriptsQuery.scripts) setDrafts(scriptsQuery.scripts.map(toDraft));
+  }, [drafts, scriptsQuery.scripts]);
 
-  const dirty = editable && (workbookDirty || scriptDirty);
+  // Bản đã ban hành / đang khoá: còn sửa được kịch bản tổng hợp (getSummaryData), lưu riêng.
+  const summaryEditable =
+    canWrite && (version.status === "published" || version.status === "locked");
+  const scriptMode: ScriptPanelMode = editable ? "edit" : summaryEditable ? "summary" : "read";
+
+  const dirty = (editable && (workbookDirty || scriptsDirty)) || (summaryEditable && scriptsDirty);
   const backTo = `/templates?set=${form.setId}&form=${form.id}&version=${version.id}`;
 
   // Rời màn khi còn thay đổi chưa lưu: hộp hỏi của ứng dụng (UC-11 4c).
@@ -198,7 +213,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       return;
     }
     const api = spreadRef.current;
-    const values: { workbookJson?: string; scriptText?: string } = {};
+    const values: Parameters<typeof actions.saveVersion>[1] = {};
     let json: WorkbookJson | null = null;
     if (workbookDirty || mode === "preview") {
       json = mode === "preview" ? previewJson : (api?.toJSON() ?? null);
@@ -215,7 +230,15 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       }
       values.workbookJson = text;
     }
-    if (scriptDirty) values.scriptText = script;
+    // Cả danh sách kịch bản, thay toàn bộ ở máy chủ trong cùng lần lưu với bảng tính.
+    const sentDrafts = scriptsDirty && drafts ? drafts : null;
+    if (sentDrafts) {
+      if (sentDrafts.some((d) => d.name.trim() === "")) {
+        toast.error("Có kịch bản chưa đặt tên — hãy đặt tên rồi lưu lại.");
+        return;
+      }
+      values.scripts = toPayloads(sentDrafts, declaredHooksOf);
+    }
 
     const seq = editSeq.current;
     setSaving(true);
@@ -226,27 +249,63 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       return;
     }
     if (json) setSaved(json);
+    if (sentDrafts) {
+      // Lấy id máy chủ cấp cho kịch bản mới (lần lưu sau sửa tại chỗ thay vì tạo lại).
+      const fresh = await scriptsQuery.refetch();
+      const saved = Array.isArray(fresh.data?.data) ? fresh.data.data : null;
+      if (saved) setDrafts((current) => (current ? applySavedIds(current, saved) : current));
+    }
     // Sửa thêm trong lúc chờ máy chủ: phần đó chưa có trong bản vừa lưu → giữ cờ "chưa lưu".
     if (editSeq.current === seq) {
       setWorkbookDirty(false);
-      setScriptDirty(false);
+      setScriptsDirty(false);
     }
     toast.success(
-      `Đã lưu thiết kế và quy tắc của ${formLabel(form).toLowerCase()}, ${versionLabel(version).toLowerCase()}.`
+      `Đã lưu thiết kế và kịch bản của ${formLabel(form).toLowerCase()}, ${versionLabel(version).toLowerCase()}.`
     );
   }, [
     actions,
     dirty,
+    drafts,
     editable,
     form,
     mode,
     previewJson,
     saving,
-    script,
-    scriptDirty,
+    scriptsDirty,
+    scriptsQuery,
     version,
     workbookDirty,
   ]);
+
+  /** Bản đã ban hành: lưu riêng nhóm kịch bản tổng hợp (PUT …/scripts/summary). */
+  async function saveSummaryScripts() {
+    if (!drafts || savingSummary) return;
+    if (drafts.some((d) => d.id == null && !isSummaryScript(d.code))) {
+      toast.error(
+        "Kịch bản mới phải có hàm getSummaryData — kịch bản khác của bản đã ban hành không sửa được."
+      );
+      return;
+    }
+    const summary = drafts.filter((d) => isSummaryScript(d.code));
+    if (summary.some((d) => d.name.trim() === "")) {
+      toast.error("Có kịch bản chưa đặt tên — hãy đặt tên rồi lưu lại.");
+      return;
+    }
+    const seq = editSeq.current;
+    setSavingSummary(true);
+    const result = await actions.saveSummaryScripts(String(version.id), toPayloads(summary, declaredHooksOf));
+    setSavingSummary(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    // Máy chủ trả cả danh sách (kịch bản khác giữ nguyên); kịch bản đơn vị bị xoá nhầm ở màn
+    // này không bao giờ được gửi nên quay lại theo danh sách máy chủ.
+    setDrafts((current) => applySavedIds(current ?? [], result.value));
+    if (editSeq.current === seq) setScriptsDirty(false);
+    toast.success("Đã lưu kịch bản tổng hợp.");
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -310,33 +369,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     }
   }
 
-  /* ---------------- chạy thử quy tắc ---------------- */
-
-  async function runRule() {
-    const api = spreadRef.current;
-    if (!api) {
-      toast.error("Bảng tính chưa mở xong, vui lòng thử lại.");
-      return;
-    }
-    setRunning(true);
-    const time = clock();
-    const result = await runClientScript(api, script, hook, {
-      mode: "designer",
-      unitName: "Đơn vị chạy thử",
-      year: new Date().getFullYear(),
-    });
-    setRunning(false);
-    setLog((l) => [
-      ...l,
-      ...result.messages.map((text) => ({ time, text, error: !result.ok })),
-      {
-        time,
-        text: result.ok ? "Chạy xong, không có lỗi." : "Chạy xong, có lỗi — xem các dòng trên.",
-        error: !result.ok,
-      },
-    ]);
-  }
-
   /* ---------------- việc trên phiên bản ---------------- */
 
   const commands = useVersionCommands({
@@ -385,7 +417,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       ? [
           {
             key: "rules",
-            label: rulesOpen ? "Đóng khung quy tắc" : "Soạn công thức và quy tắc nhập",
+            label: rulesOpen ? "Đóng khung kịch bản" : editable ? "Soạn kịch bản của biểu" : "Xem kịch bản của biểu",
             icon: CodeXml,
             onSelect: () => setRulesOpen((o) => !o),
           },
@@ -473,6 +505,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
         className="min-h-0 flex-1"
         onReady={(api) => {
           spreadRef.current = api;
+          setDesignApi(api);
         }}
       />
     );
@@ -480,7 +513,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     sheetArea = (
       <SpreadWorkbook
         workbook={previewJson}
-        scriptText={script}
+        scriptText={runtimeScriptText(drafts ?? [])}
         scriptContext={{
           mode: "input",
           unitName: "Đơn vị xem trước",
@@ -500,6 +533,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
         className="min-h-0 flex-1"
         onReady={(api) => {
           spreadRef.current = api;
+          setDesignApi(api);
         }}
         onDirtyChange={(d) => {
           if (!d) return;
@@ -549,21 +583,24 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
         </div>
 
         {mode === "design" && rulesOpen && (
-          <RulesPanel
-            script={script}
-            readOnly={!editable}
+          <ScriptEditorPanel
+            drafts={drafts}
+            loadFailed={scriptsQuery.isError && drafts == null}
+            onReload={() => void scriptsQuery.refetch()}
             onChange={(next) => {
-              setScript(next);
+              setDrafts(next);
               editSeq.current += 1;
-              setScriptDirty(true);
+              setScriptsDirty(true);
             }}
-            hook={hook}
-            onHookChange={setHook}
-            log={log}
-            running={running}
-            onRun={() => void runRule()}
+            mode={scriptMode}
+            sheetCode={data.template.code}
+            sheetLabel={data.template.shortName}
+            workbook={designApi}
+            summaryDirty={scriptsDirty}
+            savingSummary={savingSummary}
+            onSaveSummary={() => void saveSummaryScripts()}
             onClose={() => setRulesOpen(false)}
-            className="w-[min(520px,45%)] shrink-0"
+            className="w-[min(760px,58%)] shrink-0"
           />
         )}
       </div>
