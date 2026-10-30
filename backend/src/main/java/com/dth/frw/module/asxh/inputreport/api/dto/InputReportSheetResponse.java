@@ -17,8 +17,9 @@ import java.time.Instant;
  * <ul>
  *   <li>{@code templateWorkbookJson} — workbook khung của biểu, CHỈ khi tờ biểu chưa có
  *       số liệu ({@code dataJson} trống) — có số liệu rồi thì khung đã nằm trong số liệu;</li>
- *   <li>{@code scriptText} — script của phiên bản mẫu (hook onLoad, validate…) chạy ở
- *       trình duyệt.</li>
+ *   <li>{@code scriptText} — các kịch bản đang bật của phiên bản mẫu (hook onLoad,
+ *       validate…) chạy ở trình duyệt, dạng mảng JSON {@code [{ id, name, code, … }]} theo
+ *       thứ tự chạy (xem {@code TemplateScriptService.runtimeScriptText}).</li>
  * </ul>
  */
 public record InputReportSheetResponse(

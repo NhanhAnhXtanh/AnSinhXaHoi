@@ -1,18 +1,15 @@
 package com.dth.frw.module.asxh.summary.service;
 
 import com.dth.frw.module.asxh.script.ServerScriptRunner;
-import java.util.regex.Pattern;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 
 /**
- * Nhận diện hook khai trong script phiên bản mẫu bằng mã nguồn (bỏ chú thích) — port
- * {@code TemplateScriptService.hasSummaryHook}. Dùng để quyết định biểu nào Sở sửa số được
- * (UC-55 2a: chỉ biểu có {@code getSummaryData}).
+ * Nhận diện hook {@code getSummaryData} trong một đoạn mã script (bỏ chú thích) — port
+ * {@code TemplateScriptService.hasSummaryHook}. Kịch bản lưu theo bản ghi thì dùng thẳng
+ * {@link TemplateScriptService#hasSummaryHook} / {@link TemplateScriptService#isSummaryScript};
+ * lớp này giữ cho chuỗi script ở dạng cũ (một đoạn mã hoặc mảng JSON nhiều bản ghi).
  */
 public final class ScriptHooks {
-
-    private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
-    private static final Pattern LINE_COMMENT = Pattern.compile("//[^\\n]*");
-    private static final Pattern SUMMARY_HOOK = Pattern.compile("\\bgetSummaryData\\s*[(:]");
 
     private ScriptHooks() {
     }
@@ -25,8 +22,7 @@ public final class ScriptHooks {
         // Dạng mảng JSON nhiều bản ghi: xét mã từng bản ghi (bỏ chú thích trên chuỗi JSON thô
         // sẽ cắt mất phần sau "//" của cả dòng).
         for (ServerScriptRunner.ScriptRecord record : ServerScriptRunner.parseScriptText(scriptText)) {
-            String code = LINE_COMMENT.matcher(BLOCK_COMMENT.matcher(record.code()).replaceAll(" ")).replaceAll(" ");
-            if (SUMMARY_HOOK.matcher(code).find()) {
+            if (TemplateScriptService.isSummaryScript(record.code())) {
                 return true;
             }
         }

@@ -87,3 +87,7 @@ databaseChangeLog:
       file: db/changelog/changes/168-seed-asxh-indicator-measure-permissions.sql
   - include:
       file: db/changelog/changes/169-seed-asxh-template-script-th-blocks.sql
+  - include:
+      file: db/changelog/changes/170-create-asxh-template-scripts.yaml
+  - include:
+      file: db/changelog/changes/171-split-asxh-template-scripts.yaml

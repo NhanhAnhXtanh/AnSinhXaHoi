@@ -23,6 +23,7 @@ import com.dth.frw.module.asxh.dept.service.DeptSheetService;
 import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.module.asxh.script.ServerScriptRunner;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.shared.exception.ConflictException;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -59,7 +60,7 @@ class DeptRestoreBeforeFirstSaveTest {
         service = new DeptSheetService(mock(DeptPeriodService.class), reportRepository, sheetRepository,
                 lineRepository, changeRepository, mock(DeptLedgerAuditRepository.class), versionService,
                 mock(DeptYearLockService.class), mock(ServerScriptRunner.class), mock(SummaryQueries.class),
-                mock(EntityManager.class));
+                mock(EntityManager.class), mock(TemplateScriptService.class));
 
         DeptReport report = new DeptReport(null, 2029);
         ReflectionTestUtils.setField(report, "id", 2L);

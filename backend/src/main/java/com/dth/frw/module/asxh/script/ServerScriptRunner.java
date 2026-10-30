@@ -28,7 +28,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Chạy script của phiên bản mẫu ({@code TemplateVersion.scriptText}) bằng GraalJS ở phía máy
+ * Chạy các kịch bản của phiên bản mẫu ({@code TemplateScript}, mỗi kịch bản một {@link ScriptSource}) bằng GraalJS ở phía máy
  * chủ — port {@code ServerScriptRunner} của bản Jmix, giữ NGUYÊN mô hình biên dịch và facade
  * {@code ctx} để script bê từ bản Jmix chạy được không sửa.
  *

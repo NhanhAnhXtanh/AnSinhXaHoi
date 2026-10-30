@@ -22,6 +22,7 @@ import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.domain.asxh.unit.ReportUnitType;
 import com.dth.frw.module.asxh.ledger.repo.LedgerEntryRepository;
 import com.dth.frw.module.asxh.script.ServerScriptRunner;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.shared.exception.ConflictException;
 import java.time.LocalDate;
 import java.util.List;
@@ -48,7 +49,7 @@ class LedgerApproveOverlapLockTest {
     void setUp() {
         entryRepository = mock(LedgerEntryRepository.class);
         writer = new LedgerWriteService(entryRepository, mock(LedgerReplaceService.class),
-                mock(LedgerAuditService.class), mock(ServerScriptRunner.class));
+                mock(LedgerAuditService.class), mock(ServerScriptRunner.class), mock(TemplateScriptService.class));
 
         ReportUnit unit = new ReportUnit("X01", "UBND phường Kiểm Thử", null, ReportUnitType.UBND_XA, ReportBlock.XA);
         ReflectionTestUtils.setField(unit, "id", 42L);

@@ -1,0 +1,20 @@
+# Tách script_text gộp của mỗi phiên bản mẫu thành các dòng asxh_template_scripts (xem 170).
+#
+# Luật tách nằm ở ScriptTextSplitter (có test): mỗi dòng đánh dấu
+#   // ===== [Khối Jmix k/n] <tên> — hook: <danh sách hook> =====
+# mở một kịch bản (tên, hook khai lấy từ dòng đánh dấu; bỏ lớp bọc (function () { … })(); để
+# còn đúng mã gốc của bản Jmix); không có dòng đánh dấu thì cả đoạn là một kịch bản
+# "Script của mẫu"; mảng JSON [{ name, code, … }] thì mỗi phần tử một kịch bản.
+#
+# Chạy lại an toàn: phiên bản nào đã có kịch bản trong bảng mới thì bỏ qua. Cột script_text
+# giữ nguyên. Đếm trước khi chạy trên CSDL thật: docs/form-template/sql/170-dem-khoi-truoc-khi-tach.sql.
+databaseChangeLog:
+  - changeSet:
+      id: 171-split-asxh-template-scripts
+      author: dth
+      changes:
+        - customChange:
+            class: com.dth.frw.module.asxh.template.migration.SplitTemplateScriptsChange
+      rollback:
+        - sql:
+            sql: DELETE FROM asxh_template_scripts WHERE created_by = 'migration-171'

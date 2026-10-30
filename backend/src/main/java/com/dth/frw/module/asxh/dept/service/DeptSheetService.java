@@ -30,8 +30,8 @@ import com.dth.frw.module.asxh.script.ServerScriptRunner;
 import com.dth.frw.module.asxh.summary.query.UnitNode;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
 import com.dth.frw.module.asxh.summary.security.SummaryPermissions;
-import com.dth.frw.module.asxh.summary.service.ScriptHooks;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregator;
+import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.CurrentUser;
@@ -95,6 +95,8 @@ public class DeptSheetService {
     private final SummaryQueries queries;
     private final EntityManager entityManager;
 
+    private final TemplateScriptService scriptService;
+
     public DeptSheetService(DeptPeriodService periodService,
                             DeptReportRepository reportRepository,
                             DeptReportSheetRepository sheetRepository,
@@ -105,7 +107,9 @@ public class DeptSheetService {
                             DeptYearLockService yearLockService,
                             ServerScriptRunner scriptRunner,
                             SummaryQueries queries,
-                            EntityManager entityManager) {
+                            EntityManager entityManager,
+                            TemplateScriptService scriptService) {
+        this.scriptService = scriptService;
         this.periodService = periodService;
         this.reportRepository = reportRepository;
         this.sheetRepository = sheetRepository;
@@ -220,8 +224,8 @@ public class DeptSheetService {
         DeptReportSheet sheet = sheetOf(report, sheetRef);
         checkVersion(report, version);
         Template template = sheet.getTemplate();
-        String scriptText = sheet.getTemplateVersion().getScriptText();
-        boolean hook = ScriptHooks.hasSummaryHook(scriptText);
+        String scriptText = scriptService.runtimeScriptText(sheet.getTemplateVersion());
+        boolean hook = scriptService.hasSummaryHook(sheet.getTemplateVersion());
         String reason = readOnlyReason(report, sheet, hook, version);
         boolean perUnit = isPerUnit(template);
         List<DeptDataRow> rows = periodData(linesOf(sheet, version), null, perUnit);
@@ -328,7 +332,7 @@ public class DeptSheetService {
         DeptReportSheet sheet = sheetOf(report, sheetRef);
         assertEditable(report);
         assertSheetOpen(sheet);
-        if (!ScriptHooks.hasSummaryHook(sheet.getTemplateVersion().getScriptText())) {
+        if (!scriptService.hasSummaryHook(sheet.getTemplateVersion())) {
             throw new ConflictException("Biểu này chưa được thiết lập để Sở sửa số trực tiếp.");
         }
         if (sheet.getRevision() != revision) {
@@ -584,13 +588,12 @@ public class DeptSheetService {
                     + " chưa có bảng đang sửa. Mở biểu, sửa số rồi bấm Lưu dữ liệu trước.");
         }
         Template template = sheet.getTemplate();
-        String scriptText = sheet.getTemplateVersion().getScriptText();
         ReportPeriod period = report.getPeriod();
         ServerScriptRunner.GetSummaryDataResult result;
         try {
+            // Mọi kịch bản đang bật của phiên bản (thường: kịch bản đơn vị rồi kịch bản tổng hợp).
             result = scriptRunner.runGetSummaryData(draft,
-                    List.of(new ServerScriptRunner.ScriptSource("biểu " + template.getShortName(),
-                            scriptText == null ? "" : scriptText)),
+                    scriptService.runtimeSources(sheet.getTemplateVersion()),
                     new ServerScriptRunner.ReportInfo(String.valueOf(report.getId()), template.getCode(), "DRAFT",
                             "", "", template.getShortName(), period.getName(), report.getReportYear()),
                     unitCodesByName(units));
@@ -764,7 +767,7 @@ public class DeptSheetService {
         Template template = sheet.getTemplate();
         return new SheetInfo(template.getId(), template.getCode(), template.getShortName(), template.getName(),
                 sheet.getTemplateVersionId(), sheet.getDisplayOrder(), sheet.getCompletion(),
-                ScriptHooks.hasSummaryHook(sheet.getTemplateVersion().getScriptText()), sheet.hasPendingDraft(),
+                scriptService.hasSummaryHook(sheet.getTemplateVersion()), sheet.hasPendingDraft(),
                 sheet.getDraftUpdatedAt(), sheet.getCompletedAt(), sheet.getCompletedBy());
     }
 
