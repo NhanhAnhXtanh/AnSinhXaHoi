@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Ellipsis } from "lucide-react";
 
-import { formatNumber } from "@/shared/components/asxh";
+import { formatNumber } from "./format";
 import { Button } from "@/shared/ui/button";
 import {
   Select,

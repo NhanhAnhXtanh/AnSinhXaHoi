@@ -28,6 +28,7 @@ import { PermissionMatrix, type PermissionRef } from "./permission-matrix";
 import { RoleDataScopes } from "./data-scopes";
 import { AdminPageHeader } from "../record-actions";
 import { errorDescription } from "../labels";
+import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
 
 /**
  * The create payload, which is `RoleRequest` on the backend rather than the
@@ -66,6 +67,8 @@ export const RoleCreate = () => {
     refineCore: { onFinish },
     ...form
   } = useForm({
+    // Cảnh báo chưa lưu do useWarnWhenChanged lo (so với giá trị lúc mở).
+    warnWhenUnsavedChanges: false,
     // To the edit screen rather than back to the list, which is Refine's
     // default. A new role is not finished when its row exists: its data scopes
     // cannot be written until it has an id to belong to, and the tab that
@@ -88,6 +91,7 @@ export const RoleCreate = () => {
     },
     defaultValues: DEFAULT_VALUES,
   });
+  useWarnWhenChanged(form, form.formState.defaultValues);
 
   const grantedCount = form.watch("permissions")?.length ?? 0;
 
