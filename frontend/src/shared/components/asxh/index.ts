@@ -31,4 +31,6 @@ export { WorkCard } from "./work-card";
 
 export { ConfirmDialog } from "./confirm-dialog";
 
+export { Pager } from "./pager";
+
 export { formatNumber, formatDate, formatDateTime } from "./format";
