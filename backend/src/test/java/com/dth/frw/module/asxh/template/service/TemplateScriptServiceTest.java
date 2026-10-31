@@ -114,51 +114,33 @@ class TemplateScriptServiceTest {
     }
 
     @Test
-    @DisplayName("Bản đã ban hành: không lưu thay cả danh sách được (409); kịch bản tổng hợp thì thay riêng được")
-    void publishedOnlySummaryScripts() {
+    @DisplayName("Bản đã ban hành: chỉ xem — không lưu được kịch bản nào, kể cả kịch bản tổng hợp (409)")
+    void publishedIsReadOnly() {
         TemplateVersion version = draft();
-        List<TemplateScript> saved = service.replaceAll(version.getId(), List.of(
+        service.replaceAll(version.getId(), List.of(
                 payload(null, "Đơn vị", UNIT_CODE),
                 payload(null, "Sổ cái Sở", SUMMARY_CODE)));
         versionService.publish(version.getId(), JAN_2026);
 
         assertThrows(ConflictException.class,
                 () -> service.replaceAll(version.getId(), List.of(payload(null, "x", UNIT_CODE))));
+        assertThrows(ConflictException.class, () -> service.replaceAll(version.getId(),
+                List.of(payload(null, "Sổ cái Sở thêm", SUMMARY_CODE))));
         assertThrows(ConflictException.class, () -> versionService.update(version.getId(),
                 new TemplateVersionPatchRequest(null, null, List.of())));
 
-        // Gửi kèm kịch bản không khai getSummaryData → 400, không đổi gì.
-        assertThrows(IllegalArgumentException.class, () -> service.replaceSummaryScripts(version.getId(),
-                List.of(payload(null, "Lén sửa đơn vị", UNIT_CODE))));
-        // id trỏ vào kịch bản đơn vị → 400.
-        Long unitId = saved.get(0).getId();
-        assertThrows(IllegalArgumentException.class, () -> service.replaceSummaryScripts(version.getId(),
-                List.of(payload(unitId, "Đơn vị", SUMMARY_CODE))));
-
-        Long summaryId = saved.get(1).getId();
-        List<TemplateScript> after = service.replaceSummaryScripts(version.getId(), List.of(
-                payload(summaryId, "Sổ cái Sở (sửa)", SUMMARY_CODE + "\n// sửa"),
-                payload(null, "Sổ cái Sở thêm", SUMMARY_CODE)));
-
-        assertEquals(List.of("Đơn vị", "Sổ cái Sở (sửa)", "Sổ cái Sở thêm"), names(after));
-        assertEquals(unitId, after.get(0).getId(), "kịch bản đơn vị giữ nguyên");
-        assertEquals(UNIT_CODE, after.get(0).getCode());
-        assertEquals(summaryId, after.get(1).getId());
-        assertTrue(after.get(1).getDisplayOrder() > after.get(0).getDisplayOrder(), "tổng hợp xếp sau đơn vị");
+        assertEquals(List.of("Đơn vị", "Sổ cái Sở"),
+                names(service.list(version.getId())));
         assertTrue(service.hasSummaryHook(version));
-
-        // Gửi danh sách rỗng: xoá hết kịch bản tổng hợp, kịch bản đơn vị vẫn còn.
-        assertEquals(List.of("Đơn vị"), names(service.replaceSummaryScripts(version.getId(), List.of())));
-        assertFalse(service.hasSummaryHook(version));
     }
 
     @Test
-    @DisplayName("Bản đã thu hồi: không sửa kể cả kịch bản tổng hợp")
+    @DisplayName("Bản đã thu hồi: không sửa được kịch bản nào")
     void revokedIsFrozen() {
         TemplateVersion version = draft();
         versionService.startTesting(version.getId());
         versionService.revoke(version.getId());
-        assertThrows(ConflictException.class, () -> service.replaceSummaryScripts(version.getId(),
+        assertThrows(ConflictException.class, () -> service.replaceAll(version.getId(),
                 List.of(payload(null, "Sổ cái Sở", SUMMARY_CODE))));
     }
 

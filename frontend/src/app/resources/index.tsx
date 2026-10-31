@@ -98,6 +98,7 @@ export const resources: ResourceProps[] = [
   {
     name: "publication_history",
     list: "/publication-history",
+    show: "/publication-history/:id",
     meta: { label: "Lịch sử mở đợt", icon: <RotateCcwClock className="h-4 w-4" />, parent: "dot_bao_cao" },
   },
 

@@ -40,8 +40,9 @@ import org.springframework.web.bind.annotation.RestController;
  * (UC-13, UC-15, UC-17) và {@code GET /resolve} (UC-19).
  *
  * <p>Danh sách trả dạng gọn (không kèm workbook); {@code getOne} và các thao tác
- * trả dạng đầy đủ. Kịch bản của phiên bản: {@code GET / PUT /{id}/scripts} và
- * {@code PUT /{id}/scripts/summary} (port REST kịch bản của bản Jmix).
+ * trả dạng đầy đủ. Kịch bản của phiên bản: {@code GET / PUT /{id}/scripts} (port REST kịch bản
+ * của bản Jmix). Khác Jmix: không có {@code PUT /{id}/scripts/summary} — bản đã ban hành không sửa
+ * được kịch bản nào, kể cả kịch bản tổng hợp.
  */
 @RestController
 @RequestMapping("/api/template_versions")
@@ -181,16 +182,5 @@ public class TemplateVersionController {
     public List<TemplateScriptResponse> replaceScripts(
             @PathVariable Long id, @RequestBody List<TemplateScriptPayload> payloads) {
         return scriptService.replaceAll(id, payloads).stream().map(TemplateScriptResponse::from).toList();
-    }
-
-    /**
-     * Thay riêng nhóm kịch bản TỔNG HỢP (khai {@code getSummaryData}) — được cả khi đã ban hành;
-     * gửi kèm kịch bản không khai hàm đó → 400; bản đã thu hồi → 409.
-     */
-    @PutMapping("/{id}/scripts/summary")
-    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
-    public List<TemplateScriptResponse> replaceSummaryScripts(
-            @PathVariable Long id, @RequestBody List<TemplateScriptPayload> payloads) {
-        return scriptService.replaceSummaryScripts(id, payloads).stream().map(TemplateScriptResponse::from).toList();
     }
 }

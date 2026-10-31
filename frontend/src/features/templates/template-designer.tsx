@@ -67,7 +67,6 @@ import { ScriptEditorPanel, type ScriptPanelMode } from "./components/script-edi
 import { useVersionCommands } from "./components/use-version-commands";
 import {
   applySavedIds,
-  isSummaryScript,
   runtimeScriptText,
   toDraft,
   toPayloads,
@@ -175,17 +174,15 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
   // Bản soạn tại chỗ — null tới khi tải xong. Chỉ nạp một lần; sau khi lưu chỉ ghép id mới vào.
   const [drafts, setDrafts] = useState<DraftScript[] | null>(null);
   const [scriptsDirty, setScriptsDirty] = useState(false);
-  const [savingSummary, setSavingSummary] = useState(false);
   useEffect(() => {
     if (drafts == null && scriptsQuery.scripts) setDrafts(scriptsQuery.scripts.map(toDraft));
   }, [drafts, scriptsQuery.scripts]);
 
-  // Bản đã ban hành / đang khoá: còn sửa được kịch bản tổng hợp (getSummaryData), lưu riêng.
-  const summaryEditable =
-    canWrite && (version.status === "published" || version.status === "locked");
-  const scriptMode: ScriptPanelMode = editable ? "edit" : summaryEditable ? "summary" : "read";
+  // Chỉ bản Nháp / Đang thử nghiệm sửa được kịch bản; bản đã ban hành trở đi chỉ xem (kể cả
+  // kịch bản tổng hợp — khác Jmix, người dùng chốt: muốn đổi thì tạo phiên bản kế tiếp).
+  const scriptMode: ScriptPanelMode = editable ? "edit" : "read";
 
-  const dirty = (editable && (workbookDirty || scriptsDirty)) || (summaryEditable && scriptsDirty);
+  const dirty = editable && (workbookDirty || scriptsDirty);
   const backTo = `/templates?set=${form.setId}&form=${form.id}&version=${version.id}`;
 
   // Rời màn khi còn thay đổi chưa lưu: hộp hỏi của ứng dụng (UC-11 4c).
@@ -277,35 +274,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     version,
     workbookDirty,
   ]);
-
-  /** Bản đã ban hành: lưu riêng nhóm kịch bản tổng hợp (PUT …/scripts/summary). */
-  async function saveSummaryScripts() {
-    if (!drafts || savingSummary) return;
-    if (drafts.some((d) => d.id == null && !isSummaryScript(d.code))) {
-      toast.error(
-        "Kịch bản mới phải có hàm getSummaryData — kịch bản khác của bản đã ban hành không sửa được."
-      );
-      return;
-    }
-    const summary = drafts.filter((d) => isSummaryScript(d.code));
-    if (summary.some((d) => d.name.trim() === "")) {
-      toast.error("Có kịch bản chưa đặt tên — hãy đặt tên rồi lưu lại.");
-      return;
-    }
-    const seq = editSeq.current;
-    setSavingSummary(true);
-    const result = await actions.saveSummaryScripts(String(version.id), toPayloads(summary, declaredHooksOf));
-    setSavingSummary(false);
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    // Máy chủ trả cả danh sách (kịch bản khác giữ nguyên); kịch bản đơn vị bị xoá nhầm ở màn
-    // này không bao giờ được gửi nên quay lại theo danh sách máy chủ.
-    setDrafts((current) => applySavedIds(current ?? [], result.value));
-    if (editSeq.current === seq) setScriptsDirty(false);
-    toast.success("Đã lưu kịch bản tổng hợp.");
-  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -596,9 +564,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
             sheetCode={data.template.code}
             sheetLabel={data.template.shortName}
             workbook={designApi}
-            summaryDirty={scriptsDirty}
-            savingSummary={savingSummary}
-            onSaveSummary={() => void saveSummaryScripts()}
             onClose={() => setRulesOpen(false)}
             className="w-[min(760px,58%)] shrink-0"
           />

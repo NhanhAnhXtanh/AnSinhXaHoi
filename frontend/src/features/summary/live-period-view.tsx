@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Download, FileSpreadsheet, GitCompare, RotateCw, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import {
@@ -55,7 +56,14 @@ export function LivePeriodView({
   emptyIcon: LucideIcon;
 }) {
   const period = overview.period;
-  const [sheetKey, setSheetKey] = useState(() => String(overview.sheets[0]?.templateId ?? ""));
+  // Biểu mở sẵn khi màn khác dẫn tới (`?bieu=`), không có trong kỳ thì về biểu đầu.
+  const [params] = useSearchParams();
+  const linkedSheet = params.get("bieu");
+  const [sheetKey, setSheetKey] = useState(() =>
+    overview.sheets.some((s) => String(s.templateId) === linkedSheet)
+      ? String(linkedSheet)
+      : String(overview.sheets[0]?.templateId ?? "")
+  );
   const [scope, setScope] = useState("tinh");
   const apiRef = useRef<SpreadWorkbookApi | null>(null);
   const [exporting, setExporting] = useState(false);

@@ -36,7 +36,7 @@ import type {
  * - `GET/POST/PATCH/DELETE /api/templates` + `POST /api/templates/{id}/next_version`
  * - `GET/PATCH/DELETE /api/template_versions` + `POST /api/template_versions/{id}/
  *   publish|lock|unlock|revoke|start_testing|stop_testing`
- * - `GET /api/template_versions/{id}/scripts` + `PUT …/scripts/summary` (kịch bản)
+ * - `GET /api/template_versions/{id}/scripts` (kịch bản; lưu cùng `PATCH` phiên bản)
  *
  * Danh sách phiên bản không có workbook (máy chủ không đọc cột đó); chỉ `getOne`
  * của một phiên bản mới trả về — màn Thiết kế mẫu nạp khi mở. Kịch bản đọc riêng.
@@ -326,22 +326,6 @@ export function useTemplateActions() {
         });
         return toVersion(res.data as unknown as ApiTemplateVersion);
       }, "Không lưu được thiết kế. Hãy thử lại."),
-
-    /**
-     * Phiên bản đã ban hành: thay riêng nhóm kịch bản tổng hợp (có hàm getSummaryData) —
-     * `PUT /template_versions/{id}/scripts/summary`. Kịch bản khác của phiên bản giữ nguyên.
-     */
-    saveSummaryScripts: (versionId: string, scripts: TemplateScriptPayload[]) =>
-      run(async () => {
-        const res = await custom({
-          url: `${API_URL}/${RESOURCE.versions}/${versionId}/scripts/summary`,
-          method: "put",
-          values: scripts as unknown as Values,
-          config: JSON_HEADERS,
-          ...quiet,
-        });
-        return res.data as unknown as ApiTemplateScript[];
-      }, "Không lưu được kịch bản tổng hợp. Hãy thử lại."),
   };
 }
 

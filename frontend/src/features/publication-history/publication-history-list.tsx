@@ -59,7 +59,6 @@ import {
   type PublicationKind,
   type PublicationStatus,
 } from "./model";
-import { PublicationDetailDialog } from "./publication-detail-dialog";
 
 const PAGE_SIZES = [10, 20, 50] as const;
 
@@ -77,7 +76,6 @@ export function PublicationHistoryList() {
   const [periodId, setPeriodId] = useState<string>("all");
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(0);
-  const [detail, setDetail] = useState<ApiPublication | null>(null);
 
   // Gõ tìm: chờ người dùng dừng tay rồi mới hỏi máy chủ.
   useEffect(() => {
@@ -402,7 +400,11 @@ export function PublicationHistoryList() {
                     <TableCell align="right" className="sticky right-0 bg-card">
                       <div className="flex justify-end">
                         <RowActions
-                          primary={{ label: "Xem chi tiết", icon: Eye, onClick: () => setDetail(p) }}
+                          primary={{
+                            label: "Xem chi tiết",
+                            icon: Eye,
+                            onClick: () => navigate(`/publication-history/${p.id}`),
+                          }}
                           items={[
                             {
                               key: "setup",
@@ -489,14 +491,6 @@ export function PublicationHistoryList() {
       actions={<YearSelect />}
     >
       {body()}
-
-      <PublicationDetailDialog
-        publication={detail}
-        periodRangeText={detail ? periodRange(periodsById.get(detail.period.id), formatDate) : ""}
-        onOpenChange={(o) => {
-          if (!o) setDetail(null);
-        }}
-      />
     </AsxhPage>
   );
 }

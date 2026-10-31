@@ -1,8 +1,10 @@
 package com.dth.frw.module.asxh.setup.api;
 
 import com.dth.frw.domain.asxh.report.Publication;
+import com.dth.frw.module.asxh.setup.api.dto.PublicationItemsResponse;
 import com.dth.frw.module.asxh.setup.api.dto.PublicationResponse;
 import com.dth.frw.module.asxh.setup.security.SetupPermissions;
+import com.dth.frw.module.asxh.setup.service.PublicationItemService;
 import com.dth.frw.module.asxh.setup.service.PublicationService;
 import com.dth.frw.shared.web.ListParams;
 import com.dth.frw.shared.web.ListResponse;
@@ -21,18 +23,21 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code /api/publications} — lịch sử mở đợt (UC-30), chỉ đọc. Đợt được tạo bởi
  * {@code POST /api/report_periods/{id}/publish} và bởi ma trận khi kỳ đang mở.
  *
- * <p>TODO: chi tiết từng dòng (đơn vị × biểu, kết quả Đã tạo / Đã tồn tại) và lịch sử về sau
- * của từng dòng — bản Jmix có bảng {@code ReportPublicationItem}; ở đây tra qua
- * {@code /api/input_reports?publication.id=} + {@code /api/input_report_sheets?report.id=}.
+ * <p>{@code GET /{id}/items} — chi tiết đợt: từng dòng đơn vị × biểu mà đợt đã phát, gom sẵn trên
+ * máy chủ (bản Jmix có bảng {@code ReportPublicationItem}; ở đây suy ra từ tờ biểu, xem
+ * {@code PublicationItemAssembler}). Lịch sử về sau của một dòng đọc ở
+ * {@code /api/input_reports/{id}/history} và {@code /api/input_reports/{id}/ledger_audits}.
  */
 @RestController
 @RequestMapping("/api/publications")
 public class PublicationController {
 
     private final PublicationService service;
+    private final PublicationItemService itemService;
 
-    public PublicationController(PublicationService service) {
+    public PublicationController(PublicationService service, PublicationItemService itemService) {
         this.service = service;
+        this.itemService = itemService;
     }
 
     @GetMapping
@@ -54,5 +59,11 @@ public class PublicationController {
     @PreAuthorize("hasAuthority('" + SetupPermissions.PUBLICATIONS_READ + "')")
     public PublicationResponse get(@PathVariable Long id) {
         return PublicationResponse.from(service.get(id));
+    }
+
+    @GetMapping("/{id}/items")
+    @PreAuthorize("hasAuthority('" + SetupPermissions.PUBLICATIONS_READ + "')")
+    public PublicationItemsResponse items(@PathVariable Long id) {
+        return itemService.items(id);
     }
 }
