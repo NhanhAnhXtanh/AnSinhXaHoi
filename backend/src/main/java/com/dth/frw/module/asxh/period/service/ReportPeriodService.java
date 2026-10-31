@@ -13,6 +13,7 @@ import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.rowlevel.Action;
 import com.dth.frw.shared.web.ListParams;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -52,6 +53,8 @@ public class ReportPeriodService {
     private static final Logger log = LoggerFactory.getLogger(ReportPeriodService.class);
 
     private static final String RESOURCE = "Kỳ báo cáo";
+
+    private static final ZoneId VIETNAM = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private static final Set<String> SORTABLE = Set.of(
             "id", "kind", "seq", "code", "name", "fromDate", "toDate", "openFrom", "deadline",
@@ -159,10 +162,8 @@ public class ReportPeriodService {
         LocalDate openFrom = request.openFrom() != null ? request.openFrom() : period.getOpenFrom();
         LocalDate deadline = request.deadline() != null ? request.deadline() : period.getDeadline();
         requireOrdered("Cửa sổ nhận nhập liệu", openFrom, deadline);
-        if (request.deadline() != null && request.deadline().isBefore(period.getToDate())) {
-            // Hạn nộp trước ngày cuối kỳ thì đơn vị chưa có đủ số liệu để nộp.
-            throw new IllegalArgumentException("Hạn nộp của kỳ " + period.getName()
-                    + " không được trước ngày cuối kỳ (" + vnDate(period.getToDate()) + ").");
+        if (request.deadline() != null && !request.deadline().equals(period.getDeadline())) {
+            requireDeadlineAllowed(period, request.deadline(), LocalDate.now(VIETNAM));
         }
 
         period.setOpenFrom(openFrom);
@@ -174,6 +175,22 @@ public class ReportPeriodService {
         }
         rowLevel.checkWritable(period);
         return repository.persist(period);
+    }
+
+    /**
+     * Hạn nộp sửa tay phải sau ngày cuối kỳ (đơn vị cần ít nhất một ngày để chốt số liệu) và
+     * không phải ngày đã qua (hạn đã qua thì kỳ thành Quá hạn ngay lần chạy job kế tiếp). Hạn
+     * nộp đúng hôm nay vẫn hợp lệ: kỳ chỉ quá hạn từ ngày hôm sau.
+     */
+    static void requireDeadlineAllowed(ReportPeriod period, LocalDate deadline, LocalDate today) {
+        if (!deadline.isAfter(period.getToDate())) {
+            throw new IllegalArgumentException("Hạn nộp của kỳ " + period.getName()
+                    + " phải sau ngày cuối kỳ (" + vnDate(period.getToDate()) + ").");
+        }
+        if (deadline.isBefore(today)) {
+            throw new IllegalArgumentException("Hạn nộp của kỳ " + period.getName()
+                    + " không được là ngày đã qua (hôm nay là " + vnDate(today) + ").");
+        }
     }
 
     /** Hạn nộp hệ thống tự tính cho kỳ theo số ngày hạn nộp hiện tại của lịch. */

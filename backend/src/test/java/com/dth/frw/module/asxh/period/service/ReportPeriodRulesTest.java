@@ -1,8 +1,10 @@
 package com.dth.frw.module.asxh.period.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dth.frw.domain.asxh.period.PeriodKind;
@@ -16,7 +18,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Quy tắc thuần của kỳ báo cáo: tự chuyển trạng thái theo ngày (UC-25), kỳ nào được
- * tính lại hạn nộp khi lịch đổi số ngày (UC-21), và bảng chuyển trạng thái.
+ * tính lại hạn nộp khi lịch đổi số ngày (UC-21), hạn nộp sửa tay được chọn từ ngày nào,
+ * và bảng chuyển trạng thái.
  */
 class ReportPeriodRulesTest {
 
@@ -48,6 +51,34 @@ class ReportPeriodRulesTest {
     void afterDeadlineIsOverdue() {
         assertEquals(PeriodStatus.OVERDUE,
                 ReportPeriodService.dateStatus(fourthQuarter(), LocalDate.of(2027, 1, 6)));
+    }
+
+    @Test
+    @DisplayName("Hạn nộp sửa tay: phải sau ngày cuối kỳ")
+    void manualDeadlineMustBeAfterPeriodEnd() {
+        ReportPeriod period = fourthQuarter();
+        LocalDate today = LocalDate.of(2026, 10, 31);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                ReportPeriodService.requireDeadlineAllowed(period, LocalDate.of(2026, 12, 30), today));
+        assertThrows(IllegalArgumentException.class, () ->
+                ReportPeriodService.requireDeadlineAllowed(period, LocalDate.of(2026, 12, 31), today));
+        assertDoesNotThrow(() ->
+                ReportPeriodService.requireDeadlineAllowed(period, LocalDate.of(2027, 1, 1), today));
+    }
+
+    @Test
+    @DisplayName("Hạn nộp sửa tay: không được là ngày đã qua, đúng hôm nay vẫn được")
+    void manualDeadlineMustNotBeInThePast() {
+        ReportPeriod period = fourthQuarter();
+        LocalDate today = LocalDate.of(2027, 1, 4);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () ->
+                ReportPeriodService.requireDeadlineAllowed(period, LocalDate.of(2027, 1, 1), today));
+        assertTrue(error.getMessage().contains("ngày đã qua"));
+        assertDoesNotThrow(() -> ReportPeriodService.requireDeadlineAllowed(period, today, today));
+        assertDoesNotThrow(() ->
+                ReportPeriodService.requireDeadlineAllowed(period, LocalDate.of(2027, 1, 10), today));
     }
 
     @Test
