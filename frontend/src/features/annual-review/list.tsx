@@ -181,7 +181,7 @@ export function AnnualReviewList() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell align="right" className="bg-card sticky right-0">
+                <TableCell align="right" className="bg-card sticky right-0 transition-colors [tr:hover>&]:bg-[color-mix(in_oklab,var(--color-accent)_40%,var(--color-card))]">
                   <RowActions
                     primary={{
                       label: waiting ? "Duyệt báo cáo" : "Xem phiếu",

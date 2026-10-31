@@ -422,7 +422,7 @@ export function MeasureKindList() {
                     {row.note || "—"}
                   </TableCell>
                   {canWrite && (
-                    <TableCell align="right" className="sticky right-0 bg-card">
+                    <TableCell align="right" className="sticky right-0 bg-card transition-colors [tr:hover>&]:bg-[color-mix(in_oklab,var(--color-accent)_40%,var(--color-card))]">
                       <RowActions
                         primary={{
                           label: row.measureKind ? "Đổi bản chất" : "Khai bản chất",
