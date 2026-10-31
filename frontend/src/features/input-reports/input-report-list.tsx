@@ -294,8 +294,11 @@ export function InputReportList() {
                         }
                       />
                     </TableCell>
-                    <TableCell>
-                      <div className="flex max-w-96 flex-col items-start gap-1">
+                    {/* Ô nhận phần bề rộng còn lại của bảng (w-full) mà không tự nở theo chữ
+                        (max-w-0), nên dòng lý do chỉ cắt "…" khi chạm mép cột; min-w-64 giữ
+                        cột không bị bóp quá hẹp khi màn nhỏ. */}
+                    <TableCell className="w-full max-w-0 min-w-64">
+                      <div className="flex flex-col items-start gap-1">
                         <StatusBadge tone={STATUS_META[s].tone}>{STATUS_META[s].label}</StatusBadge>
                         <span className="w-full truncate text-xs text-muted-foreground" title={sub}>
                           {sub}
