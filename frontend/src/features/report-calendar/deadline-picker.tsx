@@ -21,8 +21,10 @@ const WEEKDAY_NAMES = [
 ];
 
 /**
- * Ô hạn nộp của một kỳ: bấm vào mở lịch chọn ngày. Chỉ cho chọn từ ngày sau
- * khi hết kỳ trở đi — hạn nộp trước ngày cuối kỳ thì đơn vị chưa có số liệu.
+ * Ô hạn nộp của một kỳ: bấm vào mở lịch chọn ngày. Ngày sớm nhất chọn được là
+ * ngày muộn hơn trong hai mốc: ngày sau khi hết kỳ (trước đó đơn vị chưa có số
+ * liệu) và hôm nay (hạn đã qua thì kỳ thành Quá hạn ngay). Máy chủ kiểm lại
+ * đúng quy tắc này (ReportPeriodService.requireDeadlineAllowed).
  */
 export function DeadlinePicker({
   value,
@@ -43,6 +45,10 @@ export function DeadlinePicker({
 }) {
   const [open, setOpen] = useState(false);
   const selected = fromIso(value);
+  const afterEnd = addDays(periodEnd, 1);
+  const today = toIso(new Date());
+  // Chuỗi yyyy-MM-dd so sánh được theo thứ tự chữ.
+  const earliest = afterEnd > today ? afterEnd : today;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -67,8 +73,9 @@ export function DeadlinePicker({
         <Calendar
           mode="single"
           selected={selected}
-          defaultMonth={selected}
-          disabled={{ before: fromIso(addDays(periodEnd, 1)) }}
+          // Hạn hiện tại đã qua thì mở sẵn ở tháng của ngày sớm nhất còn chọn được.
+          defaultMonth={value < earliest ? fromIso(earliest) : selected}
+          disabled={{ before: fromIso(earliest) }}
           onSelect={(day) => {
             if (!day) return;
             onChange(toIso(day));
