@@ -302,7 +302,7 @@ export function InputReportList() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell align="right" className="sticky right-0 bg-card">
+                    <TableCell align="right" className="sticky right-0 bg-card transition-colors [tr:hover>&]:bg-[color-mix(in_oklab,var(--color-accent)_40%,var(--color-card))]">
                       <div className="flex justify-end">
                         <RowActions primary={primary} items={items} />
                       </div>

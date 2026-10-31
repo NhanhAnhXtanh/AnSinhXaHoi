@@ -1,6 +1,4 @@
-# Dependabot mở PR cập nhật thư viện vào hai nhánh:
-# - nhatanh: thứ Hai hằng tuần;
-# - main: hằng ngày.
+# Dependabot mở PR cập nhật thư viện vào hai nhánh nhatanh và main, cùng lịch thứ Hai hằng tuần.
 # Bản vá + bản nhỏ gom chung một PR mỗi hệ sinh thái để đỡ nhiễu; bản lớn tách riêng từng PR.
 # Mỗi khối dưới đây là một (hệ sinh thái, nhánh) — Dependabot cho phép trùng thư mục khi khác
 # target-branch.
@@ -67,7 +65,8 @@ updates:
     directory: /backend
     target-branch: main
     schedule:
-      interval: daily
+      interval: weekly
+      day: monday
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 5
     # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
@@ -83,7 +82,8 @@ updates:
     directory: /frontend
     target-branch: main
     schedule:
-      interval: daily
+      interval: weekly
+      day: monday
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 5
     # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
@@ -106,7 +106,8 @@ updates:
     directory: /
     target-branch: main
     schedule:
-      interval: daily
+      interval: weekly
+      day: monday
       timezone: Asia/Ho_Chi_Minh
     # Chỉ đề xuất bản đã phát hành >= 7 ngày: tránh dính bản bị chèn mã độc vừa tung ra.
     cooldown:

@@ -227,7 +227,7 @@ function HistoryList({
                 <TableCell>
                   <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
                 </TableCell>
-                <TableCell align="right" className="bg-card sticky right-0">
+                <TableCell align="right" className="bg-card sticky right-0 transition-colors [tr:hover>&]:bg-[color-mix(in_oklab,var(--color-accent)_40%,var(--color-card))]">
                   <RowActions
                     primary={{
                       label: "Xem phiếu",
