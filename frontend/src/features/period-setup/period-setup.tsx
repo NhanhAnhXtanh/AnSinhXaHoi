@@ -87,7 +87,8 @@ import {
   type CellRef,
 } from "./use-period-setup";
 
-const PAGE_SIZE = 10;
+/** Số đơn vị mỗi trang của ma trận; 0 = tất cả trên một trang. */
+const PAGE_SIZES = [10, 20, 50, 0] as const;
 const EMPTY_SET: ReadonlySet<string> = new Set<string>();
 const FALLBACK_ERROR = "Chưa thực hiện được. Bạn thử lại sau ít phút.";
 
@@ -133,6 +134,7 @@ export function PeriodSetup() {
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<"all" | UnitGroup>("all");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [dialog, setDialog] = useState<DialogKind | null>(null);
   const [switchTo, setSwitchTo] = useState<string | null>(null);
 
@@ -215,9 +217,10 @@ export function PeriodSetup() {
       (u) => (group === "all" || u.group === group) && (!q || fold(u.name).includes(q))
     );
   }, [axes.units, search, group]);
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const perPage = pageSize === 0 ? Math.max(1, filtered.length) : pageSize;
+  const pages = Math.max(1, Math.ceil(filtered.length / perPage));
   const currentPage = Math.min(page, pages - 1);
-  const pageUnits = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const pageUnits = filtered.slice(currentPage * perPage, (currentPage + 1) * perPage);
   const groupsPresent = useMemo(
     () =>
       (Object.keys(UNIT_GROUP_LABEL) as UnitGroup[]).filter((g) =>
@@ -785,12 +788,17 @@ export function PeriodSetup() {
                   ? "Tài khoản của bạn chỉ được xem thiết lập, không tích hoặc bỏ biểu mẫu được."
                   : footerNote(selected, mode)
               }
-              first={filtered.length === 0 ? 0 : currentPage * PAGE_SIZE + 1}
-              last={currentPage * PAGE_SIZE + pageUnits.length}
+              first={filtered.length === 0 ? 0 : currentPage * perPage + 1}
+              last={currentPage * perPage + pageUnits.length}
               total={filtered.length}
               page={currentPage}
               pages={pages}
               onPage={setPage}
+              pageSize={pageSize}
+              onPageSize={(size) => {
+                setPageSize(size);
+                setPage(0);
+              }}
             />
           </section>
         ) : (
@@ -947,6 +955,8 @@ function MatrixFooter({
   page,
   pages,
   onPage,
+  pageSize,
+  onPageSize,
 }: {
   note: string | null;
   first: number;
@@ -955,6 +965,9 @@ function MatrixFooter({
   page: number;
   pages: number;
   onPage: (page: number) => void;
+  /** 0 = tất cả. */
+  pageSize: number;
+  onPageSize: (size: number) => void;
 }) {
   return (
     <div className="flex min-h-[52px] flex-wrap items-center gap-x-4 gap-y-2 border-t px-5 py-2.5">
@@ -1011,6 +1024,18 @@ function MatrixFooter({
             <ChevronsRight />
           </Button>
         </div>
+        <Select value={String(pageSize)} onValueChange={(v) => onPageSize(Number(v))}>
+          <SelectTrigger size="sm" className="w-28" aria-label="Số đơn vị mỗi trang">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {PAGE_SIZES.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n === 0 ? "Tất cả" : `${n} / trang`}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
