@@ -220,4 +220,33 @@ class AnnualReportWorkflowTest {
         // Mở lại chỉ dành cho phiếu đã duyệt.
         assertThrows(ConflictException.class, () -> workflow.reopen(report.getId(), "Sai số"));
     }
+
+    /** Đăng nhập giả bằng token có claim tên đăng nhập — đúng thứ CurrentUser.username() đọc. */
+    private static void signInAs(String username) {
+        org.springframework.security.oauth2.jwt.Jwt jwt = org.springframework.security.oauth2.jwt.Jwt
+                .withTokenValue("t").header("alg", "none").subject("1")
+                .claim(com.dth.frw.shared.security.JwtService.CLAIM_USERNAME, username).build();
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt));
+    }
+
+    @Test
+    @DisplayName("Người nộp không tự phê duyệt / trả lại báo cáo năm của mình; người khác duyệt được")
+    void submitterCannotApproveOwnReport() {
+        try {
+            signInAs("so.tonghop");
+            readyToSubmit(5);
+            AnnualReport submitted = workflow.submit(YEAR, "12/TTr-STC", DOC_DATE, List.of());
+
+            ConflictException error = assertThrows(ConflictException.class, () -> workflow.approve(submitted.getId()));
+            assertTrue(error.getMessage().startsWith("Bạn là người nộp báo cáo năm này"));
+            assertThrows(ConflictException.class, () -> workflow.returnReport(submitted.getId(), "Tự trả lại"));
+            assertEquals(AnnualReportStatus.SUBMITTED, submitted.getStatus());
+
+            signInAs("ubnd.duyet");
+            assertEquals(AnnualReportStatus.APPROVED, workflow.approve(submitted.getId()).getStatus());
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
 }
