@@ -12,9 +12,12 @@ import {
   SquarePen,
   Users,
 } from "lucide-react";
+import { usePermissions } from "@refinedev/core";
+import { useMemo } from "react";
 import { Link } from "react-router";
 
 import { StatusBadge, formatNumber } from "@/shared/components/asxh";
+import { permissionFor } from "@/shared/lib/permissions";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -37,16 +40,36 @@ import {
 } from "./status";
 import type { Counts, HomeDashboard, TodoItem } from "./types";
 
-const QUICK_LINKS: { label: string; to: string; icon: LucideIcon }[] = [
-  { label: "Nhập liệu báo cáo", to: "/input-reports", icon: SquarePen },
-  { label: "Duyệt phiếu nhập", to: "/report-review", icon: ClipboardCheck },
-  { label: "Tổng hợp báo cáo", to: "/summary", icon: ChartColumn },
-  { label: "Thiết lập & điều hành", to: "/period-setup", icon: ListChecks },
-  { label: "Bộ biểu mẫu", to: "/templates", icon: FileText },
-  { label: "Lịch và kỳ báo cáo", to: "/report-calendar", icon: CalendarDays },
-  { label: "Danh sách đơn vị", to: "/report-units", icon: BuildingComplex },
-  { label: "Người dùng", to: "/users", icon: Users },
+/** `resource`: tên resource trong `app/resources` — nút chỉ hiện khi tài khoản mở được màn đó. */
+const QUICK_LINKS: { label: string; to: string; resource: string; icon: LucideIcon }[] = [
+  { label: "Nhập liệu báo cáo", to: "/input-reports", resource: "input_reports", icon: SquarePen },
+  { label: "Duyệt phiếu nhập", to: "/report-review", resource: "report_review", icon: ClipboardCheck },
+  { label: "Tổng hợp báo cáo", to: "/summary", resource: "summary", icon: ChartColumn },
+  { label: "Thiết lập & điều hành", to: "/period-setup", resource: "period_setup", icon: ListChecks },
+  { label: "Bộ biểu mẫu", to: "/templates", resource: "templates", icon: FileText },
+  { label: "Lịch và kỳ báo cáo", to: "/report-calendar", resource: "report_calendar", icon: CalendarDays },
+  { label: "Danh sách đơn vị", to: "/report-units", resource: "report_units", icon: BuildingComplex },
+  { label: "Người dùng", to: "/users", resource: "users", icon: Users },
 ];
+
+/**
+ * Các nút Truy cập nhanh tài khoản mở được — cùng luật lọc menu bên trái
+ * (`useAccessibleMenuItems`): cần quyền `list` của resource. Chưa có danh sách
+ * quyền (đang tải) thì chưa hiện nút nào, để không nháy nút rồi mất.
+ */
+function useQuickLinks() {
+  const { data: permissions } = usePermissions<string[]>({});
+  return useMemo(
+    () =>
+      permissions
+        ? QUICK_LINKS.filter((link) => {
+            const required = permissionFor(link.resource, "list");
+            return !required || permissions.includes(required);
+          })
+        : [],
+    [permissions]
+  );
+}
 
 /** Số đếm của một tình trạng hiển thị. */
 const countOf = (counts: Counts, s: SheetStatus): number => counts[s];
@@ -83,6 +106,7 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
   const total = totals.total;
   const statuses = statusesOf(totals);
   const canApprove = capabilities.approve;
+  const quickLinks = useQuickLinks();
 
   return (
     <>
@@ -264,7 +288,7 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
         <Panel>
           <PanelHeader title="Truy cập nhanh" />
           <div className="scrollbar-fade grid min-h-0 grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2">
-            {QUICK_LINKS.map(({ label, to, icon: Icon }) => (
+            {quickLinks.map(({ label, to, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}
