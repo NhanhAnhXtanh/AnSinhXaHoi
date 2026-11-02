@@ -6,6 +6,8 @@ import { Link } from "react-router";
 import { formatNumber } from "@/shared/components/asxh";
 import { cn } from "@/shared/lib/utils";
 
+import { useCanOpen } from "./use-can-open";
+
 /** Màu ô biểu tượng của thẻ chỉ số. */
 export type StatTone = "primary" | "warning" | "success" | "destructive";
 
@@ -18,7 +20,8 @@ const STAT_TONE: Record<StatTone, string> = {
 
 /**
  * Thẻ chỉ số: ô biểu tượng 40px + số lớn + một dòng giải thích.
- * Có `to` thì cả thẻ là liên kết sang màn tương ứng (UC-75 bước 2).
+ * Có `to` thì cả thẻ là liên kết sang màn tương ứng (UC-75 bước 2) — chỉ khi tài khoản mở
+ * được màn đó; không thì thẻ chỉ hiện số.
  */
 export function StatCard({
   icon: Icon,
@@ -54,8 +57,9 @@ export function StatCard({
     </>
   );
   const frame = "flex min-w-0 items-center gap-4 rounded-xl border bg-card p-5 shadow-e1";
+  const canOpen = useCanOpen();
 
-  if (to) {
+  if (to && canOpen(to)) {
     return (
       <Link
         to={to}
@@ -121,7 +125,10 @@ export function PanelHeader({
   );
 }
 
+/** Liên kết "… →"; tài khoản không mở được màn đích thì không hiện. */
 export function ArrowLink({ to, children }: { to: string; children: ReactNode }) {
+  const canOpen = useCanOpen();
+  if (!canOpen(to)) return null;
   return (
     <Link
       to={to}

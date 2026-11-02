@@ -1,4 +1,5 @@
 import { compileRecord } from "./compile";
+import { ScriptTimeoutError } from "./loop-guard";
 import type { ScriptContextHandle } from "./ctx-factory";
 import {
   SCRIPT_ERROR_CODE,
@@ -38,6 +39,7 @@ export class ScriptHookEngine {
   private scripts: CompiledScript[] = [];
   private errors: ScriptCompileError[] = [];
   private readonly handle: ScriptContextHandle;
+  private timedOut = false;
 
   constructor(handle: ScriptContextHandle) {
     this.handle = handle;
@@ -68,6 +70,11 @@ export class ScriptHookEngine {
     return this.errors;
   }
 
+  /** Có kịch bản nào bị dừng vì giữ trình duyệt quá giới hạn (loop-guard.ts) không. */
+  get didTimeOut(): boolean {
+    return this.timedOut || this.errors.some((entry) => entry.timedOut === true);
+  }
+
   hasHook(name: ScriptHookName): boolean {
     return this.scripts.some((script) => script.hooks[name] != null);
   }
@@ -77,6 +84,7 @@ export class ScriptHookEngine {
     error: unknown,
     severity: "ERROR" | "WARNING" = "WARNING"
   ): TempTableValidationIssue {
+    if (error instanceof ScriptTimeoutError) this.timedOut = true;
     return {
       severity,
       code: SCRIPT_ERROR_CODE,
@@ -84,9 +92,13 @@ export class ScriptHookEngine {
     };
   }
 
+  /**
+   * Kịch bản không biên dịch được: ERROR, không phải cảnh báo — kịch bản đó có thể chính là bước
+   * kiểm tra trước khi nộp, cho qua là số liệu chưa kiểm vẫn nộp được (bản Jmix để WARNING).
+   */
   compileErrorIssues(): TempTableValidationIssue[] {
     return this.errors.map((entry) =>
-      this.scriptErrorIssue(entry.record.name, entry.message)
+      this.scriptErrorIssue(entry.record.name, entry.message, "ERROR")
     );
   }
 
@@ -162,6 +174,7 @@ export class ScriptHookEngine {
           return false;
         }
       } catch (error) {
+        if (error instanceof ScriptTimeoutError) this.timedOut = true;
         console.warn(`Script "${script.record.name}" lỗi ở hook ${name}:`, error);
       } finally {
         const elapsed = performance.now() - startedAt;

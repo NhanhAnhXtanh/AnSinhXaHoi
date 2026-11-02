@@ -173,6 +173,7 @@ public class AnnualReportWorkflowService {
         if (report.getStatus() != AnnualReportStatus.SUBMITTED) {
             throw new ConflictException("Chỉ phê duyệt được báo cáo năm đang chờ UBND duyệt.");
         }
+        requireNotSubmitter(report);
         report.setStatus(AnnualReportStatus.APPROVED);
         report.setDecidedAt(Instant.now());
         report.setDecidedBy(CurrentUser.username().orElse(null));
@@ -195,6 +196,7 @@ public class AnnualReportWorkflowService {
         if (report.getStatus() != AnnualReportStatus.SUBMITTED) {
             throw new ConflictException("Chỉ trả lại được báo cáo năm đang chờ UBND duyệt.");
         }
+        requireNotSubmitter(report);
         return decideReturned(report, text, false);
     }
 
@@ -210,6 +212,17 @@ public class AnnualReportWorkflowService {
     }
 
     // ------------------------------------------------------------------ nội bộ
+
+    /**
+     * Sở và UBND dùng chung quyền quyết định báo cáo năm (như bản Jmix), nên quyền không đủ để tách
+     * người nộp khỏi người quyết định: người đã nộp phiếu không tự phê duyệt / trả lại phiếu đó.
+     */
+    private static void requireNotSubmitter(AnnualReport report) {
+        if (AnnualReportService.isSubmittedByCurrentUser(report)) {
+            throw new ConflictException("Bạn là người nộp báo cáo năm này nên không tự phê duyệt hoặc trả lại "
+                    + "được. Lãnh đạo UBND sẽ quyết định.");
+        }
+    }
 
     private AnnualReport decideReturned(AnnualReport report, String reason, boolean reopened) {
         report.setStatus(AnnualReportStatus.RETURNED);

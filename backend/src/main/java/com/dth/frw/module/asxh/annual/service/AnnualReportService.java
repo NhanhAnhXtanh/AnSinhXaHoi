@@ -187,12 +187,21 @@ public class AnnualReportService {
             return actions;
         }
         if (report.getStatus() == AnnualReportStatus.SUBMITTED) {
-            actions.add("approve");
-            actions.add("return");
+            // Người nộp không tự quyết định phiếu của mình (AnnualReportWorkflowService).
+            if (!isSubmittedByCurrentUser(report)) {
+                actions.add("approve");
+                actions.add("return");
+            }
         } else if (report.getStatus() == AnnualReportStatus.APPROVED) {
             actions.add("reopen");
         }
         return actions;
+    }
+
+    /** Người đang đăng nhập chính là người đã nộp phiếu này. */
+    public static boolean isSubmittedByCurrentUser(AnnualReport report) {
+        String actor = CurrentUser.username().orElse(null);
+        return actor != null && actor.equalsIgnoreCase(report.getSubmittedBy());
     }
 
     /** Phiếu còn hiệu lực của năm (đang chờ / đã duyệt); {@code null} = nộp được phiếu mới. */

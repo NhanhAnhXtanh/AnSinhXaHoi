@@ -12,6 +12,7 @@ import {
   SquarePen,
   Users,
 } from "lucide-react";
+import { useMemo } from "react";
 import { Link } from "react-router";
 
 import { StatusBadge, formatNumber } from "@/shared/components/asxh";
@@ -36,7 +37,9 @@ import {
   type SheetStatus,
 } from "./status";
 import type { Counts, HomeDashboard, TodoItem } from "./types";
+import { useCanOpen } from "./use-can-open";
 
+/** Nút chỉ hiện khi tài khoản mở được màn đích (`useCanOpen`). */
 const QUICK_LINKS: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Nhập liệu báo cáo", to: "/input-reports", icon: SquarePen },
   { label: "Duyệt phiếu nhập", to: "/report-review", icon: ClipboardCheck },
@@ -47,6 +50,15 @@ const QUICK_LINKS: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Danh sách đơn vị", to: "/report-units", icon: BuildingComplex },
   { label: "Người dùng", to: "/users", icon: Users },
 ];
+
+/**
+ * Các nút Truy cập nhanh tài khoản mở được (`useCanOpen`, cùng luật lọc menu bên trái). Chưa tải
+ * xong danh sách quyền thì chưa hiện nút nào, để không nháy nút rồi mất.
+ */
+function useQuickLinks() {
+  const canOpen = useCanOpen();
+  return useMemo(() => QUICK_LINKS.filter((link) => canOpen(link.to)), [canOpen]);
+}
 
 /** Số đếm của một tình trạng hiển thị. */
 const countOf = (counts: Counts, s: SheetStatus): number => counts[s];
@@ -83,6 +95,8 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
   const total = totals.total;
   const statuses = statusesOf(totals);
   const canApprove = capabilities.approve;
+  const quickLinks = useQuickLinks();
+  const canOpen = useCanOpen();
 
   return (
     <>
@@ -237,15 +251,10 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
             </PanelEmpty>
           ) : (
             <ul className="scrollbar-fade -mx-1 min-h-0 overflow-y-auto px-1">
-              {todo.items.map((item) => (
-                <li key={item.reportId} className="border-b last:border-b-0">
-                  <Link
-                    to={todoLink(item, canApprove)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-sm py-2",
-                      "hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    )}
-                  >
+              {todo.items.map((item) => {
+                const to = todoLink(item, canApprove);
+                const content = (
+                  <>
                     <div className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm font-medium">{item.unitName}</span>
                       <span className="text-muted-foreground truncate text-xs">
@@ -253,9 +262,26 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
                       </span>
                     </div>
                     {todoBadge(item)}
-                  </Link>
-                </li>
-              ))}
+                  </>
+                );
+                return (
+                  <li key={item.reportId} className="border-b last:border-b-0">
+                    {canOpen(to) ? (
+                      <Link
+                        to={to}
+                        className={cn(
+                          "flex items-center gap-3 rounded-sm py-2",
+                          "hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        )}
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-3 py-2">{content}</div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Panel>
@@ -264,7 +290,7 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
         <Panel>
           <PanelHeader title="Truy cập nhanh" />
           <div className="scrollbar-fade grid min-h-0 grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2">
-            {QUICK_LINKS.map(({ label, to, icon: Icon }) => (
+            {quickLinks.map(({ label, to, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}

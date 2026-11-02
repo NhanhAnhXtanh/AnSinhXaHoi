@@ -26,6 +26,8 @@ import { ReportUnitPicker, type ReportUnitRef } from "./report-unit-picker";
 import { AccountLevelField } from "./account-level-field";
 import { StatusSwitchField } from "./status-switch-field";
 import { RequiredMark, joinFullName, USER_FIELD_RULES } from "./user-form-fields";
+import { UsernameAvailabilityHint } from "./username-availability";
+import { USERNAME_TAKEN_MESSAGE, useUsernameAvailability } from "./use-username-availability";
 import { AdminPageHeader } from "../record-actions";
 import { errorDescription } from "../labels";
 import {
@@ -124,6 +126,7 @@ export const UserCreate = () => {
     defaultValues: defaultValues(presetUnit?.id ?? null),
   });
   useWarnWhenChanged(form, form.formState.defaultValues);
+  const usernameState = useUsernameAvailability(form.watch("username"));
 
   // Vai trò cán bộ đơn vị chọn sẵn khi cấp tài khoản cho đơn vị (UC-70). Cùng truy vấn với ô
   // chọn vai trò bên dưới (cùng khoá), nên không tốn thêm yêu cầu.
@@ -144,6 +147,10 @@ export const UserCreate = () => {
   }, [reporterRoleId, getValues, setValue]);
 
   function onSubmit(values: UserFormValues) {
+    if (usernameState === "taken") {
+      form.setError("username", { type: "server", message: USERNAME_TAKEN_MESSAGE });
+      return;
+    }
     // Đúng `UserRequest` của API: họ tên ghép lại thành một ô, không gửi ô
     // nhập lại mật khẩu. Ép kiểu vì `onFinish` nhận kiểu của form.
     const payload = {
@@ -155,7 +162,16 @@ export const UserCreate = () => {
       roles: values.roles,
       reportUnit: values.reportUnit,
     };
-    onFinish(payload as unknown as UserFormValues);
+    // Máy chủ từ chối (trùng tên đăng nhập / thư điện tử…): thông báo chung đã hiện qua
+    // errorNotification; ghi thêm lỗi vào đúng ô để người dùng sửa tại chỗ.
+    onFinish(payload as unknown as UserFormValues).catch((error: unknown) => {
+      const message = errorDescription(error);
+      if (message?.startsWith("Tên đăng nhập")) {
+        form.setError("username", { type: "server", message });
+      } else if (message?.startsWith("Thư điện tử")) {
+        form.setError("email", { type: "server", message });
+      }
+    });
   }
 
   return (
@@ -262,9 +278,13 @@ export const UserCreate = () => {
                         placeholder="Ví dụ: an.nv"
                       />
                     </FormControl>
-                    <FormDescription>
-                      Dùng để đăng nhập. Không được trùng với tài khoản khác.
-                    </FormDescription>
+                    {usernameState === "idle" ? (
+                      <FormDescription>
+                        Dùng để đăng nhập. Không được trùng với tài khoản khác.
+                      </FormDescription>
+                    ) : (
+                      <UsernameAvailabilityHint state={usernameState} />
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

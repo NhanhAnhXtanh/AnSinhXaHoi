@@ -238,6 +238,8 @@ export interface CompiledScript {
 export interface ScriptCompileError {
   record: ScriptRecord;
   message: string;
+  /** Dừng vì chạy quá giới hạn thời gian ngay khi nạp (vòng lặp ở mức ngoài cùng). */
+  timedOut?: boolean;
 }
 
 /** Mã issue engine tự sinh khi script hỏng. */

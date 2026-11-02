@@ -72,18 +72,23 @@ public class AuthService {
     // data in it. Answered from the policy cache, so it costs no query either.
     private final RowLevelSecurity rowLevel;
 
+    // Khoá đăng nhập tạm thời sau nhiều lần nhập sai liên tiếp.
+    private final LoginAttemptService loginAttempts;
+
     public AuthService(UserService userService,
                        RefreshTokenService refreshTokenService,
                        JwtService jwtService,
                        PasswordEncoder passwordEncoder,
                        AuthorizationService authorizationService,
-                       RowLevelSecurity rowLevel) {
+                       RowLevelSecurity rowLevel,
+                       LoginAttemptService loginAttempts) {
         this.userService = userService;
         this.refreshTokenService = refreshTokenService;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.authorizationService = authorizationService;
         this.rowLevel = rowLevel;
+        this.loginAttempts = loginAttempts;
     }
 
     /**
@@ -93,21 +98,39 @@ public class AuthService {
      *                                 an account that is not active — the same
      *                                 exception and the same message for all
      *                                 three, so that a failed attempt reveals
-     *                                 nothing about which accounts exist
+     *                                 nothing about which accounts exist.
+     *                                 The one exception is the temporary
+     *                                 lock after repeated wrong passwords
+     *                                 ({@link LoginAttemptService}), which
+     *                                 says so and for how long: the person
+     *                                 locked out has to know to wait
      */
     @Transactional
     public TokenResponse login(LoginRequest request) {
         Optional<User> found = userService.findForAuthentication(request.username());
+        Instant now = Instant.now();
 
         String hash = found.map(User::getPasswordHash).orElse(DUMMY_HASH);
         boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
+
+        // Đang khoá tạm thời thì từ chối cả khi mật khẩu đúng — không thì khoá vô nghĩa. Mật khẩu
+        // vẫn được so ở trên để thời gian trả lời như mọi lần khác.
+        if (found.isPresent() && found.get().isLoginLockedAt(now)) {
+            throw new BadCredentialsException(LoginAttemptService.lockedMessage(found.get().getLockedUntil(), now));
+        }
+        if (found.isPresent() && !passwordMatches) {
+            Instant lockedUntil = loginAttempts.recordFailure(found.get().getId(), now);
+            if (lockedUntil != null) {
+                throw new BadCredentialsException(LoginAttemptService.lockedMessage(lockedUntil, now));
+            }
+        }
 
         User user = found
                 .filter(candidate -> passwordMatches)
                 .filter(User::canSignIn)
                 .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS));
 
-        Instant now = Instant.now();
+        user.clearLoginFailures();
         userService.recordLogin(user, now);
         return issue(user, now);
     }

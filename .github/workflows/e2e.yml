@@ -101,7 +101,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Playwright (preview :4180 do playwright.config.ts tự bật)
         working-directory: frontend
-        run: npm run e2e
+        # Chỉ 4 luồng chính 01–04. Bộ 90–96 (biên, gian lận, toàn chức năng) dựa vào dữ liệu và
+        # tài khoản của CSDL thử dth-framework máy local, chạy tay từng file.
+        run: npm run e2e -- "e2e/0[1-4]-"
 
       - name: Lưu báo cáo Playwright khi lỗi
         if: failure()

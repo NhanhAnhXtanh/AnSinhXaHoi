@@ -9,6 +9,7 @@ export type {
   SpreadWorkbookProps,
   SpreadDesignerProps,
   ScriptRunResult,
+  WorkbookCellRef,
   ExportSheetSource,
 } from "./types";
 

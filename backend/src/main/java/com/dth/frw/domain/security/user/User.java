@@ -134,6 +134,14 @@ public class User {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    /** Số lần đăng nhập sai liên tiếp (LoginAttemptService); đăng nhập đúng thì về 0. */
+    @Column(name = "failed_login_count", nullable = false)
+    private int failedLoginCount;
+
+    /** Khoá đăng nhập tạm thời tới thời điểm này; null = không khoá. */
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
     protected User() {
         // for JPA
     }
@@ -280,6 +288,25 @@ public class User {
 
     public void setLastLoginAt(Instant lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public int getFailedLoginCount() {
+        return failedLoginCount;
+    }
+
+    public Instant getLockedUntil() {
+        return lockedUntil;
+    }
+
+    /** Đang trong thời gian khoá đăng nhập tạm thời. */
+    public boolean isLoginLockedAt(Instant when) {
+        return lockedUntil != null && lockedUntil.isAfter(when);
+    }
+
+    /** Đăng nhập đúng / đặt lại mật khẩu: đếm lại từ đầu, bỏ khoá. */
+    public void clearLoginFailures() {
+        this.failedLoginCount = 0;
+        this.lockedUntil = null;
     }
 
     @Override

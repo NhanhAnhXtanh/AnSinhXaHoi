@@ -172,6 +172,7 @@ export function createScriptContext(
           message: issue.message,
           businessKey: issue.businessKey,
           field: issue.field,
+          source: issueSource(issue.source),
         });
       },
     }),
@@ -185,6 +186,16 @@ export function createScriptContext(
       return drained;
     },
   };
+}
+
+/** Ô gây lỗi (để màn nhập tô đỏ); bỏ qua nếu script ghi sai dạng. */
+function issueSource(source: unknown): TempTableValidationIssue["source"] {
+  if (source == null || typeof source !== "object") return undefined;
+  const { sheetName, row, column } = source as Record<string, unknown>;
+  if (typeof sheetName !== "string" || !Number.isInteger(row) || !Number.isInteger(column)) {
+    return undefined;
+  }
+  return { sheetName, row: row as number, column: column as number };
 }
 
 /** `/api/x` hoặc `/rest/qt/x` → `x` (tương đối với gốc API của kyInstance). */

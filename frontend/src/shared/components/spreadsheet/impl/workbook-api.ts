@@ -23,7 +23,7 @@ export function createWorkbookApi(
 
   const api: SpreadWorkbookApi = {
     toJSON() {
-      return stripEvaluationSheet(adapter.workbook.toJSON() as WorkbookJson);
+      return stripEvaluationSheet(adapter.withoutMarks(() => adapter.workbook.toJSON()) as WorkbookJson);
     },
     getSheetNames() {
       return businessSheetIndexes().map((i) => adapter.getSheetName(i));
@@ -33,7 +33,7 @@ export function createWorkbookApi(
       if (index >= 0) adapter.setActiveSheet(index);
     },
     exportXlsx(fileName) {
-      return exportWorkbookJson(adapter.workbook.toJSON() as WorkbookJson, fileName);
+      return exportWorkbookJson(adapter.withoutMarks(() => adapter.workbook.toJSON()) as WorkbookJson, fileName);
     },
     async importFile(file) {
       adapter.suspendPaint();
@@ -51,6 +51,16 @@ export function createWorkbookApi(
       const index = adapter.getSheetIndex(sheet);
       if (index < 0) return undefined;
       return adapter.getValue(index, row, col);
+    },
+    markInvalidCells(cells) {
+      const indexed = cells.flatMap((cell) => {
+        const sheetIndex = adapter.getSheetIndex(cell.sheetName);
+        return sheetIndex >= 0 ? [{ sheetIndex, row: cell.row, col: cell.column }] : [];
+      });
+      adapter.markCells(indexed);
+    },
+    clearInvalidCells() {
+      adapter.clearMarks();
     },
     raw() {
       return adapter.workbook;

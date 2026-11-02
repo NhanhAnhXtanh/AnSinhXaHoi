@@ -8,14 +8,16 @@ import "@mescius/spread-sheets-io";
 import "@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css";
 
 import { useEffect, useRef, useState } from "react";
-import { TriangleAlert } from "lucide-react";
+import { RotateCcw, TriangleAlert } from "lucide-react";
 
 import { EmptyState, LoadingState } from "@/shared/components/asxh";
+import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 
 import { parseScriptText } from "../script/compile";
 import { createScriptContext } from "../script/ctx-factory";
 import { ScriptHookEngine } from "../script/hook-engine";
+import { canRaiseScriptTimeLimit, raiseScriptTimeLimit } from "../script/loop-guard";
 import {
   registerScriptSession,
   resolveReport,
@@ -73,6 +75,9 @@ function stampInputCellLocks(adapter: SpreadAdapter, sheetIndex: number): void {
   }
 }
 
+/** onLoad / afterInject bị dừng vì chạy quá giới hạn: biểu chưa sẵn sàng để nhập. */
+class ScriptLoadTimeout extends Error {}
+
 function issueText(issue: TempTableValidationIssue): string {
   return issue.severity === "WARNING" ? `Lưu ý: ${issue.message}` : issue.message;
 }
@@ -83,7 +88,9 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
   const latestRef = useRef(props);
   latestRef.current = props;
   const adapterRef = useRef<SpreadAdapter | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "script-timeout">("loading");
+  // Tăng để nạp lại bảng tính (nút "Tải lại" khi phần tự động của biểu chạy quá lâu).
+  const [reloadKey, setReloadKey] = useState(0);
   const contentVersion = useContentVersion(props.workbook);
 
   useEffect(() => {
@@ -223,9 +230,12 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
         const messages = [...issues.map(issueText), ...scriptMessages];
         if (issues.length > 0) console.warn("Script của mẫu báo:", issues);
         latestRef.current.onScriptResult?.({
-          ok: !issues.some((issue) => issue.severity === "ERROR"),
+          ok: !issues.some((issue) => issue.severity === "ERROR") && !engine.didTimeOut,
           messages,
         });
+        // Biểu chưa chạy xong phần tự động thì không cho dùng (ô khoá / số tự điền có thể thiếu).
+        // Bảng ngầm (kiểm tra trước khi nộp) vẫn đi tiếp: bước kiểm tra tự báo lỗi của nó.
+        if (engine.didTimeOut && !initial.offscreen) throw new ScriptLoadTimeout();
       }
 
       // Chỉ xem: khoá MỌI ô (bản nháp mang sẵn ô mở khoá — chỉ protect là chưa đủ),
@@ -275,6 +285,10 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
       })
       .catch((error: unknown) => {
         if (cancelled) return;
+        if (error instanceof ScriptLoadTimeout) {
+          setStatus("script-timeout");
+          return;
+        }
         console.error("Không mở được bảng tính:", error);
         setStatus("error");
       })
@@ -310,7 +324,7 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
     };
     // Nạp lại khi NỘI DUNG workbook, chế độ chỉ xem hoặc script đổi. Các prop khác
     // (scriptContext, callback) đọc qua latestRef tại thời điểm nạp.
-  }, [contentVersion, readOnly, scriptText]);
+  }, [contentVersion, readOnly, scriptText, reloadKey]);
 
   // Ẩn/hiện hàng tab không cần nạp lại.
   useEffect(() => {
@@ -356,6 +370,34 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
             icon={TriangleAlert}
             title="Không mở được bảng tính"
             description="Vui lòng tải lại trang. Nếu vẫn không được, hãy báo cho quản trị hệ thống."
+          />
+        </div>
+      )}
+      {status === "script-timeout" && (
+        <div className="bg-card absolute inset-0 z-10 flex">
+          <EmptyState
+            icon={TriangleAlert}
+            title="Không tải được đầy đủ biểu mẫu"
+            description={
+              canRaiseScriptTimeLimit()
+                ? "Phần tự tính và kiểm tra số liệu của biểu chạy quá lâu nên đã dừng. Bạn bấm Tải lại để thử lần nữa."
+                : "Phần tự tính và kiểm tra số liệu của biểu vẫn chạy quá lâu. Bạn báo cán bộ hỗ trợ của Sở để kiểm tra lại biểu mẫu."
+            }
+            action={
+              canRaiseScriptTimeLimit() ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    raiseScriptTimeLimit();
+                    setStatus("loading");
+                    setReloadKey((key) => key + 1);
+                  }}
+                >
+                  <RotateCcw />
+                  Tải lại
+                </Button>
+              ) : undefined
+            }
           />
         </div>
       )}

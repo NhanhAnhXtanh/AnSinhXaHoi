@@ -1,6 +1,9 @@
 package com.dth.frw.module.asxh.script;
 
 import java.util.Map;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -61,6 +64,36 @@ public final class WorkbookJsonCellReader {
             return !sheets.isObject() || sheets.isEmpty();
         } catch (RuntimeException e) {
             return false; // để parse() báo lỗi rõ ràng
+        }
+    }
+
+    /**
+     * Thân {@code dataJson} có phải một workbook đọc được không: đúng cú pháp JSON, gốc là đối
+     * tượng, và {@code sheets} (nếu có) là đối tượng. Đọc kiểu luồng, bỏ qua nội dung từng sheet,
+     * nên workbook 20MB không phải dựng cả cây trong bộ nhớ.
+     */
+    public static boolean isReadableWorkbook(String workbookJson) {
+        if (workbookJson == null || workbookJson.isBlank()) {
+            return false;
+        }
+        try (JsonParser parser = MAPPER.createParser(workbookJson)) {
+            if (parser.nextToken() != JsonToken.START_OBJECT) {
+                return false;
+            }
+            for (JsonToken token = parser.nextToken(); token != JsonToken.END_OBJECT; token = parser.nextToken()) {
+                if (token != JsonToken.PROPERTY_NAME) {
+                    return false;
+                }
+                String name = parser.currentName();
+                JsonToken value = parser.nextToken();
+                if ("sheets".equals(name) && value != JsonToken.START_OBJECT) {
+                    return false;
+                }
+                parser.skipChildren();
+            }
+            return parser.nextToken() == null;
+        } catch (JacksonException e) {
+            return false;
         }
     }
 
