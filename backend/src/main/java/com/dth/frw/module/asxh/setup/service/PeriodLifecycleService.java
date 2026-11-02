@@ -215,9 +215,11 @@ public class PeriodLifecycleService {
         if (period.getYear() != null) {
             yearLockService.assertOpen(period.getYear());
         }
-        if (newDeadline == null || newDeadline.isBefore(TemplateDates.today())) {
-            throw new ConflictException("Hạn nộp mới phải từ hôm nay trở đi.");
+        if (newDeadline == null) {
+            throw new IllegalArgumentException("Vui lòng chọn hạn nộp mới.");
         }
+        // Cùng luật với sửa hạn nộp ở lịch: sau ngày cuối kỳ và không phải ngày đã qua.
+        ReportPeriodService.requireDeadlineAllowed(period, newDeadline, TemplateDates.today());
         // Dời hạn TRƯỚC rồi mới mở lại, cùng giao dịch.
         periodService.changeDeadline(periodId, newDeadline);
         return periodService.transition(periodId, PeriodStatus.OPEN);

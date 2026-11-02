@@ -102,26 +102,32 @@ export function ReopenDialog({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Hạn mới phải sau ngày cuối kỳ và không phải ngày đã qua — cùng luật máy chủ kiểm.
+  const dayAfterEnd = addDays(period.to, 1);
+  const earliest = dayAfterEnd > today ? dayAfterEnd : today;
+  const suggested = addDays(today, 7);
+
   useEffect(() => {
     if (open) {
-      setDateText(fmt(addDays(today, 7)));
+      setDateText(fmt(suggested > earliest ? suggested : earliest));
       setReason("");
       setError(null);
     }
-  }, [open, today]);
+  }, [open, suggested, earliest]);
 
   const submit = () => {
     const iso = parseVnDate(dateText);
+    const tooEarly = `Hạn nộp mới phải từ ngày ${fmt(earliest)} trở đi.`;
     if (!dateText.trim()) {
-      setError("Hạn nộp mới phải từ hôm nay trở đi.");
+      setError(tooEarly);
       return;
     }
     if (!iso) {
       setError("Ngày chưa đúng dạng ngày/tháng/năm, ví dụ 23/10/2026.");
       return;
     }
-    if (iso < today) {
-      setError("Hạn nộp mới phải từ hôm nay trở đi.");
+    if (iso < earliest) {
+      setError(tooEarly);
       return;
     }
     onConfirm(iso, reason.trim());
@@ -156,8 +162,8 @@ export function ReopenDialog({
             <p className="text-xs text-destructive-text">{error}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Hạn cũ là {fmt(period.deadline)}. Bạn chọn từ hôm nay ({fmt(today)})
-              trở đi.
+              Hạn cũ là {fmt(period.deadline)}. Bạn chọn từ ngày {fmt(earliest)} trở
+              đi.
             </p>
           )}
         </div>

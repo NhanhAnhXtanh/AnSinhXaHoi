@@ -182,7 +182,7 @@ public class ReportPeriodService {
      * không phải ngày đã qua (hạn đã qua thì kỳ thành Quá hạn ngay lần chạy job kế tiếp). Hạn
      * nộp đúng hôm nay vẫn hợp lệ: kỳ chỉ quá hạn từ ngày hôm sau.
      */
-    static void requireDeadlineAllowed(ReportPeriod period, LocalDate deadline, LocalDate today) {
+    public static void requireDeadlineAllowed(ReportPeriod period, LocalDate deadline, LocalDate today) {
         if (!deadline.isAfter(period.getToDate())) {
             throw new IllegalArgumentException("Hạn nộp của kỳ " + period.getName()
                     + " phải sau ngày cuối kỳ (" + vnDate(period.getToDate()) + ").");
