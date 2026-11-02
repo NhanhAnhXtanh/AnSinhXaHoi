@@ -245,6 +245,8 @@ public class UserService {
     public User setPassword(Long id, String rawPassword) {
         User user = get(id);
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        // Quản trị đặt lại mật khẩu cũng là cách mở khoá đăng nhập tạm thời.
+        user.clearLoginFailures();
         User saved = repository.save(user);
         refreshTokenService.revokeAllFor(saved, Instant.now());
         return saved;

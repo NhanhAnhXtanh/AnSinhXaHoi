@@ -4,7 +4,9 @@ import com.dth.frw.domain.security.user.User;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.time.Instant;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -57,4 +59,25 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
              WHERE us.report_unit_id IN (SELECT id FROM tree) AND us.status = 'ACTIVE'
             """)
     List<Long> findActiveIdsInReportUnitTree(@Param("unitId") Long unitId);
+
+    // ---- Khoá đăng nhập tạm thời (LoginAttemptService). Câu UPDATE thẳng: mỗi câu là một thao tác
+    // nguyên tử trên dòng, nên nhiều lần thử song song không đếm sót; không đụng updated_at.
+
+    /** Khoá cũ đã hết hạn: đếm lại từ đầu trước khi tính lần sai này. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update User u set u.failedLoginCount = 0, u.lockedUntil = null "
+            + "where u.id = :id and u.lockedUntil is not null and u.lockedUntil <= :now")
+    int clearExpiredLoginLock(@Param("id") Long id, @Param("now") Instant now);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update User u set u.failedLoginCount = u.failedLoginCount + 1 where u.id = :id")
+    int incrementFailedLogins(@Param("id") Long id);
+
+    /** Đủ số lần sai thì khoá tới {@code until}; trả 1 nếu lần này vừa khoá. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update User u set u.lockedUntil = :until "
+            + "where u.id = :id and u.failedLoginCount >= :max "
+            + "and (u.lockedUntil is null or u.lockedUntil <= :now)")
+    int lockLoginIfOverLimit(@Param("id") Long id, @Param("max") int max,
+                             @Param("now") Instant now, @Param("until") Instant until);
 }

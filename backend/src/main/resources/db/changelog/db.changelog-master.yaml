@@ -93,3 +93,5 @@ databaseChangeLog:
       file: db/changelog/changes/171-split-asxh-template-scripts.yaml
   - include:
       file: db/changelog/changes/172-update-1a-validate-whole-number.sql
+  - include:
+      file: db/changelog/changes/173-users-login-lockout.sql
