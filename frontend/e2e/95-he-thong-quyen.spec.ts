@@ -27,7 +27,14 @@ const PW = "E2e-Pass#2026";
 
 type Row = { group: string; case: string; expect: string; got: string; ok: boolean; note?: string };
 const results: Row[] = [];
-type Res = { status: number; body: string; json?: any; headers?: Record<string, string> };
+/**
+ * Thân JSON của API trong spec dò quyền / dò biên: dạng tuỳ endpoint, đọc trường tuỳ ý. Một kiểu
+ * nới duy nhất ở đây thay cho ép kiểu từng chỗ (hàng trăm chỗ đọc thân phản hồi).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- thân JSON tuỳ endpoint, chỉ dùng trong test
+type ApiJson = any;
+
+type Res = { status: number; body: string; json?: ApiJson; headers?: Record<string, string> };
 
 async function rawLogin(acc: Acc) {
   const anon = await request.newContext();
@@ -35,7 +42,7 @@ async function rawLogin(acc: Acc) {
   const status = res.status();
   const text = await res.text();
   await anon.dispose();
-  let json: any;
+  let json: ApiJson;
   try {
     json = JSON.parse(text);
   } catch {
@@ -60,7 +67,7 @@ class Raw {
   async send(method: "get" | "post" | "put" | "delete", path: string, data?: unknown): Promise<Res> {
     const res = await this.ctx[method](`${API_URL}${path}`, data === undefined ? undefined : { data });
     const text = await res.text();
-    let json: any;
+    let json: ApiJson;
     try {
       json = text ? JSON.parse(text) : undefined;
     } catch {
@@ -131,8 +138,8 @@ async function cleanup() {
   for (const r of roles) if (/^E2E_E_/.test(r.code)) await admin.send("delete", `/roles/${r.id}`);
   const units = (await admin.send("get", `/report_units?_start=0&_end=2000`)).json ?? [];
   // con trước, cha sau
-  const mine = units.filter((u: any) => /^E2E-E-/.test(u.budgetCode));
-  mine.sort((a: any, b: any) => (b.parent ? 1 : 0) - (a.parent ? 1 : 0));
+  const mine = units.filter((u: ApiJson) => /^E2E-E-/.test(u.budgetCode));
+  mine.sort((a: ApiJson, b: ApiJson) => (b.parent ? 1 : 0) - (a.parent ? 1 : 0));
   for (const u of mine) await admin.send("delete", `/report_units/${u.id}`);
   for (const u of mine) await admin.send("delete", `/report_units/${u.id}`);
   const depts = (await admin.send("get", `/departments?_start=0&_end=500`)).json ?? [];
@@ -336,7 +343,7 @@ test.describe("Nhóm E — hệ thống, quyền, phiên", () => {
     record(G, "Phân trang _end âm", await admin.send("get", `/users?_start=-5&_end=-1`), [200, 400, 422]);
     const asc = await admin.send("get", `/users?_sort=passwordHash&_order=asc`);
     const desc = await admin.send("get", `/users?_sort=passwordHash&_order=desc`);
-    const order = (r: Res) => (r.json as any[] | undefined)?.map((u) => u.id).join(",");
+    const order = (r: Res) => (r.json as ApiJson[] | undefined)?.map((u) => u.id).join(",");
     check(G, "Sắp xếp theo passwordHash (dò hash qua thứ tự)", "bị bỏ qua: asc = desc", `asc=${asc.status} desc=${desc.status} cùng thứ tự=${order(asc) === order(desc)}`,
       [200, 400, 422].includes(asc.status) && (asc.status !== 200 || order(asc) === order(desc)), "SORTABLE whitelist ở UserService");
     const all = await admin.send("get", `/users`);
@@ -353,7 +360,7 @@ test.describe("Nhóm E — hệ thống, quyền, phiên", () => {
     record(G, "User thường đặt MK cho admin", await a.send("post", `/users/1/password`, { password: "Hacked#2026" }), FORBID);
     record(G, "User thường xoá user khác", await a.send("delete", `/users/${id}`), FORBID);
     record(G, "User thường tạo user", await a.send("post", `/users`, userBody("e2e-e-hack", [ids.roleByCode["ADMIN"]])), FORBID);
-    const roleAfter = (await admin.send("get", `/users/${aId}`)).json?.roles?.map((r: any) => r.code).join(",");
+    const roleAfter = (await admin.send("get", `/users/${aId}`)).json?.roles?.map((r: ApiJson) => r.code).join(",");
     check(G, "Sau các ca trên, e2e-e-a vẫn chỉ có E2E_E_BASIC", "E2E_E_BASIC", String(roleAfter), roleAfter === "E2E_E_BASIC");
 
     // admin tự xoá / tự hạ — dùng admin e2e riêng (không đụng admin thật)
@@ -447,7 +454,7 @@ test.describe("Nhóm E — hệ thống, quyền, phiên", () => {
     record(G, "Scope lồng sâu 200 cấp", await admin.send("post", `/row_level_policies`, {
       ...base,
       name: "E2E-E-deep",
-      scope: Array.from({ length: 200 }).reduce((acc: any) => ({ not: acc }), { field: "id", op: "eq", value: { lit: 1 } }),
+      scope: Array.from({ length: 200 }).reduce((acc: ApiJson) => ({ not: acc }), { field: "id", op: "eq", value: { lit: 1 } }),
     }), [201, 400, 422], "201 = nhận (không giới hạn độ sâu)");
     // Bỏ ca lồng 3000 cấp: cùng họ với ca 5000 lá (scope lớn), không thử trên backend dùng chung.
     // ĐÃ GỠ ca "Scope 'all' 5000 lá": máy chủ NHẬN (201) chính sách ~264 KB, rồi GET/DELETE chính
@@ -457,19 +464,19 @@ test.describe("Nhóm E — hệ thống, quyền, phiên", () => {
     record(G, "Xoá lại policy đã xoá", await admin.send("delete", `/row_level_policies/${pid}`), [404]);
 
     // lọc dữ liệu thật
-    const unitTB = Object.values((await admin.send("get", `/report_units?budgetCode=1051101`)).json as any[])[0];
-    const allReports = (await admin.send("get", `/input_reports?_start=0&_end=1000`)).json as any[];
+    const unitTB = Object.values((await admin.send("get", `/report_units?budgetCode=1051101`)).json as ApiJson[])[0];
+    const allReports = (await admin.send("get", `/input_reports?_start=0&_end=1000`)).json as ApiJson[];
     const otherReport = allReports.find((r) => r.unit?.id !== unitTB.id);
     const tb = await Raw.as(EXISTING["donvi.bienhoa"]);
     const tbList = await tb.send("get", `/input_reports?_start=0&_end=1000`);
-    const foreign = (tbList.json as any[] | undefined)?.filter((r) => r.unit?.id !== unitTB.id) ?? [];
+    const foreign = (tbList.json as ApiJson[] | undefined)?.filter((r) => r.unit?.id !== unitTB.id) ?? [];
     check(G, "donvi.bienhoa GET /input_reports chỉ thấy phiếu của Trấn Biên", "0 phiếu đơn vị khác",
       `status ${tbList.status}, tổng ${tbList.json?.length}, đơn vị khác ${foreign.length} (admin thấy ${allReports.length})`, tbList.status === 200 && foreign.length === 0);
     if (otherReport) {
       record(G, `donvi.bienhoa GET /input_reports/{phiếu đơn vị khác #${otherReport.id}} (IDOR)`, await tb.send("get", `/input_reports/${otherReport.id}`), [403, 404]);
       record(G, "donvi.bienhoa GET /input_report_sheets?report.id=<phiếu đơn vị khác>", await tb.send("get", `/input_report_sheets?report.id=${otherReport.id}`), [200, 403, 404]);
       const sh = await tb.send("get", `/input_report_sheets?report.id=${otherReport.id}`);
-      check(G, "…không trả tờ biểu nào của đơn vị khác", "0 dòng", `status ${sh.status} rows=${Array.isArray(sh.json) ? sh.json.length : "-"}`, sh.status !== 200 || (sh.json as any[]).length === 0);
+      check(G, "…không trả tờ biểu nào của đơn vị khác", "0 dòng", `status ${sh.status} rows=${Array.isArray(sh.json) ? sh.json.length : "-"}`, sh.status !== 200 || (sh.json as ApiJson[]).length === 0);
       record(G, "Lách lọc: ?unit.id=<đơn vị khác>", await tb.send("get", `/input_reports?unit.id=${otherReport.unit.id}`), [200, 400, 403]);
       const lach = await tb.send("get", `/input_reports?unit.id=${otherReport.unit.id}`);
       check(G, "…kết quả lách lọc rỗng", "0 dòng", `rows=${Array.isArray(lach.json) ? lach.json.length : "-"}`, !Array.isArray(lach.json) || lach.json.length === 0);
@@ -778,7 +785,7 @@ test.describe("Nhóm E — hệ thống, quyền, phiên", () => {
     await page.getByRole("button", { name: "Tạo người dùng" }).click();
     await page.waitForTimeout(3000);
     const admin = await Raw.as(ADMIN);
-    const created = ((await admin.send("get", `/users?q=e2e-e-ui`)).json as any[] | undefined)?.find((u) => u.username === "e2e-e-ui");
+    const created = ((await admin.send("get", `/users?q=e2e-e-ui`)).json as ApiJson[] | undefined)?.find((u) => u.username === "e2e-e-ui");
     check(G, "Tạo người dùng qua giao diện", "có user e2e-e-ui", created ? `id=${created.id} url=${page.url()}` : `không có; url=${page.url()}`, Boolean(created));
     if (created) {
       ids.users["e2e-e-ui"] = created.id;

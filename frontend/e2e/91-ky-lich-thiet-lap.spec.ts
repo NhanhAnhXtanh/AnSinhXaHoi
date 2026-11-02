@@ -49,7 +49,7 @@ class Raw {
           : { data };
     const res = await this.ctx[method](`${API_URL}${path}`, opts);
     const body = await res.text();
-    let json: any = null;
+    let json: ApiJson = null;
     try {
       json = body ? JSON.parse(body) : null;
     } catch {
@@ -61,6 +61,13 @@ class Raw {
     return this.ctx.dispose();
   }
 }
+
+/**
+ * Thân JSON của API trong spec dò quyền / dò biên: dạng tuỳ endpoint, đọc trường tuỳ ý. Một kiểu
+ * nới duy nhất ở đây thay cho ép kiểu từng chỗ (hàng trăm chỗ đọc thân phản hồi).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- thân JSON tuỳ endpoint, chỉ dùng trong test
+type ApiJson = any;
 
 const DENIED = [400, 403, 404, 409, 422];
 const BAD = [400, 422];
@@ -90,7 +97,7 @@ async function step(group: string, name: string, fn: () => Promise<void>) {
   }
 }
 
-async function sql<T = any>(text: string, params: unknown[] = []): Promise<T[]> {
+async function sql<T = ApiJson>(text: string, params: unknown[] = []): Promise<T[]> {
   const client = new pg.Client({ connectionString: databaseUrl() });
   await client.connect();
   try {
@@ -172,10 +179,10 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
       calId = created.json?.id;
       check(G, "Tạo lịch sinh đúng 16 kỳ", "createdPeriods=16", `createdPeriods=${created.json?.createdPeriods}`, created.json?.createdPeriods === 16);
       const list = await dh.send("get", `/report_calendars?year=${Y2}`);
-      check(G, "Danh sách lọc year=2036 có lịch vừa tạo", "1 dòng năm 2036", list.body, list.status === 200 && (list.json ?? []).some((c: any) => c.id === calId));
+      check(G, "Danh sách lọc year=2036 có lịch vừa tạo", "1 dòng năm 2036", list.body, list.status === 200 && (list.json ?? []).some((c: ApiJson) => c.id === calId));
       record(G, "Xem lịch theo id", await dh.send("get", `/report_calendars/${calId}`), [200]);
       const preview = await dh.send("get", `/report_calendars/preview?year=${Y2}&deadlineDays=5&kinds=thang,quy`);
-      check(G, "Xem trước: 16 kỳ, đều đánh dấu đã có", "16 dòng exists=true", `${preview.status} ${(preview.json ?? []).length} dòng, exists=${(preview.json ?? []).every((r: any) => r.exists)}`, preview.status === 200 && preview.json?.length === 16 && preview.json.every((r: any) => r.exists));
+      check(G, "Xem trước: 16 kỳ, đều đánh dấu đã có", "16 dòng exists=true", `${preview.status} ${(preview.json ?? []).length} dòng, exists=${(preview.json ?? []).every((r: ApiJson) => r.exists)}`, preview.status === 200 && preview.json?.length === 16 && preview.json.every((r: ApiJson) => r.exists));
       const plan = await dh.send("get", `/report_calendars/${calId}/update_plan?deadlineDays=7&kinds=thang,quy,sau_thang,nam`);
       check(G, "update_plan thêm 6 tháng + năm = 3 kỳ mới", "addedKinds=2, createdPeriods=3", plan.body, plan.status === 200 && plan.json?.createdPeriods === 3);
       const patched = await dh.send("patch", `/report_calendars/${calId}`, { year: Y2, deadlineDays: 7, kinds: ["thang", "quy", "sau_thang", "nam"] });
@@ -416,7 +423,7 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
       check(G, "Bấm đúp Mở đợt Q2 (2 yêu cầu đồng thời)", "1 thành công, 1 đợt, 2 phiếu, không 5xx", `${a.status}/${b.status}; ${q2pubs.length} đợt; ${q2reports} phiếu`, [a.status, b.status].filter((s) => s === 200).length === 1 && a.status < 500 && b.status < 500 && q2pubs.length === 1 && q2reports === 2);
 
       const locks = await dh.send("get", `/report_periods/setup_locks?ids[0]=${ps.T1.id}&ids[1]=${ps["6TĐN"].id}&ids[2]=${ps.Q3.id}&ids[3]=${Q1}`);
-      const locked = new Set((locks.json ?? []).map((l: any) => l.periodId));
+      const locked = new Set((locks.json ?? []).map((l: ApiJson) => l.periodId));
       check(G, "Sau mở Q1+Q2: T1, 6TĐN bị khoá; Q3 và Q1 không", "T1,6TĐN khoá", locks.body, locked.has(ps.T1.id) && locked.has(ps["6TĐN"].id) && !locked.has(ps.Q3.id) && !locked.has(Q1));
       record(G, "Mở đợt T1 (trùng Q1 đã mở)", await dh.send("post", `/report_periods/${ps.T1.id}/publish`), [409]);
       record(G, "Gán thêm vào T1 (bị khoá cả kỳ)", await M(ps.T1.id, [cell(BL)]), [409]);
@@ -436,11 +443,11 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
 
     await step(G, "lịch sử mở đợt", async () => {
       const list = await dh.send("get", `/publications?period.id=${Q1}`);
-      check(G, "Q1 có 2 đợt (Lần đầu + Bổ sung)", "2", `${(list.json ?? []).map((p: any) => p.kind).join(",")}`, list.json?.length === 2);
-      const first = (list.json ?? []).find((p: any) => p.kind === "LAN_DAU");
+      check(G, "Q1 có 2 đợt (Lần đầu + Bổ sung)", "2", `${(list.json ?? []).map((p: ApiJson) => p.kind).join(",")}`, list.json?.length === 2);
+      const first = (list.json ?? []).find((p: ApiJson) => p.kind === "LAN_DAU");
       record(G, "GET /publications/{id}", await dh.send("get", `/publications/${first?.id}`), [200]);
       const items = await dh.send("get", `/publications/${first?.id}/items`);
-      const names = ((items.json?.items ?? []) as any[]).map((i) => i.unit?.name).join(", ");
+      const names = ((items.json?.items ?? []) as ApiJson[]).map((i) => i.unit?.name).join(", ");
       check(G, "GET /publications/{id}/items liệt kê 2 đơn vị", "200, có Trấn Biên + Bửu Long", `${items.status} ${names}`, items.status === 200 && /Trấn Biên/.test(names) && /Bửu Long/.test(names));
       const byYear = await dh.send("get", `/publications?year=${Y1}`);
       check(G, "Lọc đợt theo năm 2035", "3 đợt (Q1×2 + Q2)", `${(byYear.json ?? []).length}`, byYear.json?.length === 3);
@@ -502,8 +509,8 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
       const ledger = (await sql(`SELECT count(*)::int n FROM asxh_ledger_entries WHERE period_id=$1`, [Q2]))[0].n;
       const pubs = (await dh.send("get", `/publications?period.id=${Q2}`)).json ?? [];
       check(G, "Sau thu hồi: kỳ Đã thiết lập, 0 phiếu, 0 dòng sổ cái, đợt Đã thu hồi, ô giữ nguyên", "ready, 0, 0, CANCELLED, 2 ô",
-        `${(await periodNow(dh, Q2)).status}, ${reports} phiếu, ${ledger} sổ cái, ${pubs.map((p: any) => p.status).join(",")}, ${(await dh.send("get", `/period_assignments?period.id=${Q2}`)).json?.length} ô`,
-        (await periodNow(dh, Q2)).status === "ready" && reports === 0 && ledger === 0 && pubs.every((p: any) => p.status === "CANCELLED"));
+        `${(await periodNow(dh, Q2)).status}, ${reports} phiếu, ${ledger} sổ cái, ${pubs.map((p: ApiJson) => p.status).join(",")}, ${(await dh.send("get", `/period_assignments?period.id=${Q2}`)).json?.length} ô`,
+        (await periodNow(dh, Q2)).status === "ready" && reports === 0 && ledger === 0 && pubs.every((p: ApiJson) => p.status === "CANCELLED"));
       record(G, "Thu hồi lại lần hai", await dh.send("post", `/report_periods/${Q2}/withdraw`, { confirmName: ps.Q2.name }), [409]);
       const again = await dh.send("post", `/report_periods/${Q2}/publish`);
       check(G, "Mở lại sau thu hồi được tính là Lần đầu", "kind=LAN_DAU", `${again.status} ${again.json?.publication?.kind}`, again.status === 200 && again.json?.publication?.kind === "LAN_DAU");
@@ -692,11 +699,11 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
         rows.map((r) => r.replace(/\s+/g, " ").slice(0, 80)).join(" || "),
         q1Rows.length === 2 && q1Rows.some((r) => /Đã thu hồi/.test(r)) && rows.some((r) => r.includes(`Quý II/${Y2}`)));
       const pubs = (await dh.send("get", `/publications?year=${Y2}`)).json ?? [];
-      const live = pubs.find((p: any) => p.period.name === Q1 && p.status === "PUBLISHED");
+      const live = pubs.find((p: ApiJson) => p.period.name === Q1 && p.status === "PUBLISHED");
       await page.goto(`/publication-history/${live.id}`);
       await expect(page.getByText("UBND phường Bửu Long").first()).toBeVisible();
       check(G, "Chi tiết đợt hiện các đơn vị đã phát", "có Trấn Biên + Bửu Long", "", await page.getByText("UBND phường Trấn Biên").first().isVisible());
-      const cancelled = pubs.find((p: any) => p.status === "CANCELLED");
+      const cancelled = pubs.find((p: ApiJson) => p.status === "CANCELLED");
       await page.goto(`/publication-history/${cancelled.id}`);
       await expect(page.getByText(/Phiếu của đợt đã bị xoá khi thu hồi kỳ/)).toBeVisible();
       check(G, "Chi tiết đợt đã thu hồi báo phiếu đã xoá", "thấy câu báo", "thấy", true);
@@ -752,7 +759,7 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
         [Y2]
       );
       const locks = await dh.send("get", `/report_periods/setup_locks?ids[0]=${ps.Q3.id}&ids[1]=${ps.Q4.id}&ids[2]=${ps.Q2.id}`);
-      check(G, "setup_locks: mọi kỳ 2036 khoá loại YEAR", "3 dòng YEAR", locks.body.slice(0, 200), (locks.json ?? []).length === 3 && locks.json.every((l: any) => l.kind === "YEAR"));
+      check(G, "setup_locks: mọi kỳ 2036 khoá loại YEAR", "3 dòng YEAR", locks.body.slice(0, 200), (locks.json ?? []).length === 3 && locks.json.every((l: ApiJson) => l.kind === "YEAR"));
       record(G, "Năm khoá: gán thêm ô (Q4)", await dh.send("put", `/period_assignments/matrix`, { periodId: ps.Q4.id, add: [cell], remove: [] }), [409]);
       record(G, "Năm khoá: gỡ ô (Q3)", await dh.send("put", `/period_assignments/matrix`, { periodId: ps.Q3.id, add: [], remove: [cell] }), [409]);
       record(G, "Năm khoá: mở đợt Q3", await dh.send("post", `/report_periods/${ps.Q3.id}/publish`), [409]);
@@ -785,7 +792,7 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
 /** Ghi bảng kết quả ra file sau mỗi test — một ca hỏng (worker khởi động lại) không làm mất bảng. */
 function saveResults() {
   const out = process.env.E2E_RESULTS_91 ?? "test-results-91/91-ky-lich-thiet-lap.json";
-  fs.mkdirSync(out.replace(/[\/][^\/]+$/, ""), { recursive: true });
+  fs.mkdirSync(out.replace(/[/][^/]+$/, ""), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(results, null, 2));
 }
 

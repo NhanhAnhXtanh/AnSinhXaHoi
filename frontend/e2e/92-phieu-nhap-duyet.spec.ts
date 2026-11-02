@@ -41,7 +41,14 @@ type Row = { group: string; case: string; expect: string; got: string; ok: boole
 const results: Row[] = [];
 const loginFailed = new Set<string>();
 
-type Res = { status: number; body: string; headers: Record<string, string>; json: () => any };
+/**
+ * Thân JSON của API trong spec dò quyền / dò biên: dạng tuỳ endpoint, đọc trường tuỳ ý. Một kiểu
+ * nới duy nhất ở đây thay cho ép kiểu từng chỗ (hàng trăm chỗ đọc thân phản hồi).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- thân JSON tuỳ endpoint, chỉ dùng trong test
+type ApiJson = any;
+
+type Res = { status: number; body: string; headers: Record<string, string>; json: () => ApiJson };
 
 /** Client thô: trả mã HTTP + thân + header, không ném lỗi. */
 class Raw {
