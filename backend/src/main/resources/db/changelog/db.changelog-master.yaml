@@ -95,3 +95,5 @@ databaseChangeLog:
       file: db/changelog/changes/172-update-1a-validate-whole-number.sql
   - include:
       file: db/changelog/changes/173-users-login-lockout.sql
+  - include:
+      file: db/changelog/changes/174-unit-reporter-drop-template-read.sql
