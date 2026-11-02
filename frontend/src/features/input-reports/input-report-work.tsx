@@ -386,9 +386,12 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
     try {
       const check = await runClientScript(api, scriptText, "validate", scriptContext);
       if (!check.ok) {
+        // Tô đỏ những ô kiểm tra chỉ ra để người dùng sửa ngay tại chỗ; số đã nhập giữ nguyên.
+        api.markInvalidCells(check.cells ?? []);
         setIssues({ purpose: "complete", list: check.messages.map((message) => ({ sheet: code, message })) });
         return;
       }
+      api.clearInvalidCells();
       // Bản lưu rỗng (workbook không có sheet) coi như chưa lưu: lưu khung đang thấy trên màn.
       const hasData = parseWorkbook(content?.dataJson) !== null || saved.current.has(sheet.id);
       if ((isDirty || !hasData) && !(await save(true))) return;

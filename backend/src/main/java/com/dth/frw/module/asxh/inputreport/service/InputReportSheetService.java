@@ -117,6 +117,12 @@ public class InputReportSheetService {
                     + "Hãy tải lại trang rồi nhập lại.");
         }
         // Trần 20MB như bản Jmix: chặn ở config/WorkbookBodySizeFilter (413) và @Size của SheetDataRequest.
+        // Thân không đọc được thì không lưu: lưu vào là biểu hỏng, lần mở sau không hiện được số liệu.
+        if (!WorkbookJsonCellReader.isReadableWorkbook(dataJson)) {
+            throw new IllegalArgumentException("Số liệu của biểu không đúng định dạng nên chưa lưu được. "
+                    + "Số bạn vừa nhập vẫn còn trên màn hình, bạn bấm Lưu lại. "
+                    + "Nếu vẫn không lưu được, bạn báo cán bộ hỗ trợ của Sở.");
+        }
         sheet.setDataJson(dataJson);
         sheet.setDataUpdatedAt(Instant.now());
         sheet.setDataUpdatedBy(InputReportService.currentUsername());

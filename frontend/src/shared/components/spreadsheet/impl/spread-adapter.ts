@@ -48,6 +48,12 @@ export interface SpreadAdapter extends ScriptWorkbookAdapter {
   blockAllEdits(): () => void;
   /** Bắn khi người dùng sửa workbook (gõ ô, dán, thêm/xoá dòng, đổi định dạng…). */
   subscribeWorkbookChanged(listener: () => void): () => void;
+  /** Tô đỏ các ô (thay lần tô trước), đưa con trỏ tới ô đầu tiên; không tính là người dùng sửa. */
+  markCells(cells: { sheetIndex: number; row: number; col: number }[]): void;
+  /** Gỡ mọi dấu tô của `markCells`. */
+  clearMarks(): void;
+  /** Chạy `fn` khi tạm gỡ dấu tô — để dấu tô không vào số liệu lưu / xuất. */
+  withoutMarks<T>(fn: () => T): T;
   /** Huỷ workbook; `onDestroyed` chạy khi đã huỷ thật (có thể trễ nếu đang nạp dở). */
   destroy(onDestroyed?: () => void): void;
 }
@@ -58,6 +64,10 @@ export type SpreadAdapterOptions = {
   /** Gọi sau khi người dùng bấm nút trong ô (script thêm/xoá dòng) — để bật cờ đã sửa. */
   onCellCommand?: () => void;
 };
+
+/** Màu tô ô số liệu sai (vẽ trên canvas nên cần mã màu; cùng tông với màu báo lỗi của giao diện). */
+const MARK_FILL = "#FDECEC";
+const MARK_LINE = "#DC2626";
 
 /** Bề ngang mỗi nút để CẢ CỤM phủ kín ô (chừa 4px) — SpreadJS không có căn giữa. */
 function cellButtonWidth(sheet: GC.Spread.Sheets.Worksheet, col: number, count: number): number | null {
@@ -96,6 +106,45 @@ export function wrapSpreadWorkbook(
   // giữa chừng làm tác vụ đó đọc vào workbook đã huỷ ("reading 'clear'"). Huỷ thật
   // được hoãn tới khi lần nạp xong (gặp khi React gắn lại component, đổi biểu nhanh).
   let pendingLoad: Promise<void> | null = null;
+
+  // Dấu tô ô sai (markCells): style gốc của từng ô để trả lại. Trong lúc tô / gỡ, sự kiện
+  // đổi ô không được tính là người dùng sửa (muted).
+  let muted = 0;
+  const marks = new Map<string, { sheetIndex: number; row: number; col: number; original: unknown }>();
+  let unbindMarkWatch: (() => void) | null = null;
+  const markKey = (sheetIndex: number, row: number, col: number) => `${sheetIndex}:${row}:${col}`;
+
+  function muteChanges(fn: () => void): void {
+    muted += 1;
+    try {
+      fn();
+    } finally {
+      muted -= 1;
+    }
+  }
+
+  function restoreMark(key: string): void {
+    const mark = marks.get(key);
+    if (!mark) return;
+    marks.delete(key);
+    const sheet = workbook.getSheet(mark.sheetIndex);
+    if (sheet) sheet.setStyle(mark.row, mark.col, mark.original as GC.Spread.Sheets.Style);
+  }
+
+  function paintMark(mark: { sheetIndex: number; row: number; col: number }): void {
+    const sheet = workbook.getSheet(mark.sheetIndex);
+    if (!sheet) return;
+    const original = sheet.getStyle(mark.row, mark.col);
+    const style = original ? original.clone() : new GC.Spread.Sheets.Style();
+    style.backColor = MARK_FILL;
+    const line = new GC.Spread.Sheets.LineBorder(MARK_LINE, GC.Spread.Sheets.LineStyle.medium);
+    style.borderLeft = line;
+    style.borderRight = line;
+    style.borderTop = line;
+    style.borderBottom = line;
+    sheet.setStyle(mark.row, mark.col, style);
+    marks.set(markKey(mark.sheetIndex, mark.row, mark.col), { ...mark, original: original ?? null });
+  }
 
   function assertNotDestroyed(): void {
     if (destroyed) throw new Error("Bảng tính đã đóng.");
@@ -387,12 +436,76 @@ export function wrapSpreadWorkbook(
         // Đổi định dạng ô từ ribbon của Designer không bắn ValueChanged.
         GC.Spread.Sheets.Events.CellChanged,
       ];
-      const handler = () => listener();
+      const handler = () => {
+        if (muted === 0) listener();
+      };
       events.forEach((name) => workbook.bind(name, handler));
       return () => {
         if (destroyed) return;
         events.forEach((name) => workbook.unbind(name, handler));
       };
+    },
+    markCells(cells) {
+      assertNotDestroyed();
+      workbook.suspendPaint();
+      try {
+        muteChanges(() => {
+          for (const key of [...marks.keys()]) restoreMark(key);
+          for (const cell of cells) paintMark(cell);
+        });
+        if (marks.size > 0 && !unbindMarkWatch) {
+          // Người dùng sửa ô đã tô → gỡ dấu tô của riêng ô đó.
+          const onValueChanged = (_: unknown, args: { sheet: GC.Spread.Sheets.Worksheet; row: number; col: number }) => {
+            const key = markKey(workbook.getSheetIndex(args.sheet.name()), args.row, args.col);
+            if (marks.has(key)) muteChanges(() => restoreMark(key));
+          };
+          workbook.bind(GC.Spread.Sheets.Events.ValueChanged, onValueChanged);
+          unbindMarkWatch = () => workbook.unbind(GC.Spread.Sheets.Events.ValueChanged, onValueChanged);
+        }
+      } finally {
+        workbook.resumePaint();
+      }
+      const first = cells[0];
+      if (!first) return;
+      const sheet = workbook.getSheet(first.sheetIndex);
+      if (!sheet) return;
+      workbook.setActiveSheetIndex(first.sheetIndex);
+      sheet.setActiveCell(first.row, first.col);
+      sheet.showCell(
+        first.row,
+        first.col,
+        GC.Spread.Sheets.VerticalPosition.center,
+        GC.Spread.Sheets.HorizontalPosition.center
+      );
+    },
+    clearMarks() {
+      if (destroyed || marks.size === 0) return;
+      workbook.suspendPaint();
+      try {
+        muteChanges(() => {
+          for (const key of [...marks.keys()]) restoreMark(key);
+        });
+      } finally {
+        workbook.resumePaint();
+      }
+    },
+    withoutMarks(fn) {
+      if (destroyed || marks.size === 0) return fn();
+      const saved = [...marks.values()].map(({ sheetIndex, row, col }) => ({ sheetIndex, row, col }));
+      let result!: ReturnType<typeof fn>;
+      workbook.suspendPaint();
+      try {
+        muteChanges(() => {
+          for (const key of [...marks.keys()]) restoreMark(key);
+        });
+        result = fn();
+        muteChanges(() => {
+          for (const cell of saved) paintMark(cell);
+        });
+      } finally {
+        workbook.resumePaint();
+      }
+      return result;
     },
     applyComboBox(sheetIndex, row, col, rowCount, items) {
       const sheet = sheetAt(sheetIndex);

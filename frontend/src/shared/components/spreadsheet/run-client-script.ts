@@ -112,8 +112,12 @@ export async function runClientScript(
     });
   }
 
+  const cells = issues.flatMap((issue) =>
+    issue.severity === "ERROR" && issue.source ? [issue.source] : []
+  );
   return {
     ok: !issues.some((issue) => issue.severity === "ERROR"),
     messages: [...issues.map(issueText), ...messages],
+    cells,
   };
 }

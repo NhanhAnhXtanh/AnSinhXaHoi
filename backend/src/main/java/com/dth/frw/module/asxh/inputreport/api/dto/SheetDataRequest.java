@@ -6,7 +6,8 @@ import jakarta.validation.constraints.Size;
 /**
  * {@code PUT /api/input_report_sheets/{id}} — lưu số liệu của biểu.
  *
- * @param dataJson workbook (JSON) frontend gửi lên; máy chủ lưu nguyên, không đọc nội dung
+ * @param dataJson workbook (JSON) frontend gửi lên; máy chủ chỉ kiểm đọc được (đúng dạng workbook)
+ *                 rồi lưu nguyên, không đọc số liệu trong ô
  * @param version  số hiệu bản lưu đang cầm (từ lần đọc / lưu trước); bỏ trống thì không kiểm
  *                 ghi đè
  */

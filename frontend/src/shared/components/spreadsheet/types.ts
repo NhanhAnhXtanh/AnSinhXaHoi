@@ -16,12 +16,25 @@ export type SpreadWorkbookApi = {
   /** Nạp .xlsx/.ssjson/.json vào workbook (thay toàn bộ nội dung). */
   importFile(file: File): Promise<void>;
   getCellValue(sheet: string, row: number, col: number): unknown;
+  /**
+   * Tô đỏ các ô số liệu sai (thay lần tô trước) và đưa con trỏ tới ô đầu tiên. Dấu tô
+   * không vào số liệu lưu / xuất Excel và tự gỡ khỏi ô ngay khi người dùng sửa ô đó.
+   */
+  markInvalidCells(cells: WorkbookCellRef[]): void;
+  /** Gỡ mọi dấu tô của `markInvalidCells`. */
+  clearInvalidCells(): void;
   /** GC.Spread.Sheets.Workbook — chỉ dùng khi thật cần. */
   raw(): unknown;
 };
 
-/** Kết quả chạy script phía trình duyệt. `ok` = không có lỗi mức ERROR. */
-export type ScriptRunResult = { ok: boolean; messages: string[] };
+/** Một ô của bảng tính, theo tên sheet (tab) và chỉ số dòng / cột tính từ 0. */
+export type WorkbookCellRef = { sheetName: string; row: number; column: number };
+
+/**
+ * Kết quả chạy script phía trình duyệt. `ok` = không có lỗi mức ERROR.
+ * `cells`: các ô mà lỗi mức ERROR chỉ ra (script ghi `source` cho lỗi) — để tô đỏ.
+ */
+export type ScriptRunResult = { ok: boolean; messages: string[]; cells?: WorkbookCellRef[] };
 
 export type SpreadWorkbookProps = {
   /** null → workbook trống 1 sheet. Đổi NỘI DUNG (không chỉ tham chiếu) mới nạp lại. */
