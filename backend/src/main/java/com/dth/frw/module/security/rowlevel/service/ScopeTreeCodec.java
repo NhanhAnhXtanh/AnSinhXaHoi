@@ -24,11 +24,31 @@ import org.springframework.stereotype.Component;
  *
  * <p>Every failure carries a pointer to the offending node, built as the parser
  * descends, so nothing has to be reconstructed afterwards.
+ *
+ * <p>A tree is also bounded in size ({@link #MAX_NODES} conditions,
+ * {@link #MAX_DEPTH} levels, {@link #MAX_LIST_VALUES} values in one list). A
+ * policy is compiled into the SQL of every query its role runs, so a tree of
+ * thousands of conditions accepted once costs memory on every request after —
+ * end-to-end tests saved one of 5 000 conditions and the next reads of the
+ * policy ran the server out of memory. Real policies are a handful of
+ * conditions; the bounds are far above that and far below the harm.
  */
 @Component
 public class ScopeTreeCodec {
 
+    /** Conditions (all / any / not / field nodes together) in one tree. */
+    static final int MAX_NODES = 500;
+    /** Levels of nesting, counting the root as one. */
+    static final int MAX_DEPTH = 16;
+    /** Values in one list literal ({@code in} / {@code not_in}). */
+    static final int MAX_LIST_VALUES = 1_000;
+
     private final ObjectMapper mapper;
+
+    /** Nodes seen so far while parsing one tree. */
+    private static final class Budget {
+        private int nodes;
+    }
 
     public ScopeTreeCodec(ObjectMapper mapper) {
         this.mapper = mapper;
@@ -45,12 +65,12 @@ public class ScopeTreeCodec {
         } catch (JacksonException e) {
             throw new PolicyValidationException("scope", "is not valid JSON");
         }
-        return node(root, "scope");
+        return node(root, "scope", 1, new Budget());
     }
 
     /** Parses a tree that arrived as part of a request body rather than out of a column. */
     public ScopeTree parse(JsonNode json) {
-        return node(json, "scope");
+        return node(json, "scope", 1, new Budget());
     }
 
     /** The stored JSON as a node, so a response carries the tree rather than a string of it. */
@@ -79,12 +99,18 @@ public class ScopeTreeCodec {
         }
     }
 
-    private ScopeTree node(JsonNode json, String at) {
+    private ScopeTree node(JsonNode json, String at, int depth, Budget budget) {
         if (json == null || json.isNull()) {
             return ScopeTree.unrestricted();
         }
         if (!json.isObject()) {
             throw new PolicyValidationException(at, "must be an object");
+        }
+        if (depth > MAX_DEPTH) {
+            throw new PolicyValidationException(at, "is nested deeper than %d levels".formatted(MAX_DEPTH));
+        }
+        if (++budget.nodes > MAX_NODES) {
+            throw new PolicyValidationException(at, "makes the tree larger than %d conditions".formatted(MAX_NODES));
         }
 
         boolean all = json.has("all");
@@ -101,24 +127,27 @@ public class ScopeTreeCodec {
         }
 
         if (all) {
-            return new ScopeTree.All(children(json.get("all"), at + ".all"));
+            return new ScopeTree.All(children(json.get("all"), at + ".all", depth, budget));
         }
         if (any) {
-            return new ScopeTree.Any(children(json.get("any"), at + ".any"));
+            return new ScopeTree.Any(children(json.get("any"), at + ".any", depth, budget));
         }
         if (not) {
-            return new ScopeTree.Not(node(json.get("not"), at + ".not"));
+            return new ScopeTree.Not(node(json.get("not"), at + ".not", depth + 1, budget));
         }
         return leaf(json, at);
     }
 
-    private List<ScopeTree> children(JsonNode json, String at) {
+    private List<ScopeTree> children(JsonNode json, String at, int depth, Budget budget) {
         if (!json.isArray()) {
             throw new PolicyValidationException(at, "must be an array of conditions");
         }
+        if (json.size() > MAX_NODES) {
+            throw new PolicyValidationException(at, "makes the tree larger than %d conditions".formatted(MAX_NODES));
+        }
         List<ScopeTree> nodes = new ArrayList<>();
         for (int i = 0; i < json.size(); i++) {
-            nodes.add(node(json.get(i), "%s[%d]".formatted(at, i)));
+            nodes.add(node(json.get(i), "%s[%d]".formatted(at, i), depth + 1, budget));
         }
         return nodes;
     }
@@ -189,6 +218,9 @@ public class ScopeTreeCodec {
             return null;
         }
         if (json.isArray()) {
+            if (json.size() > MAX_LIST_VALUES) {
+                throw new PolicyValidationException(null, "a list may hold at most %d values".formatted(MAX_LIST_VALUES));
+            }
             List<Object> values = new ArrayList<>(json.size());
             for (int i = 0; i < json.size(); i++) {
                 values.add(plain(json.get(i)));
