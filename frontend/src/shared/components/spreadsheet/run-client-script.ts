@@ -9,6 +9,7 @@ import {
   toSharedData,
 } from "./script/session";
 import {
+  SCRIPT_ERROR_CODE,
   SCRIPT_HOOKS,
   type ScriptHookName,
   type TempTableRow,
@@ -20,6 +21,21 @@ const SYNC_HOOKS: readonly ScriptHookName[] = ["beforeEdit", "beforeCommit", "be
 
 function issueText(issue: TempTableValidationIssue): string {
   return issue.severity === "WARNING" ? `Lưu ý: ${issue.message}` : issue.message;
+}
+
+/** Câu cho cán bộ khi chính phần kiểm tra của biểu mẫu bị lỗi (lỗi kỹ thuật nằm ở console). */
+const BROKEN_CHECK_MESSAGE =
+  "Biểu mẫu đang lỗi ở phần kiểm tra số liệu nên chưa kiểm tra được. Bạn báo cán bộ hỗ trợ của Sở để sửa biểu mẫu.";
+
+/**
+ * Lỗi của chính kịch bản (biên dịch, chạy hỏng, quá giờ) ở mức ERROR gộp thành một câu dễ hiểu;
+ * lỗi số liệu do kịch bản báo giữ nguyên.
+ */
+function userMessages(issues: TempTableValidationIssue[]): string[] {
+  const broken = issues.filter((issue) => issue.severity === "ERROR" && issue.code === SCRIPT_ERROR_CODE);
+  if (broken.length > 0) console.warn("Kịch bản của mẫu lỗi:", broken.map((issue) => issue.message));
+  const rest = issues.filter((issue) => !broken.includes(issue)).map(issueText);
+  return broken.length > 0 ? [BROKEN_CHECK_MESSAGE, ...rest] : rest;
 }
 
 /**
@@ -107,7 +123,7 @@ export async function runClientScript(
     // Engine đã tự cô lập lỗi từng script; tới đây là lỗi ngoài dự kiến.
     issues.push({
       severity: "ERROR",
-      code: "SCRIPT_ERROR",
+      code: SCRIPT_ERROR_CODE,
       message: `Script của mẫu gặp lỗi: ${error instanceof Error ? error.message : String(error)}`,
     });
   }
@@ -117,7 +133,7 @@ export async function runClientScript(
   );
   return {
     ok: !issues.some((issue) => issue.severity === "ERROR"),
-    messages: [...issues.map(issueText), ...messages],
+    messages: [...userMessages(issues), ...messages],
     cells,
   };
 }

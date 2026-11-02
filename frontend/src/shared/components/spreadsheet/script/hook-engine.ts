@@ -92,9 +92,13 @@ export class ScriptHookEngine {
     };
   }
 
+  /**
+   * Kịch bản không biên dịch được: ERROR, không phải cảnh báo — kịch bản đó có thể chính là bước
+   * kiểm tra trước khi nộp, cho qua là số liệu chưa kiểm vẫn nộp được (bản Jmix để WARNING).
+   */
   compileErrorIssues(): TempTableValidationIssue[] {
     return this.errors.map((entry) =>
-      this.scriptErrorIssue(entry.record.name, entry.message)
+      this.scriptErrorIssue(entry.record.name, entry.message, "ERROR")
     );
   }
 
