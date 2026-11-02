@@ -1,18 +1,23 @@
 // Nguon: DB qt_template_script — bieu 1a, phien ban PB-000005, script "Validate"
-// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+// Hook: validate. Dong bo tu ban DA KIEM THU ngay 2026-08-22; them so nguyen / tran / o loi ngay 2026-11-02 (changeset 172).
 
 // ==== 1a · Script 2/3: VALIDATE KHI NỘP ====
 // displayOrder = 2, enabled = true, gắn biểu reportType = "1a".
 // Chạy trong TRÌNH DUYỆT khi bấm NỘP. issue 'ERROR' chặn nộp; 'WARNING' cảnh báo. Chỉ ĐỌC ô.
 //
 // KIỂM: Số đối tượng (cột C) VÀ Kinh phí (cột D) đều phải LÀ SỐ (nếu có nhập/ tính ra).
-//   - Kinh phí là ô CÔNG THỨC → đọc giá trị đã tính; kiểm "là số" bắt luôn lỗi công thức.
+//   - Số đối tượng: số nguyên, không âm, không quá MAX_QUANTITY (2.5 người, 1e20 người bị chặn).
+//   - Kinh phí là ô CÔNG THỨC → đọc giá trị đã tính; kiểm "là số" bắt luôn lỗi công thức;
+//     không âm, không quá MAX_AMOUNT đồng.
+//   - Mỗi lỗi ghi `source` = ô gây lỗi để màn nhập tô đỏ ô đó (2/11/2026).
 // KHÔNG kiểm Ghi chú (cột E) — ghi gì cũng được.
 //
 // THÔNG BÁO (message) dùng TÊN chỉ tiêu (không in MÃ). `code` chỉ để host gom nhóm;
 // `businessKey` (mã) chỉ để tra cứu nội bộ — banner hiển thị `message`.
 
 const SHEET = '1a';
+const MAX_QUANTITY = 10000000;          // 10 triệu người — vượt xa dân số toàn tỉnh
+const MAX_AMOUNT = 1000000000000000;    // 1 triệu tỷ đồng
 
 // Mỗi dòng lá: mã (nội bộ) + tên (hiển thị) + ô Số đối tượng (C) + ô Kinh phí (D). Ghi chú (E) không kiểm.
 const BINDINGS = [
@@ -49,17 +54,32 @@ return defineScript({
       const qty = toNumber(ctx.cell.get(SHEET, b.quantity.row, b.quantity.col));
       const amt = toNumber(ctx.cell.get(SHEET, b.amount.row, b.amount.col));
 
+      const qtyCell = { sheetName: SHEET, row: b.quantity.row, column: b.quantity.col };
+      const amtCell = { sheetName: SHEET, row: b.amount.row, column: b.amount.col };
+
       if (Number.isNaN(qty)) {
-        issues.push({ severity: 'ERROR', code: 'QTY_NOT_NUMBER', businessKey: b.code,
+        issues.push({ severity: 'ERROR', code: 'QTY_NOT_NUMBER', businessKey: b.code, source: qtyCell,
           message: `${b.name}: số đối tượng phải là số.` });
       } else if (typeof qty === 'number' && qty < 0) {
-        issues.push({ severity: 'ERROR', code: 'QTY_NEGATIVE', businessKey: b.code,
+        issues.push({ severity: 'ERROR', code: 'QTY_NEGATIVE', businessKey: b.code, source: qtyCell,
           message: `${b.name}: số đối tượng không được âm.` });
+      } else if (typeof qty === 'number' && !Number.isInteger(qty)) {
+        issues.push({ severity: 'ERROR', code: 'QTY_NOT_WHOLE', businessKey: b.code, source: qtyCell,
+          message: `${b.name}: số đối tượng phải là số nguyên (không có phần lẻ).` });
+      } else if (typeof qty === 'number' && qty > MAX_QUANTITY) {
+        issues.push({ severity: 'ERROR', code: 'QTY_TOO_LARGE', businessKey: b.code, source: qtyCell,
+          message: `${b.name}: số đối tượng lớn bất thường, bạn kiểm tra lại số đã nhập.` });
       }
 
       if (Number.isNaN(amt)) {
-        issues.push({ severity: 'ERROR', code: 'AMOUNT_NOT_NUMBER', businessKey: b.code,
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_NOT_NUMBER', businessKey: b.code, source: amtCell,
           message: `${b.name}: kinh phí phải là số (kiểm tra công thức/tham số).` });
+      } else if (typeof amt === 'number' && amt < 0) {
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_NEGATIVE', businessKey: b.code, source: amtCell,
+          message: `${b.name}: kinh phí không được âm.` });
+      } else if (typeof amt === 'number' && amt > MAX_AMOUNT) {
+        issues.push({ severity: 'ERROR', code: 'AMOUNT_TOO_LARGE', businessKey: b.code, source: amtCell,
+          message: `${b.name}: kinh phí lớn bất thường, bạn kiểm tra lại số đã nhập.` });
       }
 
       if ((typeof qty === 'number' && qty > 0) || (typeof amt === 'number' && amt > 0)) filledRows += 1;
