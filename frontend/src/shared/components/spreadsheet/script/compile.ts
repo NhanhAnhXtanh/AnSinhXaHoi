@@ -1,3 +1,4 @@
+import { LOOP_GUARD_NAME, ScriptTimeoutError, instrumentLoops, loopGuard } from "./loop-guard";
 import {
   SCRIPT_HOOKS,
   type CompiledScript,
@@ -93,12 +94,14 @@ export function compileRecord(record: ScriptRecord): CompileOutcome {
   };
   try {
     // 'use strict' chèn TRƯỚC code người dùng: chặn biến global vô tình, `with`,
-    // và this = undefined ở top level.
+    // và this = undefined ở top level. Mọi vòng lặp được chèn lệnh kiểm giờ
+    // (loop-guard.ts): vòng lặp vô hạn dừng sau giới hạn thay vì treo cả trang.
     const factory = new Function(
       "defineScript",
-      `'use strict';\n${record.code}`
-    ) as (define: typeof defineScript) => unknown;
-    const returned = factory(defineScript);
+      LOOP_GUARD_NAME,
+      `'use strict';\n${instrumentLoops(record.code)}`
+    ) as (define: typeof defineScript, guard: typeof loopGuard) => unknown;
+    const returned = factory(defineScript, loopGuard);
     const blocks: unknown[] = [...registered];
     if (
       returned != null &&
@@ -126,6 +129,7 @@ export function compileRecord(record: ScriptRecord): CompileOutcome {
         {
           record,
           message: error instanceof Error ? error.message : String(error),
+          timedOut: error instanceof ScriptTimeoutError,
         },
       ],
     };

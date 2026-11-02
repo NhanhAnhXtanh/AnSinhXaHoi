@@ -83,7 +83,8 @@ type LogLine = { text: string };
  *   (kịch bản cũ giữ thứ tự Jmix, kịch bản mới thêm vào cuối);
  * - ô Tên, Phạm vi (Mọi biểu / Riêng biểu đang mở), Bật, Mô tả, nút Xoá;
  * - Chạy / Dừng TỪNG kịch bản trên bảng đang thiết kế (gắn bộ chặn sửa ô của riêng kịch bản đó,
- *   chạy kiểm tra, chạy thử lấy số tổng hợp); khi mở khung tự chạy lần lượt các kịch bản đang bật;
+ *   chạy kiểm tra, chạy thử lấy số tổng hợp); mở khung KHÔNG tự chạy kịch bản nào (kịch bản
+ *   hỏng sẽ chặn chính màn dùng để sửa nó). Vòng lặp chạy quá giới hạn tự dừng (loop-guard.ts);
  * - ô soạn Monaco riêng cho từng kịch bản, thanh dòng / cột, phóng to ô soạn;
  * - nhật ký chạy nền tối tô màu theo loại dòng, Xoá nhật ký, kéo đổi chiều cao.
  *
@@ -198,17 +199,8 @@ export function ScriptEditorPanel({
     [appendLog, sheetCode, stopScript, workbook]
   );
 
-  // Mở khung lần đầu (đã có kịch bản và bảng tính): chạy lần lượt các kịch bản đang bật.
-  const autoRan = useRef(false);
-  useEffect(() => {
-    if (autoRan.current || !drafts || !workbook) return;
-    autoRan.current = true;
-    const enabled = drafts.filter((d) => d.enabled);
-    if (enabled.length === 0) return;
-    void (async () => {
-      for (const draft of enabled) await runScript(draft);
-    })();
-  }, [drafts, workbook, runScript]);
+  // Không tự chạy kịch bản khi mở khung: kịch bản hỏng (vòng lặp vô hạn…) sẽ chặn chính màn
+  // dùng để sửa nó. Người soạn bấm Chạy cho từng kịch bản.
 
   /* ---------------- sửa danh sách ---------------- */
 
@@ -220,8 +212,6 @@ export function ScriptEditorPanel({
   }
 
   function addScript() {
-    // Chốt "đã tự chạy" để kịch bản vừa thêm không bị chạy ngay; người soạn bấm Chạy để thử.
-    autoRan.current = true;
     const draft: DraftScript = {
       uid: nextDraftUid(),
       id: null,
