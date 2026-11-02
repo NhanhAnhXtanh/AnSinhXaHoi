@@ -12,12 +12,10 @@ import {
   SquarePen,
   Users,
 } from "lucide-react";
-import { usePermissions } from "@refinedev/core";
 import { useMemo } from "react";
 import { Link } from "react-router";
 
 import { StatusBadge, formatNumber } from "@/shared/components/asxh";
-import { permissionFor } from "@/shared/lib/permissions";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -39,36 +37,27 @@ import {
   type SheetStatus,
 } from "./status";
 import type { Counts, HomeDashboard, TodoItem } from "./types";
+import { useCanOpen } from "./use-can-open";
 
-/** `resource`: tên resource trong `app/resources` — nút chỉ hiện khi tài khoản mở được màn đó. */
-const QUICK_LINKS: { label: string; to: string; resource: string; icon: LucideIcon }[] = [
-  { label: "Nhập liệu báo cáo", to: "/input-reports", resource: "input_reports", icon: SquarePen },
-  { label: "Duyệt phiếu nhập", to: "/report-review", resource: "report_review", icon: ClipboardCheck },
-  { label: "Tổng hợp báo cáo", to: "/summary", resource: "summary", icon: ChartColumn },
-  { label: "Thiết lập & điều hành", to: "/period-setup", resource: "period_setup", icon: ListChecks },
-  { label: "Bộ biểu mẫu", to: "/templates", resource: "templates", icon: FileText },
-  { label: "Lịch và kỳ báo cáo", to: "/report-calendar", resource: "report_calendar", icon: CalendarDays },
-  { label: "Danh sách đơn vị", to: "/report-units", resource: "report_units", icon: BuildingComplex },
-  { label: "Người dùng", to: "/users", resource: "users", icon: Users },
+/** Nút chỉ hiện khi tài khoản mở được màn đích (`useCanOpen`). */
+const QUICK_LINKS: { label: string; to: string; icon: LucideIcon }[] = [
+  { label: "Nhập liệu báo cáo", to: "/input-reports", icon: SquarePen },
+  { label: "Duyệt phiếu nhập", to: "/report-review", icon: ClipboardCheck },
+  { label: "Tổng hợp báo cáo", to: "/summary", icon: ChartColumn },
+  { label: "Thiết lập & điều hành", to: "/period-setup", icon: ListChecks },
+  { label: "Bộ biểu mẫu", to: "/templates", icon: FileText },
+  { label: "Lịch và kỳ báo cáo", to: "/report-calendar", icon: CalendarDays },
+  { label: "Danh sách đơn vị", to: "/report-units", icon: BuildingComplex },
+  { label: "Người dùng", to: "/users", icon: Users },
 ];
 
 /**
- * Các nút Truy cập nhanh tài khoản mở được — cùng luật lọc menu bên trái
- * (`useAccessibleMenuItems`): cần quyền `list` của resource. Chưa có danh sách
- * quyền (đang tải) thì chưa hiện nút nào, để không nháy nút rồi mất.
+ * Các nút Truy cập nhanh tài khoản mở được (`useCanOpen`, cùng luật lọc menu bên trái). Chưa tải
+ * xong danh sách quyền thì chưa hiện nút nào, để không nháy nút rồi mất.
  */
 function useQuickLinks() {
-  const { data: permissions } = usePermissions<string[]>({});
-  return useMemo(
-    () =>
-      permissions
-        ? QUICK_LINKS.filter((link) => {
-            const required = permissionFor(link.resource, "list");
-            return !required || permissions.includes(required);
-          })
-        : [],
-    [permissions]
-  );
+  const canOpen = useCanOpen();
+  return useMemo(() => QUICK_LINKS.filter((link) => canOpen(link.to)), [canOpen]);
 }
 
 /** Số đếm của một tình trạng hiển thị. */
@@ -107,6 +96,7 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
   const statuses = statusesOf(totals);
   const canApprove = capabilities.approve;
   const quickLinks = useQuickLinks();
+  const canOpen = useCanOpen();
 
   return (
     <>
@@ -261,15 +251,10 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
             </PanelEmpty>
           ) : (
             <ul className="scrollbar-fade -mx-1 min-h-0 overflow-y-auto px-1">
-              {todo.items.map((item) => (
-                <li key={item.reportId} className="border-b last:border-b-0">
-                  <Link
-                    to={todoLink(item, canApprove)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-sm py-2",
-                      "hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    )}
-                  >
+              {todo.items.map((item) => {
+                const to = todoLink(item, canApprove);
+                const content = (
+                  <>
                     <div className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm font-medium">{item.unitName}</span>
                       <span className="text-muted-foreground truncate text-xs">
@@ -277,9 +262,26 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
                       </span>
                     </div>
                     {todoBadge(item)}
-                  </Link>
-                </li>
-              ))}
+                  </>
+                );
+                return (
+                  <li key={item.reportId} className="border-b last:border-b-0">
+                    {canOpen(to) ? (
+                      <Link
+                        to={to}
+                        className={cn(
+                          "flex items-center gap-3 rounded-sm py-2",
+                          "hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        )}
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-3 py-2">{content}</div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Panel>
