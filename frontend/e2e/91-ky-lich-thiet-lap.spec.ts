@@ -11,8 +11,6 @@ import {
   API_URL,
   Api,
   TEMPLATE_1A,
-  attachTreasury,
-  fillAndCompleteSheet,
   reportOf,
   sheetsOf,
   unitSubmitsViaApi,
@@ -63,7 +61,6 @@ class Raw {
     return this.ctx.dispose();
   }
 }
-type Res = Awaited<ReturnType<Raw["send"]>>;
 
 const DENIED = [400, 403, 404, 409, 422];
 const BAD = [400, 422];
@@ -600,7 +597,6 @@ test.describe("Nhóm A — lịch, kỳ, thiết lập & điều hành, mở đ�
 
     const ps = await periodsOf(dh, Y2);
     const Q1 = `Quý I/${Y2}`;
-    const header = page.locator("main");
     const primary = (name: string | RegExp) => page.getByRole("button", { name });
 
     await step(G, "thiết lập & mở đợt", async () => {
