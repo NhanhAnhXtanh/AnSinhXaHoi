@@ -384,15 +384,8 @@ test.describe("Nhóm D — biểu mẫu, phiên bản, kịch bản, Designer, b
     record(G, "Khoá bản Nháp", await a.send("post", `${V(v1)}/lock`), [409]);
     record(G, "Mở khoá bản Nháp", await a.send("post", `${V(v1)}/unlock`), [409]);
     record(G, "Thu hồi bản Nháp", await a.send("post", `${V(v1)}/revoke`), [409]);
-    record(G, "Trả về nháp khi đang Nháp (idempotent)", await a.send("post", `${V(v1)}/stop_testing`), [200]);
-    const st = await a.send("post", `${V(v1)}/start_testing`);
-    record(G, "Nháp → Đang thử nghiệm", st, [200]);
-    check(G, "Trạng thái sau start_testing = TESTING", json<{ status: string }>(st).status === "TESTING", "TESTING", json<{ status: string }>(st).status);
-    record(G, "start_testing lần hai (idempotent)", await a.send("post", `${V(v1)}/start_testing`), [200]);
-    record(G, "Khoá bản Đang thử nghiệm", await a.send("post", `${V(v1)}/lock`), [409]);
-    record(G, "Sửa workbook khi Đang thử nghiệm (được phép)", await a.send("patch", V(v1), { workbookJson: (await getWorkbook(a, v1)) }), [200]);
-    const back = await a.send("post", `${V(v1)}/stop_testing`);
-    record(G, "Đang thử nghiệm → Nháp", back, [200]);
+    record(G, "Chuyển sang thử nghiệm (thao tác đã bỏ)", await a.send("post", `${V(v1)}/start_testing`), [404, 405]);
+    record(G, "Sửa workbook khi đang Nháp (được phép)", await a.send("patch", V(v1), { workbookJson: (await getWorkbook(a, v1)) }), [200]);
     record(G, "Thao tác lên phiên bản không tồn tại (publish)", await a.send("post", "/template_versions/987654321/publish"), [404]);
     record(G, "Ban hành với ngày áp dụng sai định dạng", await a.send("post", `${V(v1)}/publish`, { effectiveFrom: "2026-13-45" }), BAD);
 
@@ -403,7 +396,6 @@ test.describe("Nhóm D — biểu mẫu, phiên bản, kịch bản, Designer, b
     record(G, "Sửa workbook bản đã ban hành", await a.send("patch", V(v1), { workbookJson: workbook() }), [409]);
     record(G, "Đổi ngày áp dụng bản đã ban hành", await a.send("patch", V(v1), { effectiveFrom: "2026-02-01" }), [409]);
     record(G, "Thay kịch bản bản đã ban hành", await a.send("put", `${V(v1)}/scripts`, []), [409]);
-    record(G, "start_testing bản đã ban hành", await a.send("post", `${V(v1)}/start_testing`), [409]);
     record(G, "Thu hồi bản ban hành cuối cùng của biểu", await a.send("post", `${V(v1)}/revoke`), [409]);
     record(G, "Xoá biểu đã có bản ban hành", await a.send("delete", `/templates/${templateId}`), [409]);
     record(G, "Đổi loại biểu sau ban hành", await a.send("patch", `/templates/${templateId}`, { kind: "TONG_HOP" }), [409, 400]);
@@ -533,8 +525,6 @@ test.describe("Nhóm D — biểu mẫu, phiên bản, kịch bản, Designer, b
         ["khoá", "post", `${V}/lock`],
         ["mở khoá", "post", `${V}/unlock`],
         ["thu hồi", "post", `${V}/revoke`],
-        ["start_testing", "post", `${V}/start_testing`],
-        ["stop_testing", "post", `${V}/stop_testing`],
         ["khai bản chất chỉ tiêu", "put", "/indicator_measures", { indicatorCodes: ["x"], measureKind: "TIEN" }],
       ];
       for (const [name, m, path, data] of calls) {

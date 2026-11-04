@@ -24,6 +24,7 @@ import {
 import type { TemplateActions } from "../api";
 import type { FormKind, TemplateForm, TemplateSet } from "../types";
 import { KIND_LABEL, firstOfNextMonth, parseVnDate } from "../model";
+import { DateInput } from "./date-input";
 
 type Field = "name" | "kind" | "date";
 
@@ -190,15 +191,12 @@ export function CreateFormDialog({
             <Label htmlFor={dateId}>
               Áp dụng từ ngày <span className="text-destructive-text">*</span>
             </Label>
-            <Input
+            <DateInput
               id={dateId}
               value={date}
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="ngày/tháng/năm"
-              aria-invalid={invalid.has("date") || undefined}
-              onChange={(e) => {
-                setDate(e.target.value);
+              invalid={invalid.has("date")}
+              onChange={(text) => {
+                setDate(text);
                 clear("date");
               }}
             />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCan } from "@refinedev/core";
-import { FolderPen, FolderPlus, Inbox, Plus, RotateCw, Trash, TriangleAlert } from "lucide-react";
+import { FolderPen, Inbox, Plus, RotateCw, Trash, TriangleAlert } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -142,13 +142,9 @@ export function TemplateSets() {
   /* ---------------- đầu trang ---------------- */
 
   const templateCount = selectedSet?.templateCount ?? 0;
+  // Nút chính đầu trang là "Tạo bộ biểu mẫu"; "Tạo biểu mẫu" là nút "+" đầu cột giữa
+  // (FormsPanel), nên menu ⋯ chỉ còn sửa / xoá bộ mẫu.
   const allHeaderItems: ActionItem[] = [
-    {
-      key: "create-set",
-      label: "Tạo bộ mẫu",
-      icon: FolderPlus,
-      onSelect: () => setSetDialog({ open: true, editing: null }),
-    },
     {
       key: "edit-set",
       label: "Sửa bộ mẫu",
@@ -384,11 +380,11 @@ export function TemplateSets() {
       actions={
         <HeaderActions
           primary={
-            canFormWrite
+            canSetWrite
               ? {
-                  label: "Tạo biểu mẫu",
+                  label: "Tạo bộ biểu mẫu",
                   icon: Plus,
-                  onClick: () => setCreateFormIn(selectedSet),
+                  onClick: () => setSetDialog({ open: true, editing: null }),
                 }
               : undefined
           }

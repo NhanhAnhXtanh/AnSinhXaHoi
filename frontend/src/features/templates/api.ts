@@ -35,7 +35,7 @@ import type {
  * - `GET/POST/PATCH/DELETE /api/template_sets`
  * - `GET/POST/PATCH/DELETE /api/templates` + `POST /api/templates/{id}/next_version`
  * - `GET/PATCH/DELETE /api/template_versions` + `POST /api/template_versions/{id}/
- *   publish|lock|unlock|revoke|start_testing|stop_testing`
+ *   publish|lock|unlock|revoke`
  * - `GET /api/template_versions/{id}/scripts` (kịch bản; lưu cùng `PATCH` phiên bản)
  *
  * Danh sách phiên bản không có workbook (máy chủ không đọc cột đó); chỉ `getOne`
@@ -166,9 +166,7 @@ export type VersionAction =
   | "publish"
   | "lock"
   | "unlock"
-  | "revoke"
-  | "start_testing"
-  | "stop_testing";
+  | "revoke";
 
 const JSON_HEADERS = { headers: { "Content-Type": "application/json" } };
 

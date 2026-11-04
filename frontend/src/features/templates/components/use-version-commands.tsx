@@ -5,13 +5,11 @@ import {
   CodeXml,
   CopyPlus,
   Eye,
-  FlaskConical,
   Lock,
   LockOpen,
   Pencil,
   Send,
   Trash,
-  Undo2,
 } from "lucide-react";
 import { useCan } from "@refinedev/core";
 import { toast } from "sonner";
@@ -58,7 +56,7 @@ export function useVersionCommands({
   onCloned?: (version: TemplateVersion) => void;
   onDeleted?: (version: TemplateVersion) => void;
   onPublished?: (version: TemplateVersion) => void;
-  /** Sau mọi thao tác đổi trạng thái thành công (khoá, mở khoá, thu hồi, thử nghiệm). */
+  /** Sau mọi thao tác đổi trạng thái thành công (khoá, mở khoá, thu hồi). */
   onChanged?: (version: TemplateVersion) => void;
 }) {
   const [publishing, setPublishing] = useState<TemplateVersion | null>(null);
@@ -93,7 +91,7 @@ export function useVersionCommands({
 
   async function change(
     version: TemplateVersion,
-    action: "lock" | "unlock" | "revoke" | "start_testing" | "stop_testing",
+    action: "lock" | "unlock" | "revoke",
     done: string
   ) {
     if (busy) return;
@@ -138,8 +136,6 @@ export function useVersionCommands({
     const revocable = canRevoke(chain, version);
     const removable = canDelete(chain, version);
     const locked = version.status === "locked";
-    const testing = version.status === "testing";
-
     const items: ActionItem[] = [
       {
         key: "design",
@@ -154,22 +150,6 @@ export function useVersionCommands({
         onSelect: () => onOpenDesigner?.(version, true),
       },
     ];
-    if (editable) {
-      items.push({
-        key: "testing",
-        label: testing ? "Trả về nháp" : "Chuyển sang thử nghiệm",
-        icon: testing ? Undo2 : FlaskConical,
-        disabled: busy,
-        onSelect: () =>
-          void change(
-            version,
-            testing ? "stop_testing" : "start_testing",
-            testing
-              ? `Đã trả ${versionLabel(version).toLowerCase()} về nháp.`
-              : `Đã chuyển ${versionLabel(version).toLowerCase()} sang thử nghiệm.`
-          ),
-      });
-    }
     items.push(
       {
         key: "publish",

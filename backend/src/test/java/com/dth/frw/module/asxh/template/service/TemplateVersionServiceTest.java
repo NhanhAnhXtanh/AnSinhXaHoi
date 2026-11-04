@@ -246,29 +246,11 @@ class TemplateVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Nháp và Đang thử nghiệm không bao giờ được chọn theo ngày")
+    @DisplayName("Bản nháp không bao giờ được chọn theo ngày")
     void draftsAreNeverResolved() {
         Template template = newTemplate();
-        TemplateVersion v1 = design(firstVersion(template));
-        service.startTesting(v1.getId());
+        design(firstVersion(template));
         assertFalse(service.resolveOrEarliest(template.getId(), JUL_2026).isPresent());
-    }
-
-    // ------------------------------------------------------------- thử nghiệm
-
-    @Test
-    @DisplayName("Nháp ⇄ Đang thử nghiệm; bản thử nghiệm vẫn sửa và ban hành được")
-    void testingRoundTrip() {
-        TemplateVersion v1 = firstVersion(newTemplate());
-
-        assertEquals(TemplateStatus.TESTING, service.startTesting(v1.getId()).getStatus());
-        assertEquals(TemplateStatus.DRAFT, service.stopTesting(v1.getId()).getStatus());
-
-        service.startTesting(v1.getId());
-        design(v1);
-        assertEquals(TemplateStatus.PUBLISHED, service.publish(v1.getId(), JAN_2026).getStatus());
-        assertThrows(ConflictException.class, () -> service.startTesting(v1.getId()));
-        assertThrows(ConflictException.class, () -> service.stopTesting(v1.getId()));
     }
 
     // -------------------------------------------------------------- workbook
