@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Calendar, CircleAlert, CircleX, LoaderCircle } from "lucide-react";
+import { CircleAlert, CircleX, LoaderCircle } from "lucide-react";
 
 import { API_URL } from "@/shared/api/constants";
 import { getAccessToken, refreshSession } from "@/shared/api/session";
+import { DateInput } from "@/shared/components/date-input";
 import { FileUpload } from "@/shared/components/file-upload";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -232,22 +233,13 @@ export function SubmitYearDialog({
             <Label htmlFor="submit-doc-date">
               Ngày văn bản <span className="text-destructive-text">*</span>
             </Label>
-            <div className="relative">
-              <Calendar
-                aria-hidden
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-              />
-              <Input
-                id="submit-doc-date"
-                value={docDate}
-                onChange={(e) => setDocDate(e.target.value)}
-                placeholder="dd/mm/yyyy"
-                inputMode="numeric"
-                className="ps-9"
-                disabled={busy}
-                aria-invalid={Boolean(errors.docDate)}
-              />
-            </div>
+            <DateInput
+              id="submit-doc-date"
+              value={docDate}
+              onChange={setDocDate}
+              disabled={busy}
+              invalid={Boolean(errors.docDate)}
+            />
             {errors.docDate && <FieldNote error={errors.docDate} />}
           </div>
 

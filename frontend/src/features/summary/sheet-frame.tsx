@@ -20,6 +20,7 @@ export function SheetFrame({
   tabs,
   tab,
   onTabChange,
+  hideSingleTab = false,
   children,
 }: {
   title: ReactNode;
@@ -29,6 +30,8 @@ export function SheetFrame({
   tabs: { key: string; label: string; done?: boolean }[];
   tab: string;
   onTabChange: (key: string) => void;
+  /** Chỉ có một biểu thì không hiện tab biểu (vẫn giữ chân thẻ với nút toàn màn hình). */
+  hideSingleTab?: boolean;
   children: ReactNode;
 }) {
   const [full, setFull] = useState(false);
@@ -44,7 +47,7 @@ export function SheetFrame({
         footer={
           tabs.length > 0 ? (
             <SheetTabs
-              tabs={tabs}
+              tabs={hideSingleTab && tabs.length === 1 ? [] : tabs}
               value={tab}
               onChange={onTabChange}
               overflowLabel={(n) => `+${n} biểu khác`}

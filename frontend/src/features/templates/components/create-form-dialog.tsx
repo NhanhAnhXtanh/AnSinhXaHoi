@@ -24,7 +24,7 @@ import {
 import type { TemplateActions } from "../api";
 import type { FormKind, TemplateForm, TemplateSet } from "../types";
 import { KIND_LABEL, firstOfNextMonth, parseVnDate } from "../model";
-import { DateInput } from "./date-input";
+import { DateInput } from "@/shared/components/date-input";
 
 type Field = "name" | "kind" | "date";
 

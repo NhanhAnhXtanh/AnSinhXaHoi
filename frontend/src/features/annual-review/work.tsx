@@ -327,7 +327,7 @@ function WorkScreen({ report: s, backTo }: { report: AnnualReportRecord; backTo:
           key={`${s.id}-${current.templateId}`}
           workbook={workbook}
           readOnly
-          hideTabs
+          // Biểu tổng hợp năm có nhiều trang (01, 1a, 1b…) — phải thấy thanh trang để chuyển.
           scriptText={current.scriptText}
           scriptContext={scriptContext}
           onReady={(api) => {
@@ -361,7 +361,8 @@ function WorkScreen({ report: s, backTo }: { report: AnnualReportRecord; backTo:
           <div className="flex min-h-0 flex-1 flex-col p-4">{body}</div>
           <div className="flex shrink-0 items-center gap-2 border-t px-4 py-2">
             <SheetTabs
-              tabs={sheets.map((t) => ({ key: String(t.templateId), label: t.shortName }))}
+              // Chỉ một biểu (thường là 01-TongHop) thì không hiện tab biểu — thừa với thanh trang của bảng.
+              tabs={sheets.length > 1 ? sheets.map((t) => ({ key: String(t.templateId), label: t.shortName })) : []}
               value={sheet ? String(sheet.templateId) : ""}
               onChange={(key) => {
                 apiRef.current = null;
