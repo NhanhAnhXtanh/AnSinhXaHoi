@@ -1,0 +1,67 @@
+// Nguon: sinh 2026-11-04 tu 3-getinputdata-khi-duyet + 1-khoa-o-nhap-lieu cua bieu 1i, script "Sổ cái Sở"
+// Hook: beforeEdit,beforeCommit,beforePaste,getSummaryData. Ghi vao DB qua changeset 177 (khong kem 3 dong dau nay).
+
+// Hàm cho SỔ CÁI SỞ — biểu 1i. Nằm CHUNG bộ script của biểu (displayOrder = 5).
+// Hook: beforeEdit, beforeCommit, beforePaste (chỉ có hiệu lực ở mode 'summary-edit'), getSummaryData
+// (máy chủ chạy mỗi lần Sở bấm Lưu sổ).
+//
+// 1i là biểu GỘP: mỗi dòng là một CHỈ TIÊU, không có dòng theo đơn vị. 4-tonghop-theo-ky đổ số vào
+// đúng các ô của 3-getinputdata-khi-duyet.
+// - Guard: Sở chỉ sửa ô nhập của dòng chỉ tiêu (ô đơn vị nhập ở 1-khoa-o-nhap-lieu, không công thức);
+//   tham số, ghi chú, tiêu đề, ô công thức khoá.
+// - getSummaryData: đọc lại từng chỉ tiêu (cùng mã, cùng ô với 3-getinputdata-khi-duyet),
+//   organizationCode = '' (dòng gộp). Máy chủ so với tổng các đơn vị trong sổ Sở; phần chênh ghi vào
+//   đơn vị Sở chọn ở hộp lý do, hoặc dòng "Sở điều chỉnh chung".
+
+const SHEET = "1i";
+const BINDINGS = [
+  { code: "1I.TRE_MG", name: "Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › Trẻ mẫu giáo", row: 7, qty: 2, amt: 5 },
+  { code: "1I.HS_PHO_THONG", name: "Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HS tiểu học, THCS, THPT", row: 8, qty: 2, amt: 5 },
+  { code: "1I.HS_PTDT_BAN_TRU", name: "Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HS trường PTDT bán trú", row: 9, qty: 2, amt: 5 },
+  { code: "1I.HS_PTDT_NOI_TRU", name: "Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HS trường PTDT nội trú", row: 10, qty: 2, amt: 5 },
+  { code: "1I.HSSV_CAC_TRUONG", name: "Ưu tiên tuyển sinh & hỗ trợ học tập DTTS rất ít người › HSSV tại các trường", row: 11, qty: 2, amt: 5 },
+];
+// Ô Sở sửa được, dạng "dòng:cột" (0-based).
+const EDITABLE = ["7:2","8:2","9:2","10:2","11:2"];
+
+function num(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function editable(ctx, sheetName, row, col) {
+  return sheetName === SHEET && EDITABLE.indexOf(row + ':' + col) >= 0;
+}
+
+return defineScript({
+  // Ngoài sổ cái Sở (màn nhập, tổng hợp) không ý kiến — guard của màn nhập ở 1-khoa-o-nhap-lieu.
+  beforeEdit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    if (ctx.mode !== 'summary-edit') return;
+    for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+      for (let col = range.col; col < range.col + range.colCount; col += 1) {
+        if (!editable(ctx, range.sheetName, row, col)) return false;
+      }
+    }
+    return true;
+  },
+  getSummaryData(ctx) {
+    const rows = [];
+    BINDINGS.forEach(function (b, index) {
+      const quantity = b.qty == null ? null : num(ctx.cell.get(SHEET, b.row, b.qty));
+      const amount = b.amt == null ? null : num(ctx.cell.get(SHEET, b.row, b.amt));
+      if (quantity == null && amount == null) return;
+      rows.push({ organizationCode: '', indicatorCode: b.code, indicatorName: b.name,
+        quantity: quantity, amount: amount, orderNo: index });
+    });
+    return rows;
+  },
+});

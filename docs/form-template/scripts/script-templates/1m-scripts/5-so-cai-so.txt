@@ -1,0 +1,111 @@
+// Nguon: sinh 2026-11-04 tu 3-getinputdata-khi-duyet + 1-khoa-o-nhap-lieu cua bieu 1m, script "Sổ cái Sở"
+// Hook: beforeEdit,beforeCommit,beforePaste,getSummaryData. Ghi vao DB qua changeset 177 (khong kem 3 dong dau nay).
+
+// Hàm cho SỔ CÁI SỞ — biểu 1m. Nằm CHUNG bộ script của biểu (displayOrder = 5).
+// Hook: beforeEdit, beforeCommit, beforePaste (chỉ có hiệu lực ở mode 'summary-edit'), getSummaryData
+// (máy chủ chạy mỗi lần Sở bấm Lưu sổ).
+//
+// 1m là biểu GỘP: mỗi dòng là một CHỈ TIÊU, không có dòng theo đơn vị. 4-tonghop-theo-ky đổ số vào
+// đúng các ô của 3-getinputdata-khi-duyet.
+// - Guard: Sở chỉ sửa ô nhập của dòng chỉ tiêu (ô đơn vị nhập ở 1-khoa-o-nhap-lieu, không công thức);
+//   tham số, ghi chú, tiêu đề, ô công thức khoá.
+// - getSummaryData: đọc lại từng chỉ tiêu (cùng mã, cùng ô với 3-getinputdata-khi-duyet),
+//   organizationCode = '' (dòng gộp). Máy chủ so với tổng các đơn vị trong sổ Sở; phần chênh ghi vào
+//   đơn vị Sở chọn ở hộp lý do, hoặc dòng "Sở điều chỉnh chung".
+
+const SHEET = "1m";
+const BINDINGS = [
+  { code: "1M.A1.01.DUOI4T", name: "BTXH › Trẻ dưới 16 tuổi không nguồn nuôi dưỡng — dưới 4 tuổi", row: 11, qty: 5, amt: 6 },
+  { code: "1M.A1.01.4_16T", name: "BTXH › Trẻ dưới 16 tuổi không nguồn nuôi dưỡng — từ đủ 4 đến dưới 16 tuổi", row: 12, qty: 5, amt: 6 },
+  { code: "1M.A1.02", name: "BTXH › Người từ 16 đến 22 tuổi đang học phổ thông/học nghề", row: 14, qty: 5, amt: 6 },
+  { code: "1M.A1.03.DUOI4T", name: "BTXH › Trẻ nhiễm HIV thuộc hộ nghèo — dưới 4 tuổi", row: 16, qty: 5, amt: 6 },
+  { code: "1M.A1.03.4_16T", name: "BTXH › Trẻ nhiễm HIV thuộc hộ nghèo — từ 4 đến dưới 16 tuổi", row: 17, qty: 5, amt: 6 },
+  { code: "1M.A1.03.16T_LEN", name: "BTXH › Trẻ nhiễm HIV thuộc hộ nghèo — từ 16 tuổi trở lên", row: 18, qty: 5, amt: 6 },
+  { code: "1M.A1.04.1CON", name: "BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 1 con", row: 20, qty: 5, amt: 6 },
+  { code: "1M.A1.04.2CON", name: "BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 2 con", row: 21, qty: 5, amt: 6 },
+  { code: "1M.A1.04.3CON", name: "BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 3 con", row: 22, qty: 5, amt: 6 },
+  { code: "1M.A1.04.4CON", name: "BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 4 con", row: 23, qty: 5, amt: 6 },
+  { code: "1M.A1.04.5CON", name: "BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 5 con", row: 24, qty: 5, amt: 6 },
+  { code: "1M.A1.04.6CON", name: "BTXH › Người hộ nghèo/cận nghèo một mình nuôi con — đang nuôi 6 con", row: 25, qty: 5, amt: 6 },
+  { code: "1M.A1.05_1.60_80T", name: "BTXH › Người cao tuổi hộ nghèo không người phụng dưỡng — 60 đến dưới 80 tuổi", row: 28, qty: 5, amt: 6 },
+  { code: "1M.A1.05_1.80T_LEN", name: "BTXH › Người cao tuổi hộ nghèo không người phụng dưỡng — từ đủ 80 tuổi trở lên", row: 29, qty: 5, amt: 6 },
+  { code: "1M.A1.05_2", name: "BTXH › Người từ đủ 75 đến 80 tuổi hộ nghèo/cận nghèo vùng khó khăn", row: 30, qty: 5, amt: 6 },
+  { code: "1M.A1.05_3", name: "BTXH › Người từ đủ 80 tuổi trở lên không có lương hưu/trợ cấp BHXH", row: 31, qty: 5, amt: 6 },
+  { code: "1M.A1.05_4", name: "BTXH › Người cao tuổi hộ nghèo không người phụng dưỡng (diện khác)", row: 32, qty: 5, amt: 6 },
+  { code: "1M.A1.06_1.DUOI16T", name: "BTXH › Người khuyết tật đặc biệt nặng — dưới 16 tuổi", row: 35, qty: 5, amt: 6 },
+  { code: "1M.A1.06_1.16_60T", name: "BTXH › Người khuyết tật đặc biệt nặng — từ 16 đến 60 tuổi", row: 36, qty: 5, amt: 6 },
+  { code: "1M.A1.06_1.60T_LEN", name: "BTXH › Người khuyết tật đặc biệt nặng — từ đủ 60 tuổi trở lên", row: 37, qty: 5, amt: 6 },
+  { code: "1M.A1.06_2.DUOI16T", name: "BTXH › Người khuyết tật nặng — dưới 16 tuổi", row: 39, qty: 5, amt: 6 },
+  { code: "1M.A1.06_2.16_60T", name: "BTXH › Người khuyết tật nặng — từ 16 đến 60 tuổi", row: 40, qty: 5, amt: 6 },
+  { code: "1M.A1.06_2.60T_LEN", name: "BTXH › Người khuyết tật nặng — từ đủ 60 tuổi trở lên", row: 41, qty: 5, amt: 6 },
+  { code: "1M.A1.07", name: "BTXH › Trẻ em dưới 3 tuổi hộ nghèo/cận nghèo vùng khó khăn", row: 42, qty: 5, amt: 6 },
+  { code: "1M.A2.01_1", name: "BTXH nhận nuôi › Nhận chăm sóc, nuôi dưỡng trẻ em dưới 4 tuổi", row: 45, qty: 5, amt: 6 },
+  { code: "1M.A2.01_2.1TRE", name: "BTXH nhận nuôi › Nhận nuôi trẻ 4–16 tuổi — nuôi 1 trẻ", row: 47, qty: 5, amt: 6 },
+  { code: "1M.A2.01_2.2TRE", name: "BTXH nhận nuôi › Nhận nuôi trẻ 4–16 tuổi — nuôi 2 trẻ", row: 48, qty: 5, amt: 6 },
+  { code: "1M.A2.01_2.3TRE", name: "BTXH nhận nuôi › Nhận nuôi trẻ 4–16 tuổi — nuôi 3 trẻ", row: 49, qty: 5, amt: 6 },
+  { code: "1M.A2.02", name: "BTXH nhận nuôi › Nhận nuôi người cao tuổi thuộc hộ nghèo", row: 50, qty: 5, amt: 6 },
+  { code: "1M.A2.03_1.A", name: "BTXH nhận nuôi › Hỗ trợ nuôi dưỡng người KT đặc biệt nặng (mức hệ số 1,5)", row: 53, qty: 5, amt: 6 },
+  { code: "1M.A2.03_1.B", name: "BTXH nhận nuôi › Hỗ trợ nuôi dưỡng người KT đặc biệt nặng (mức hệ số 2)", row: 54, qty: 5, amt: 6 },
+  { code: "1M.A2.03_2.1", name: "BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 1 người khuyết tật", row: 56, qty: 5, amt: 6 },
+  { code: "1M.A2.03_2.2", name: "BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 2 người khuyết tật", row: 57, qty: 5, amt: 6 },
+  { code: "1M.A2.03_2.3", name: "BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 3 người khuyết tật", row: 58, qty: 5, amt: 6 },
+  { code: "1M.A2.03_2.4", name: "BTXH nhận nuôi › Hộ trực tiếp chăm sóc — 4 người khuyết tật", row: 59, qty: 5, amt: 6 },
+  { code: "1M.A2.03_3.1NGUOI", name: "BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 1 người khuyết tật", row: 61, qty: 5, amt: 6 },
+  { code: "1M.A2.03_3.2NGUOI", name: "BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 2 người khuyết tật", row: 62, qty: 5, amt: 6 },
+  { code: "1M.A2.03_3.1TRE", name: "BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 1 trẻ em khuyết tật", row: 63, qty: 5, amt: 6 },
+  { code: "1M.A2.03_3.2TRE", name: "BTXH nhận nuôi › Hộ/cá nhân nhận nuôi — 2 trẻ em khuyết tật", row: 64, qty: 5, amt: 6 },
+  { code: "1M.A3.01_1.DUOI4T", name: "BTXH cơ sở TGXH › Trẻ không nguồn nuôi dưỡng — dưới 4 tuổi", row: 68, qty: 5, amt: 6 },
+  { code: "1M.A3.01_1.4_16T", name: "BTXH cơ sở TGXH › Trẻ không nguồn nuôi dưỡng — từ đủ 4 đến dưới 16 tuổi", row: 69, qty: 5, amt: 6 },
+  { code: "1M.A3.01_2.DUOI4T", name: "BTXH cơ sở TGXH › Trẻ nhiễm HIV hộ nghèo — dưới 4 tuổi", row: 71, qty: 5, amt: 6 },
+  { code: "1M.A3.01_2.4_16T", name: "BTXH cơ sở TGXH › Trẻ nhiễm HIV hộ nghèo — từ đủ 4 đến dưới 16 tuổi", row: 72, qty: 5, amt: 6 },
+  { code: "1M.A3.02", name: "BTXH cơ sở TGXH › Người cao tuổi diện sống ở cơ sở trợ giúp xã hội", row: 73, qty: 5, amt: 6 },
+  { code: "1M.A3.03.DUOI4T", name: "BTXH cơ sở TGXH › Người khuyết tật đặc biệt nặng — dưới 4 tuổi", row: 75, qty: 5, amt: 6 },
+  { code: "1M.A3.03.4T_LEN", name: "BTXH cơ sở TGXH › Người khuyết tật đặc biệt nặng — từ đủ 4 tuổi trở lên", row: 76, qty: 5, amt: 6 },
+  { code: "1M.A3.04.DUOI4T", name: "BTXH cơ sở TGXH › Đối tượng cần bảo vệ khẩn cấp — dưới 4 tuổi", row: 78, qty: 5, amt: 6 },
+  { code: "1M.A3.04.4T_LEN", name: "BTXH cơ sở TGXH › Đối tượng cần bảo vệ khẩn cấp — từ đủ 4 tuổi trở lên", row: 79, qty: 5, amt: 6 },
+  { code: "1M.B.MAI_TANG", name: "BTXH › Hỗ trợ chi phí mai táng", row: 80, qty: 5, amt: 6 },
+];
+// Ô Sở sửa được, dạng "dòng:cột" (0-based).
+const EDITABLE = ["11:5","12:5","14:5","16:5","17:5","18:5","20:5","21:5","22:5","23:5","24:5","25:5","28:5","29:5","30:5","31:5","32:5","35:5","36:5","37:5","39:5","40:5","41:5","42:5","45:5","47:5","48:5","49:5","50:5","53:5","54:5","56:5","57:5","58:5","59:5","61:5","62:5","63:5","64:5","68:5","69:5","71:5","72:5","73:5","75:5","76:5","78:5","79:5","80:5"];
+
+function num(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function editable(ctx, sheetName, row, col) {
+  return sheetName === SHEET && EDITABLE.indexOf(row + ':' + col) >= 0;
+}
+
+return defineScript({
+  // Ngoài sổ cái Sở (màn nhập, tổng hợp) không ý kiến — guard của màn nhập ở 1-khoa-o-nhap-lieu.
+  beforeEdit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    if (ctx.mode !== 'summary-edit') return;
+    for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+      for (let col = range.col; col < range.col + range.colCount; col += 1) {
+        if (!editable(ctx, range.sheetName, row, col)) return false;
+      }
+    }
+    return true;
+  },
+  getSummaryData(ctx) {
+    const rows = [];
+    BINDINGS.forEach(function (b, index) {
+      const quantity = b.qty == null ? null : num(ctx.cell.get(SHEET, b.row, b.qty));
+      const amount = b.amt == null ? null : num(ctx.cell.get(SHEET, b.row, b.amt));
+      if (quantity == null && amount == null) return;
+      rows.push({ organizationCode: '', indicatorCode: b.code, indicatorName: b.name,
+        quantity: quantity, amount: amount, orderNo: index });
+    });
+    return rows;
+  },
+});
