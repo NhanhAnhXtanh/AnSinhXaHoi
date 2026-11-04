@@ -154,7 +154,7 @@ const CREATE_VALUE = "__create__";
  * Ô "Năm 2026" có icon lịch, đặt ở cụm phải đầu trang.
  *
  * `onCreateYear` (chỉ màn Lịch và kỳ báo cáo, người có quyền tạo lịch): thêm mục
- * "Tạo lịch năm mới" ở cuối danh sách.
+ * "Tạo lịch" ở cuối danh sách.
  */
 export function YearSelect({
   className,
@@ -204,7 +204,7 @@ export function YearSelect({
               <SelectSeparator className="mt-0" />
               <SelectItem value={CREATE_VALUE}>
                 <CalendarPlus aria-hidden />
-                Tạo lịch năm mới
+                Tạo lịch
               </SelectItem>
             </>
           ) : undefined

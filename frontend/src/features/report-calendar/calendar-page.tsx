@@ -125,7 +125,7 @@ export function ReportCalendar() {
   const takenYears = useMemo(() => new Set(calendars.map((c) => c.year)), [calendars]);
 
   /**
-   * Mục "Tạo lịch năm mới" của ô năm: nhảy sang năm liền sau năm có lịch muộn nhất
+   * Mục "Tạo lịch" của ô năm: nhảy sang năm liền sau năm có lịch muộn nhất
    * (chưa có lịch nào thì năm nay) rồi mở khung tạo — ô Năm trong khung vẫn đổi được.
    */
   const startCreate = () => {
@@ -256,7 +256,7 @@ function CalendarWorkspace({
   /** Quyền tạo / sửa lịch (gồm hạn nộp từng kỳ). Không có thì cả khung chỉ xem. */
   canWrite: boolean;
   canDelete: boolean;
-  /** Mục "Tạo lịch năm mới" trong ô năm (chỉ khi đang xem lịch đã có). */
+  /** Mục "Tạo lịch" trong ô năm (chỉ khi đang xem lịch đã có). */
   onCreateYear?: () => void;
 }) {
   const form = useForm<CalendarFormValues>({
