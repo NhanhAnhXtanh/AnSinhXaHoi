@@ -115,11 +115,55 @@ function buildDesignerConfig(sheetStructureEditable: boolean): DesignerConfig | 
   return { ...base, contextMenu };
 }
 
+type LoadFn = (...args: unknown[]) => unknown;
+
+/**
+ * Gọi {@code onLoaded} sau mỗi lần workbook được nạp lại nguyên khối: {@code import} / {@code open}
+ * (khi callback thành công chạy) và {@code fromJSON}. Trả hàm gỡ, trả lại hàm gốc.
+ */
+function watchWholeWorkbookLoads(
+  workbook: GC.Spread.Sheets.Workbook,
+  onLoaded: () => void
+): () => void {
+  const target = workbook as unknown as Record<string, LoadFn | undefined>;
+  const restores: (() => void)[] = [];
+
+  for (const name of ["import", "open"] as const) {
+    const original = target[name];
+    if (typeof original !== "function") continue;
+    target[name] = function (this: unknown, file: unknown, success?: unknown, ...rest: unknown[]) {
+      const done = (...args: unknown[]) => {
+        if (typeof success === "function") (success as LoadFn)(...args);
+        onLoaded();
+      };
+      return original.call(this, file, done, ...rest);
+    };
+    restores.push(() => {
+      target[name] = original;
+    });
+  }
+
+  const fromJSON = target.fromJSON;
+  if (typeof fromJSON === "function") {
+    target.fromJSON = function (this: unknown, ...args: unknown[]) {
+      const result = fromJSON.apply(this, args);
+      Promise.resolve(result).then(onLoaded, () => {});
+      return result;
+    };
+    restores.push(() => {
+      target.fromJSON = fromJSON;
+    });
+  }
+
+  return () => restores.forEach((restore) => restore());
+}
+
 export default function SpreadDesignerImpl(props: SpreadDesignerProps) {
   const { className, sheetStructureEditable = true } = props;
   const latestRef = useRef(props);
   latestRef.current = props;
   const adapterRef = useRef<SpreadAdapter | null>(null);
+  const workbookRef = useRef<GC.Spread.Sheets.Workbook | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   // Tăng mỗi lần Designer khởi tạo (0 = chưa sẵn sàng) — để nạp lại vào workbook mới.
   const [designerGen, setDesignerGen] = useState(0);
@@ -169,11 +213,23 @@ export default function SpreadDesignerImpl(props: SpreadDesignerProps) {
       // fromJSON khôi phục option tab đã lưu → đặt lại theo quyền sửa cấu trúc.
       adapter.setTabOptions({ structureEditable: latestRef.current.sheetStructureEditable ?? true });
       const unsubscribe = adapter.subscribeWorkbookChanged(markDirty);
+      // Import / Open trong menu FILE của Designer thay cả workbook mà không bắn sự kiện sửa
+      // nào → bọc các hàm nạp của workbook để coi là đã sửa (nạp lần đầu ở trên đã xong).
+      const workbook = workbookRef.current;
+      const unwatchLoads = workbook
+        ? watchWholeWorkbookLoads(workbook, () => {
+            adapter.setTabOptions({
+              structureEditable: latestRef.current.sheetStructureEditable ?? true,
+            });
+            markDirty();
+          })
+        : () => {};
       listening = true;
       cleanupRef.current = () => {
         listening = false;
         if (dirtyFrame !== undefined) window.cancelAnimationFrame(dirtyFrame);
         unsubscribe();
+        unwatchLoads();
       };
       const api = createWorkbookApi(adapter, {
         afterImport: () => {
@@ -242,6 +298,7 @@ export default function SpreadDesignerImpl(props: SpreadDesignerProps) {
           spreadOptions={spreadOptions}
           designerInitialized={(designer: DesignerInstance) => {
             const workbook = designer.getWorkbook() as unknown as GC.Spread.Sheets.Workbook;
+            workbookRef.current = workbook;
             adapterRef.current?.destroy();
             // Workbook thuộc về Designer — adapter không được huỷ nó.
             adapterRef.current = wrapSpreadWorkbook(workbook, { destroyWorkbook: false });

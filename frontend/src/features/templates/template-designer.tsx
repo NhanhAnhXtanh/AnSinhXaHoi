@@ -6,7 +6,6 @@ import {
   CopyPlus,
   Eye,
   FileDown,
-  FileUp,
   FileX,
   Maximize,
   Minimize,
@@ -156,7 +155,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
   const spreadRef = useRef<SpreadWorkbookApi | null>(null);
   // Bảng đang thiết kế cho khung kịch bản (Chạy / Dừng) — state để khung biết khi nào bảng sẵn sàng.
   const [designApi, setDesignApi] = useState<SpreadWorkbookApi | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [mode, setMode] = useState<Mode>("design");
   const [fullscreen, setFullscreen] = useState(false);
@@ -300,30 +298,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     setMode("design");
   }
 
-  /* ---------------- nhập / xuất file ---------------- */
-
-  async function importFile(file: File) {
-    const api = spreadRef.current;
-    if (!api) {
-      toast.error("Bảng tính chưa mở xong, vui lòng thử lại.");
-      return;
-    }
-    try {
-      await api.importFile(file);
-      editSeq.current += 1;
-      setWorkbookDirty(true);
-      const sheets = api.getSheetNames().length;
-      if (sheets > 1) {
-        toast.warning(
-          `Đã nhập file “${file.name}”. File có ${sheets} trang — mỗi biểu chỉ dùng một trang, hãy xoá trang thừa trước khi ban hành.`
-        );
-      } else {
-        toast.success(`Đã nhập file “${file.name}”. Bấm Lưu để giữ lại.`);
-      }
-    } catch {
-      toast.error(`Không đọc được file “${file.name}”. Hãy chọn file Excel (.xlsx).`);
-    }
-  }
+  /* ---------------- tải file (bản chỉ xem) ---------------- */
 
   async function exportFile() {
     const api = spreadRef.current;
@@ -387,23 +362,18 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
           },
         ]
       : []),
-    ...(editable && mode === "design"
+    // Bản sửa được: nhập / xuất file dùng menu FILE của bảng tính (Import / Export), không
+    // lặp lại ở đây. Bản chỉ xem không có thanh công cụ đó nên vẫn giữ mục tải về.
+    ...(!editable
       ? [
           {
-            key: "import",
-            label: "Nhập file Excel",
-            icon: FileUp,
-            onSelect: () => fileRef.current?.click(),
+            key: "export",
+            label: "Tải về file Excel",
+            icon: FileDown,
+            onSelect: () => void exportFile(),
           },
         ]
       : []),
-    {
-      key: "export",
-      label: "Tải về file Excel",
-      icon: FileDown,
-      disabled: mode === "preview",
-      onSelect: () => void exportFile(),
-    },
     ...(lockItem && !editable ? [{ ...lockItem, separatorBefore: true }] : []),
     {
       key: "fullscreen",
@@ -510,18 +480,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       fill
       actions={<HeaderActions primary={primary} secondary={secondary} items={menu} />}
     >
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".xlsx,.ssjson,.json"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) void importFile(file);
-        }}
-      />
-
       <div
         className={cn(
           "bg-card flex min-h-0 flex-1 overflow-hidden border shadow-e1",
