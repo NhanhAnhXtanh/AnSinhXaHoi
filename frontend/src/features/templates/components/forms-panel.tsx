@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CopyPlus, Eye, FilePlus, Pencil, Search, SearchX, Send, Trash } from "lucide-react";
+import { CopyPlus, Eye, FilePlus, Pencil, Plus, Search, SearchX, Send, Trash } from "lucide-react";
 
 import {
   EmptyState,
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/shared/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
 
 import type {
@@ -173,15 +174,33 @@ export function FormsPanel({
         onValueChange={(v) => setTab(v as "forms" | "history")}
         className="flex min-h-0 flex-1 flex-col gap-0"
       >
-        <div className="flex flex-col gap-0.5 px-4 pt-4 pb-3">
-          <h2 className="truncate text-base leading-6 font-semibold">
-            {set.name}
-          </h2>
-          <p className="text-muted-foreground truncate text-xs leading-4">
-            {rows.length} biểu · Tạo {formatDate(set.createdAt)} · Cập nhật{" "}
-            {formatDate(set.updatedAt)}
-            {set.description ? ` · ${set.description}` : ""}
-          </p>
+        <div className="flex items-start gap-2 px-4 pt-4 pb-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <h2 className="truncate text-base leading-6 font-semibold">
+              {set.name}
+            </h2>
+            <p className="text-muted-foreground truncate text-xs leading-4">
+              {rows.length} biểu · Tạo {formatDate(set.createdAt)} · Cập nhật{" "}
+              {formatDate(set.updatedAt)}
+              {set.description ? ` · ${set.description}` : ""}
+            </p>
+          </div>
+          {onCreateForm && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Tạo biểu mẫu"
+                  className="shrink-0"
+                  onClick={onCreateForm}
+                >
+                  <Plus aria-hidden />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Tạo biểu mẫu</TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         <div className="px-4 pb-3">
