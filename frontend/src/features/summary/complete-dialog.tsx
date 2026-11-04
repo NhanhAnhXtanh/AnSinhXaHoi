@@ -21,7 +21,7 @@ import { deptSheetUrl, errorMessage, useApiArray, type PendingChange } from "./a
 const PREVIEW_LIMIT = 8;
 
 /**
- * "Kiểm tra & hoàn tất biểu …?" (UC-55 bước 4): đọc bảng đã lưu, cho biết có bao
+ * "Lưu số liệu biểu …?" (Sở sửa → Lưu): đọc bảng đang sửa, cho biết có bao
  * nhiêu dòng khác số liệu hiện hành, ô lý do điều chỉnh không bắt buộc.
  */
 export function CompleteDialog({
@@ -58,7 +58,7 @@ export function CompleteDialog({
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Kiểm tra & hoàn tất biểu {sheetLabel}?</DialogTitle>
+          <DialogTitle>Lưu số liệu biểu {sheetLabel}?</DialogTitle>
           <DialogDescription>
             Số liệu biểu {sheetLabel} của {periodName} sẽ được lưu thành phiên bản mới và biểu
             được khoá lại. Muốn sửa tiếp thì bấm "Sửa lại".
@@ -77,7 +77,7 @@ export function CompleteDialog({
           </div>
         ) : changes.length === 0 ? (
           <p className="bg-surface-subtle text-muted-foreground rounded-lg px-3.5 py-3 text-sm">
-            Biểu không có số nào khác số liệu đã lưu. Hoàn tất để đánh dấu biểu đã xong.
+            Biểu không có số nào khác số liệu đã lưu, bấm Lưu sẽ không đổi gì.
           </p>
         ) : (
           <div className="flex flex-col gap-2">
@@ -133,7 +133,7 @@ export function CompleteDialog({
             onClick={() => onConfirm(reason.trim())}
           >
             {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : <CheckCheck aria-hidden />}
-            Kiểm tra & hoàn tất
+            Lưu
           </Button>
         </DialogFooter>
       </DialogContent>

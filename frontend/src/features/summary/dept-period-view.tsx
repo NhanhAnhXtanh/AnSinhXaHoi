@@ -4,7 +4,6 @@ import { useCustomMutation, useWarnAboutChange } from "@refinedev/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import {
-  CheckCheck,
   Download,
   GitCompare,
   Pencil,
@@ -12,6 +11,7 @@ import {
   Save,
   TriangleAlert,
   Undo2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,16 +51,17 @@ import { SheetBody, SheetError, SheetFrame } from "./sheet-frame";
 import { joinVi, summaryExportName } from "./utils";
 
 type DialogKind = "complete" | "discard" | "history" | null;
-type Busy = "draft" | "complete" | "reopen" | "discard" | "export" | null;
+type Busy = "draft" | "complete" | "discard" | "export" | null;
 
 /**
  * Kỳ ĐÃ lưu số liệu tổng hợp (UC-55, UC-56): bảng đọc số liệu Sở hiện hành.
  *
  * - "Sửa số liệu" → bảng mở cho sửa (ô script cho phép). Đổi tab biểu khi đang sửa
  *   thì bảng được cất lên máy chủ trước.
- * - "Lưu số liệu đã sửa" → cất bảng đang sửa (chưa vào số liệu).
- * - "Kiểm tra & hoàn tất" → máy chủ đọc số trên bảng, lưu các dòng đổi thành
- *   phiên bản mới của năm rồi khoá biểu; "Sửa lại" mở khoá.
+ * - "Lưu" → máy chủ đọc số trên bảng, lưu các dòng đổi thành phiên bản mới của năm (kèm lý do
+ *   không bắt buộc). Không có bước "hoàn tất / sửa lại" theo biểu, tab không có dấu tích:
+ *   Tổng hợp chỉ hiện biểu, lưu xong vẫn sửa tiếp được.
+ * - "Huỷ" → thoát chế độ sửa; có số đang sửa chưa Lưu thì hỏi bỏ.
  * - ⋯ → Xuất Excel, Lịch sử và so sánh, Bỏ các số đang sửa.
  */
 export function DeptPeriodView({
@@ -227,35 +228,13 @@ export function DeptPeriodView({
       setEditing(false);
       toast.success(
         result.rowCount > 0
-          ? `Đã hoàn tất biểu ${sheet.shortName} — ${result.rowCount} dòng được lưu thành phiên bản ${result.ledgerVersion}.`
-          : `Đã hoàn tất biểu ${sheet.shortName}, số liệu không đổi.`
+          ? `Đã lưu biểu ${sheet.shortName} — ${result.rowCount} dòng, thành phiên bản ${result.ledgerVersion}.`
+          : `Biểu ${sheet.shortName} không có số nào thay đổi.`
       );
       await refreshAll();
       setReloadNo((n) => n + 1);
     } catch (error) {
-      toast.error(errorMessage(error, "Chưa hoàn tất được biểu. Bạn thử lại sau ít phút."));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const doReopen = async () => {
-    if (!sheet) return;
-    setBusy("reopen");
-    try {
-      await send({
-        url: deptSheetUrl(reportId, sheet.templateId, "/reopen"),
-        method: "post",
-        values: {},
-        config: JSON_HEADERS,
-        successNotification: false,
-        errorNotification: false,
-      });
-      setEditing(true);
-      toast.success(`Đã mở lại biểu ${sheet.shortName} để sửa tiếp.`);
-      await refreshAll();
-    } catch (error) {
-      toast.error(errorMessage(error, "Chưa mở lại được biểu. Bạn thử lại sau ít phút."));
+      toast.error(errorMessage(error, "Chưa lưu được biểu. Bạn thử lại sau ít phút."));
     } finally {
       setBusy(null);
     }
@@ -308,9 +287,8 @@ export function DeptPeriodView({
   let primary: PrimaryAction | undefined;
   let secondary: PrimaryAction[] | undefined;
   if (runtime && canEdit) {
-    if (runtime.completion === "COMPLETED") {
-      primary = { label: "Sửa lại", icon: Pencil, onClick: () => void doReopen(), loading: busy === "reopen" };
-    } else if (!editing || !runtime.editable) {
+    // Sở sửa số: [Sửa số liệu] → [Huỷ] [Lưu]. Không có bước hoàn tất / sửa lại theo biểu.
+    if (!editing || !runtime.editable) {
       primary = {
         label: "Sửa số liệu",
         icon: Pencil,
@@ -321,19 +299,19 @@ export function DeptPeriodView({
     } else {
       secondary = [
         {
-          label: "Lưu số liệu đã sửa",
-          icon: Save,
-          onClick: () => void saveDraft(false),
-          loading: busy === "draft",
+          label: "Huỷ",
+          icon: X,
+          // Có số đang sửa (chưa Lưu) thì hỏi bỏ; không thì chỉ thoát chế độ sửa.
+          onClick: () => (dirty || pendingSheets.length > 0 ? setDialog("discard") : setEditing(false)),
           disabled: busy !== null,
         },
       ];
       primary = {
-        label: "Kiểm tra & hoàn tất",
-        icon: CheckCheck,
+        label: "Lưu",
+        icon: Save,
         onClick: () => void startComplete(),
         disabled: busy !== null,
-        loading: busy === "complete",
+        loading: busy === "complete" || busy === "draft",
       };
     }
   }
@@ -374,7 +352,7 @@ export function DeptPeriodView({
           ? dirty
             ? " · Đang sửa, chưa lưu"
             : pendingSheets.length > 0
-              ? ` · Đã lưu số đang sửa của biểu ${joinVi(pendingSheets)}`
+              ? ` · Biểu ${joinVi(pendingSheets)} đang sửa dở, chưa Lưu`
               : " · Đang sửa"
           : ` · Lưu ${formatDateTime(detail.createdAt)}${detail.createdBy ? ` · ${detail.createdBy}` : ""}`
       }${yearLock ? ` · ${yearLock}` : ""}`
@@ -471,7 +449,6 @@ export function DeptPeriodView({
         tabs={sheets.map((s) => ({
           key: String(s.templateId),
           label: s.shortName,
-          done: s.completion === "COMPLETED" ? true : undefined,
         }))}
         tab={sheet ? String(sheet.templateId) : ""}
         onTabChange={(key) => void switchSheet(key)}
@@ -495,7 +472,7 @@ export function DeptPeriodView({
         open={dialog === "discard"}
         onOpenChange={(o) => !o && busy === null && setDialog(null)}
         title="Bỏ các số đang sửa?"
-        description={`Các số đã sửa nhưng chưa hoàn tất của ${period.name} sẽ bị bỏ, bảng trở về số liệu phiên bản ${
+        description={`Các số đã sửa nhưng chưa Lưu của ${period.name} sẽ bị bỏ, bảng trở về số liệu phiên bản ${
           detail?.ledgerVersion ?? ""
         }.`}
         confirmLabel="Bỏ số đang sửa"
@@ -513,7 +490,7 @@ export function DeptPeriodView({
           (!canEdit
             ? "Bạn chưa được giao quyền sửa số liệu tổng hợp."
             : dirty || pendingSheets.length > 0
-              ? "Hoàn tất hoặc bỏ các số đang sửa trước đã."
+              ? "Lưu hoặc bỏ các số đang sửa trước đã."
               : null)
         }
         onRestored={() => {

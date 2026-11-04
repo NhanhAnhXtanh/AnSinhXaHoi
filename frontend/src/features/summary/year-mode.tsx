@@ -415,8 +415,8 @@ function YearPanel({ year, onYearsChanged }: { year: number; onYearsChanged: () 
         open={dialog === "blocked"}
         onOpenChange={(o) => !o && setDialog(null)}
         year={year}
-        title="Số liệu chưa hoàn tất"
-        message={`Còn ${joinVi(unfinished)} đang sửa dở. Hoàn tất các biểu này ở Theo kỳ rồi bấm Nộp báo cáo năm.`}
+        title="Còn số liệu chưa Lưu"
+        message={`Còn ${joinVi(unfinished)} đang sửa dở, chưa Lưu. Lưu hoặc bỏ các số đang sửa ở Theo kỳ rồi bấm Nộp báo cáo năm.`}
       />
       <YearHistoryDialog open={dialog === "history"} onOpenChange={(o) => !o && setDialog(null)} year={year} />
       <SubmitYearDialog
