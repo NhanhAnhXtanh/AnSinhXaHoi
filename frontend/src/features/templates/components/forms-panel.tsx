@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CopyPlus, Eye, FilePlus, Pencil, Plus, Search, SearchX, Send, Trash } from "lucide-react";
+import { CopyPlus, Eye, FilePlus, Lock, LockOpen, Pencil, Plus, Search, SearchX, Send, Trash } from "lucide-react";
 
 import {
   EmptyState,
@@ -31,6 +31,7 @@ import type {
   TemplateVersion,
 } from "../types";
 import {
+  FORM_LOCKED_REASON,
   KIND_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
@@ -72,6 +73,7 @@ export function FormsPanel({
   onPublish,
   onClone,
   onDeleteForm,
+  onToggleFormLock,
   className,
 }: {
   set: TemplateSet;
@@ -89,6 +91,8 @@ export function FormsPanel({
   onPublish: (version: TemplateVersion) => void;
   onClone: (version: TemplateVersion) => void;
   onDeleteForm: (form: TemplateForm) => void;
+  /** Khoá / mở khoá cả biểu (cùng quyền sửa phiên bản). */
+  onToggleFormLock: (form: TemplateForm) => void;
   className?: string;
 }) {
   const [tab, setTab] = useState<"forms" | "history">("forms");
@@ -122,7 +126,9 @@ export function FormsPanel({
         icon: editable ? Pencil : Eye,
         onSelect: () => onOpenDesigner(latest),
       });
-      const publish = canPublish(latest);
+      const publish = form.locked
+        ? { ok: false as const, reason: FORM_LOCKED_REASON }
+        : canPublish(latest);
       if (canWriteVersion) items.push({
         key: "publish",
         label: editable
@@ -130,7 +136,11 @@ export function FormsPanel({
           : "Ban hành",
         icon: Send,
         disabled: !publish.ok,
-        reason: publish.ok ? undefined : "Không có phiên bản nháp nào.",
+        reason: publish.ok
+          ? undefined
+          : form.locked
+            ? FORM_LOCKED_REASON
+            : "Không có phiên bản nháp nào.",
         onSelect: () => onPublish(latest),
       });
     }
@@ -147,13 +157,20 @@ export function FormsPanel({
       reason: cloneable.ok ? undefined : cloneable.reason,
       onSelect: () => base && onClone(base),
     });
+    if (canWriteVersion) items.push({
+      key: "form-lock",
+      label: form.locked ? "Mở khoá biểu" : "Khoá biểu",
+      icon: form.locked ? LockOpen : Lock,
+      separatorBefore: true,
+      onSelect: () => onToggleFormLock(form),
+    });
     const removable = canDeleteForm(chain);
     if (canDeleteFormPermission) items.push({
       key: "delete-form",
       label: "Xoá biểu",
       icon: Trash,
       destructive: true,
-      separatorBefore: true,
+      separatorBefore: !canWriteVersion,
       disabled: !removable.ok,
       reason: removable.ok ? undefined : removable.reason,
       onSelect: () => onDeleteForm(form),
@@ -336,10 +353,14 @@ export function FormsPanel({
                                 : "—"}
                             </td>
                             <td className={td}>
-                              {current && (
-                                <StatusBadge tone={STATUS_TONE[current.status]}>
-                                  {STATUS_LABEL[current.status]}
-                                </StatusBadge>
+                              {form.locked ? (
+                                <StatusBadge tone="locked">Đã khoá</StatusBadge>
+                              ) : (
+                                current && (
+                                  <StatusBadge tone={STATUS_TONE[current.status]}>
+                                    {STATUS_LABEL[current.status]}
+                                  </StatusBadge>
+                                )
                               )}
                             </td>
                             <td className={cn(td, "pr-4")}>

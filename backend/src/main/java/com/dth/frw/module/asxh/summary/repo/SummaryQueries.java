@@ -2,6 +2,7 @@ package com.dth.frw.module.asxh.summary.repo;
 
 import com.dth.frw.domain.asxh.period.PeriodStatus;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
+import com.dth.frw.domain.asxh.report.PublicationStatus;
 import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateKind;
@@ -121,6 +122,37 @@ public class SummaryQueries {
                 .getResultList());
         templates.sort(Comparator.comparingInt(Template::getSortOrder).thenComparing(Template::getId));
         return templates;
+    }
+
+    /**
+     * Phiên bản mẫu đã ghim vào tờ biểu {@code templateId} của các phiếu còn hiện hành trong các kỳ
+     * {@code periodIds} — lấy bản của ĐỢT MỞ mới nhất (đợt còn hiệu lực), hoà thì số phiên bản lớn hơn.
+     *
+     * @param approvedOnly {@code true} = chỉ phiếu đã có số (đã duyệt, hoặc khoá sau khi duyệt);
+     *                     {@code false} = mọi phiếu còn hiện hành (đang nhập, chờ duyệt, trả lại…)
+     */
+    public Optional<Long> pinnedVersionId(Collection<Long> periodIds, Long templateId, boolean approvedOnly) {
+        if (periodIds.isEmpty()) {
+            return Optional.empty();
+        }
+        String approved = approvedOnly
+                ? " and (r.status = :approvedStatus or (r.status = :lockedStatus and r.approvedAt is not null))"
+                : "";
+        TypedQuery<Long> query = entityManager.createQuery(
+                "select v.id from InputReportSheet s join s.report r join r.publication pub join s.templateVersion v"
+                        + " where r.period.id in :periodIds and s.template.id = :templateId"
+                        + " and pub.status = :published and r.status not in :notCurrent" + approved
+                        + " order by pub.createdAt desc, pub.id desc, v.versionNo desc", Long.class)
+                .setParameter("periodIds", periodIds)
+                .setParameter("templateId", templateId)
+                .setParameter("published", PublicationStatus.PUBLISHED)
+                .setParameter("notCurrent", NOT_CURRENT)
+                .setMaxResults(1);
+        if (approvedOnly) {
+            query.setParameter("approvedStatus", ReportStatus.APPROVED)
+                    .setParameter("lockedStatus", ReportStatus.LOCKED);
+        }
+        return query.getResultList().stream().findFirst();
     }
 
     /** Số đơn vị được thiết lập (giao biểu) của từng kỳ. */

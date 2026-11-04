@@ -76,7 +76,7 @@ export function SummaryPage() {
         </>
       }
     >
-      {mode === "ky" ? <PeriodMode key={year} year={year} /> : <YearMode year={year} onYearChange={setYear} />}
+      {mode === "ky" ? <PeriodMode key={year} year={year} /> : <YearMode year={year} />}
     </AsxhPage>
   );
 }

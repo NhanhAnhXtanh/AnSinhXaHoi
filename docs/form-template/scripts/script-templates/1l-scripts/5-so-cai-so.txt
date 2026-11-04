@@ -1,0 +1,86 @@
+// Nguon: sinh 2026-11-04 tu 3-getinputdata-khi-duyet + 1-khoa-o-nhap-lieu cua bieu 1l, script "Sổ cái Sở"
+// Hook: beforeEdit,beforeCommit,beforePaste,getSummaryData. Ghi vao DB qua changeset 177 (khong kem 3 dong dau nay).
+
+// Hàm cho SỔ CÁI SỞ — biểu 1l. Nằm CHUNG bộ script của biểu (displayOrder = 5).
+// Hook: beforeEdit, beforeCommit, beforePaste (chỉ có hiệu lực ở mode 'summary-edit'), getSummaryData
+// (máy chủ chạy mỗi lần Sở bấm Lưu sổ).
+//
+// 1l là biểu GỘP: mỗi dòng là một CHỈ TIÊU, không có dòng theo đơn vị. 4-tonghop-theo-ky đổ số vào
+// đúng các ô của 3-getinputdata-khi-duyet.
+// - Guard: Sở chỉ sửa ô nhập của dòng chỉ tiêu (ô đơn vị nhập ở 1-khoa-o-nhap-lieu, không công thức);
+//   tham số, ghi chú, tiêu đề, ô công thức khoá.
+// - getSummaryData: đọc lại từng chỉ tiêu (cùng mã, cùng ô với 3-getinputdata-khi-duyet),
+//   organizationCode = '' (dòng gộp). Máy chủ so với tổng các đơn vị trong sổ Sở; phần chênh ghi vào
+//   đơn vị Sở chọn ở hộp lý do, hoặc dòng "Sở điều chỉnh chung".
+
+const SHEET = "1l";
+const BINDINGS = [
+  { code: "1L.HO_NGHEO_DTTS", name: "NSNN đóng BHYT › Hộ gia đình nghèo; người dân tộc thiểu số", row: 9, qty: 2, amt: 3 },
+  { code: "1L.TRE_EM_6T.MENH_GIA", name: "NSNN đóng BHYT › Trẻ em dưới 6 tuổi — kinh phí theo mệnh giá thẻ", row: 11, qty: 2, amt: 3 },
+  { code: "1L.TRE_EM_6T.TRUY_LINH", name: "NSNN đóng BHYT › Trẻ em dưới 6 tuổi — kinh phí truy lĩnh", row: 12, qty: 2, amt: 3 },
+  { code: "1L.NGUOI_CO_CONG", name: "NSNN đóng BHYT › Người có công với cách mạng", row: 13, qty: 2, amt: 3 },
+  { code: "1L.CUU_CHIEN_BINH_TNXP", name: "NSNN đóng BHYT › Cựu chiến binh, thanh niên xung phong", row: 14, qty: 2, amt: 3 },
+  { code: "1L.BTXH", name: "NSNN đóng BHYT › Đối tượng BTXH, người hưởng trợ cấp nuôi dưỡng", row: 15, qty: 2, amt: 3 },
+  { code: "1L.HIEN_TANG", name: "NSNN đóng BHYT › Người hiến tạng", row: 16, qty: 2, amt: 3 },
+  { code: "1L.NGUOI_75_TUOI", name: "NSNN đóng BHYT › Người 75 tuổi trở lên đang hưởng trợ cấp tuất", row: 17, qty: 2, amt: 3 },
+  { code: "1L.XA_ATK", name: "NSNN đóng BHYT › Người dân các xã ATK, vùng ATK cách mạng", row: 18, qty: 2, amt: 3 },
+  { code: "1L.HUU_TRI_XH", name: "NSNN đóng BHYT › Người hưởng trợ cấp hưu trí xã hội hằng tháng", row: 19, qty: 2, amt: 3 },
+  { code: "1L.DAI_BIEU_QH_HDND", name: "NSNN đóng BHYT › Đại biểu Quốc hội, đại biểu Hội đồng nhân dân", row: 20, qty: 2, amt: 3 },
+  { code: "1L.CAN_BO_XA_NGHI", name: "NSNN đóng BHYT › Cán bộ xã, phường, thị trấn đã nghỉ việc", row: 21, qty: 2, amt: 3 },
+  { code: "1L.DAN_QUAN", name: "NSNN đóng BHYT › Dân quân thường trực", row: 22, qty: 2, amt: 3 },
+  { code: "1L.CAN_NGHEO_100", name: "NSNN hỗ trợ mức đóng › Hộ cận nghèo được hỗ trợ 100%", row: 25, qty: 2, amt: 3 },
+  { code: "1L.CAN_NGHEO_70", name: "NSNN hỗ trợ mức đóng › Hộ cận nghèo được hỗ trợ 70%", row: 26, qty: 2, amt: 3 },
+  { code: "1L.HSSV_50", name: "NSNN hỗ trợ mức đóng › Học sinh, sinh viên (50%)", row: 27, qty: 2, amt: 3 },
+  { code: "1L.HO_NONG_LAM_NGU", name: "NSNN hỗ trợ mức đóng › Hộ làm nông, lâm, ngư, diêm nghiệp", row: 28, qty: 2, amt: 3 },
+  { code: "1L.DTTS_DIA_BAN", name: "NSNN hỗ trợ mức đóng › Người DTTS đang sinh sống tại địa bàn", row: 29, qty: 2, amt: 3 },
+  { code: "1L.DTTS_XA", name: "NSNN hỗ trợ mức đóng › Người DTTS tại các xã được xác định", row: 30, qty: 2, amt: 3 },
+  { code: "1L.LUC_LUONG_ANTT", name: "NSNN hỗ trợ mức đóng › Lực lượng tham gia bảo vệ an ninh trật tự", row: 31, qty: 2, amt: 3 },
+  { code: "1L.Y_TE_THON_BAN", name: "NSNN hỗ trợ mức đóng › Nhân viên y tế thôn, bản; cô đỡ thôn, bản", row: 32, qty: 2, amt: 3 },
+  { code: "1L.KHONG_CHUYEN_TRACH", name: "NSNN hỗ trợ mức đóng › Người hoạt động không chuyên trách ở thôn, tổ dân phố", row: 33, qty: 2, amt: 3 },
+  { code: "1L.NAN_NHAN", name: "NSNN hỗ trợ mức đóng › Nạn nhân theo Luật Phòng, chống mua bán người", row: 34, qty: 2, amt: 3 },
+  { code: "1L.NQ_RIENG", name: "NSNN hỗ trợ mức đóng › Hỗ trợ mức đóng BHYT các đối tượng theo Nghị quyết riêng", row: 35, qty: 2, amt: 3 },
+];
+// Ô Sở sửa được, dạng "dòng:cột" (0-based).
+const EDITABLE = ["9:2","9:3","11:2","11:3","12:2","12:3","13:2","13:3","14:2","14:3","15:2","15:3","16:2","16:3","17:2","17:3","18:2","18:3","19:2","19:3","20:2","20:3","21:2","21:3","22:2","22:3","25:2","25:3","26:2","26:3","27:2","27:3","28:2","28:3","29:2","29:3","30:2","30:3","31:2","31:3","32:2","32:3","33:2","33:3","34:2","34:3","35:2","35:3"];
+
+function num(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function editable(ctx, sheetName, row, col) {
+  return sheetName === SHEET && EDITABLE.indexOf(row + ':' + col) >= 0;
+}
+
+return defineScript({
+  // Ngoài sổ cái Sở (màn nhập, tổng hợp) không ý kiến — guard của màn nhập ở 1-khoa-o-nhap-lieu.
+  beforeEdit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    if (ctx.mode !== 'summary-edit') return;
+    for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+      for (let col = range.col; col < range.col + range.colCount; col += 1) {
+        if (!editable(ctx, range.sheetName, row, col)) return false;
+      }
+    }
+    return true;
+  },
+  getSummaryData(ctx) {
+    const rows = [];
+    BINDINGS.forEach(function (b, index) {
+      const quantity = b.qty == null ? null : num(ctx.cell.get(SHEET, b.row, b.qty));
+      const amount = b.amt == null ? null : num(ctx.cell.get(SHEET, b.row, b.amt));
+      if (quantity == null && amount == null) return;
+      rows.push({ organizationCode: '', indicatorCode: b.code, indicatorName: b.name,
+        quantity: quantity, amount: amount, orderNo: index });
+    });
+    return rows;
+  },
+});

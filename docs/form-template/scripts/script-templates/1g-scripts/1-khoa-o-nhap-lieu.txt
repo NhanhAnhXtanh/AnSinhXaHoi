@@ -1,5 +1,6 @@
 // Nguon: DB qt_template_script — bieu 1g, phien ban PB-000020, script "Script 1"
 // Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
+// SUA 2026-11-04 (ghi DB qua changeset 177): 3 guard bo qua mode 'summary-edit' — o so cai So do script "So cai So" quyet.
 
 // ==== 1g · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
 // displayOrder = 1, enabled = true, gắn biểu reportType = "1g".
@@ -47,13 +48,17 @@ return defineScript({
     const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
     if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
   },
+  // Guard của màn NHẬP: ở sổ cái Sở ('summary-edit') không ý kiến — script 5-so-cai-so quyết ô Sở sửa.
   beforeEdit(ctx, cell) {
+    if (ctx.mode === 'summary-edit') return;
     return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
   },
   beforeCommit(ctx, cell) {
+    if (ctx.mode === 'summary-edit') return;
     return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
   },
   beforePaste(ctx, range) {
+    if (ctx.mode === 'summary-edit') return;
     return containsOnlyEditableCells(range);
   },
 });

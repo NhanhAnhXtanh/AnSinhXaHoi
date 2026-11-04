@@ -107,6 +107,8 @@ class PeriodAssignmentCopyTest {
                 cell(102, quy4, longKhanh, bieu1a)));
         // Tháng 11 đã có sẵn một ô trùng với kỳ nguồn — giữ nguyên, không ghi lại.
         when(repository.findByPeriodId(thang11.getId())).thenReturn(List.of(cell(200, thang11, bienHoa, bieu1a)));
+        // Sau khi ghi, cả hai kỳ đích đều có ô dùng được.
+        when(repository.countUsableByPeriodId(anyLong())).thenReturn(3L);
 
         PeriodAssignmentService.CopyResult result = service.copy(quy4.getId(), List.of(thang11.getId(), thang12.getId()));
 

@@ -97,3 +97,9 @@ databaseChangeLog:
       file: db/changelog/changes/173-users-login-lockout.sql
   - include:
       file: db/changelog/changes/174-unit-reporter-drop-template-read.sql
+  - include:
+      file: db/changelog/changes/175-template-lock-whole-form.sql
+  - include:
+      file: db/changelog/changes/176-period-setup-ignore-locked-forms.sql
+  - include:
+      file: db/changelog/changes/177-so-cai-so-1c-1s.sql

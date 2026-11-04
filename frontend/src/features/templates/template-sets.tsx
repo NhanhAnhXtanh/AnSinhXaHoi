@@ -72,6 +72,9 @@ export function TemplateSets() {
   const [deletingSet, setDeletingSet] = useState<TemplateSet | null>(null);
   const [lastDeletingSet, setLastDeletingSet] = useState<TemplateSet | null>(null);
   const [deletingForm, setDeletingForm] = useState<TemplateForm | null>(null);
+  const [lockingForm, setLockingForm] = useState<TemplateForm | null>(null);
+  // Tên biểu trên hộp xác nhận giữ nguyên trong lúc hộp mờ dần khi đóng.
+  const [lastLockingForm, setLastLockingForm] = useState<TemplateForm | null>(null);
   const [lastDeletingForm, setLastDeletingForm] = useState<TemplateForm | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -137,7 +140,21 @@ export function TemplateSets() {
     onCloned: (version) => select({ version: version.id }),
     onDeleted: () => select({ version: null }),
     onPublished: (version) => select({ version: version.id }),
+    isFormLocked: (version) => content.forms.find((f) => f.id === version.formId)?.locked === true,
   });
+
+  async function setFormLocked(form: TemplateForm, locked: boolean) {
+    const result = await actions.setFormLocked(form.id, locked);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(
+      locked
+        ? `Đã khoá ${formLabel(form).toLowerCase()}. Các đợt báo cáo mới không dùng được biểu này cho tới khi mở khoá.`
+        : `Đã mở khoá ${formLabel(form).toLowerCase()}.`
+    );
+  }
 
   /* ---------------- đầu trang ---------------- */
 
@@ -244,6 +261,20 @@ export function TemplateSets() {
             toast.success(`Đã xoá ${formLabel(target).toLowerCase()}.`);
             select({ form: null });
           });
+        }}
+      />
+
+      <ConfirmDialog
+        open={lockingForm !== null}
+        onOpenChange={(open) => !open && setLockingForm(null)}
+        title={`Khoá ${lastLockingForm ? formLabel(lastLockingForm).toLowerCase() : "biểu"}?`}
+        description="Khoá cả biểu để sửa: các đợt báo cáo mới không dùng được bất kỳ phiên bản nào của biểu, và không ban hành hay thu hồi được phiên bản nào. Bạn vẫn xem và sửa được bản nháp. Phiếu đã lập theo biểu vẫn nhập và duyệt bình thường. Sửa xong thì mở khoá rồi ban hành."
+        confirmLabel="Khoá biểu"
+        onConfirm={() => {
+          if (!lockingForm) return;
+          const target = lockingForm;
+          setLockingForm(null);
+          void setFormLocked(target, true);
         }}
       />
 
@@ -368,6 +399,15 @@ export function TemplateSets() {
       onDeleteForm={(form) => {
         setLastDeletingForm(form);
         setDeletingForm(form);
+      }}
+      onToggleFormLock={(form) => {
+        if (form.locked) {
+          // Mở khoá không hỏi lại.
+          void setFormLocked(form, false);
+          return;
+        }
+        setLastLockingForm(form);
+        setLockingForm(form);
       }}
     />
   );

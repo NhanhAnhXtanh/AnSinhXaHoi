@@ -30,9 +30,11 @@ public record PeriodAssignmentResponse(
         }
     }
 
-    public record TemplateSummary(Long id, String shortName, String name) {
+    /** {@code locked} = biểu đang khoá để sửa — màn ma trận ẩn cột và ô của biểu đó. */
+    public record TemplateSummary(Long id, String shortName, String name, boolean locked) {
         static TemplateSummary from(Template template) {
-            return new TemplateSummary(template.getId(), template.getShortName(), template.getName());
+            return new TemplateSummary(template.getId(), template.getShortName(), template.getName(),
+                    template.isLocked());
         }
     }
 

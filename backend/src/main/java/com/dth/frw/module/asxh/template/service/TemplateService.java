@@ -12,7 +12,9 @@ import com.dth.frw.module.asxh.template.repo.TemplateRepository;
 import com.dth.frw.module.asxh.template.repo.TemplateSpecifications;
 import com.dth.frw.module.asxh.template.repo.TemplateVersionRepository;
 import com.dth.frw.shared.exception.ConflictException;
+import com.dth.frw.shared.security.CurrentUser;
 import com.dth.frw.shared.web.ListParams;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
@@ -54,13 +57,16 @@ public class TemplateService {
     private final TemplateRepository repository;
     private final TemplateVersionRepository versionRepository;
     private final TemplateSetService setService;
+    private final ApplicationEventPublisher events;
 
     public TemplateService(TemplateRepository repository,
                            TemplateVersionRepository versionRepository,
-                           TemplateSetService setService) {
+                           TemplateSetService setService,
+                           ApplicationEventPublisher events) {
         this.repository = repository;
         this.versionRepository = versionRepository;
         this.setService = setService;
+        this.events = events;
     }
 
     public Page<Template> list(ListParams params) {
@@ -97,6 +103,34 @@ public class TemplateService {
     public Template lock(Long id) {
         return repository.lockById(id)
                 .orElseThrow(() -> new TemplateNotFoundException("biểu", id));
+    }
+
+    /**
+     * Khoá cả biểu để chữa lỗi: từ lúc này không phiên bản nào của biểu được chọn cho đợt báo cáo
+     * mới (mở đợt, sao chép thiết lập), không ban hành / thu hồi được. Vẫn xem, vẫn tạo và sửa bản
+     * nháp. Phiếu đã lập theo biểu vẫn nhập / duyệt bình thường. Khoá lại biểu đang khoá là no-op.
+     */
+    @Transactional
+    public Template lockForm(Long id) {
+        Template template = lock(id);
+        if (!template.isLocked()) {
+            template.lockForm(CurrentUser.username().orElse(null), Instant.now());
+            repository.saveAndFlush(template);
+            events.publishEvent(new TemplateFormLockChanged(template.getId(), true));
+        }
+        return template;
+    }
+
+    /** Mở khoá cả biểu — các phiên bản đã ban hành lại được chọn như trước; bản nháp ban hành được. */
+    @Transactional
+    public Template unlockForm(Long id) {
+        Template template = lock(id);
+        if (template.isLocked()) {
+            template.unlockForm();
+            repository.saveAndFlush(template);
+            events.publishEvent(new TemplateFormLockChanged(template.getId(), false));
+        }
+        return template;
     }
 
     /** Thống kê phiên bản cho các biểu đang hiện, một truy vấn, không kéo workbook. */
@@ -206,8 +240,8 @@ public class TemplateService {
 
     /**
      * Xoá biểu. Chỉ khi biểu chưa từng có phiên bản rời trạng thái nháp — khi đó
-     * các bản nháp bị xoá cùng. Biểu đã ban hành (kể cả đã khoá / thu hồi) thì
-     * không xoá, chỉ khoá phiên bản lại.
+     * các bản nháp bị xoá cùng. Biểu đã ban hành (kể cả đã thu hồi) thì không xoá,
+     * chỉ khoá biểu lại.
      */
     @Transactional
     public Template delete(Long id) {
@@ -215,8 +249,8 @@ public class TemplateService {
         List<TemplateVersion> versions = versionRepository.findByTemplateIdOrderByVersionNoAsc(id);
         if (versions.stream().anyMatch(v -> !v.getStatus().editable())) {
             throw new ConflictException(
-                    "Không xoá được biểu này: biểu đã có phiên bản ban hành (kể cả đã khoá hoặc thu hồi). "
-                            + "Bạn chỉ có thể khoá phiên bản lại để không dùng nữa.");
+                    "Không xoá được biểu này: biểu đã có phiên bản ban hành (kể cả đã thu hồi). "
+                            + "Bạn chỉ có thể khoá biểu lại để không dùng nữa.");
         }
         try {
             // Từ bản mới nhất xuống, để khoá ngoại bản nguồn (previous_version_id) không chặn.

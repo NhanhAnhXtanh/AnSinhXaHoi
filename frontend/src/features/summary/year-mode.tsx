@@ -18,7 +18,6 @@ import {
   EmptyState,
   HeaderActions,
   LoadingState,
-  MasterDetailLayout,
   StatusBadge,
   WorkCard,
   formatDate,
@@ -29,6 +28,7 @@ import {
   exportWorkbooksToXlsx,
   type SpreadWorkbookApi,
 } from "@/shared/components/spreadsheet";
+import { ASXH_FILL_HEIGHT, useAsxhFill } from "@/shared/components/asxh/asxh-page";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 
@@ -36,9 +36,7 @@ import {
   SUMMARY_URL,
   errorMessage,
   parseWorkbook,
-  useApiArray,
   useApiObject,
-  type YearItem,
   type YearOverview,
   type YearSheet,
 } from "./api";
@@ -73,71 +71,26 @@ function yearStatus(item: { ledgerVersion: number; lockReason: string | null }):
 }
 
 /**
- * Chế độ "Theo năm" (UC-52): danh sách năm bên trái, biểu tổng hợp năm (01 và
- * các phụ lục, phiên bản theo mốc 01/07) bên phải, chỉ xem. Năm đã có số liệu
- * tổng hợp lưu ở các kỳ thì script đọc số liệu đó ở phiên bản mới nhất; chưa có
- * thì tổng hợp trực tiếp theo năm dương lịch (T1–T6 và T7–T12).
+ * Chế độ "Theo năm" (UC-52): biểu tổng hợp năm (01 và các phụ lục, phiên bản theo mốc 01/07) của
+ * NĂM ĐANG CHỌN ở ô năm đầu trang, rộng hết màn — không còn cột danh sách mọi năm (trùng ô năm;
+ * trạng thái năm đã hiện ở đầu khung). Năm đã có số liệu tổng hợp lưu ở các kỳ thì script đọc số
+ * liệu đó ở phiên bản mới nhất; chưa có thì tổng hợp trực tiếp theo năm dương lịch (T1–T6, T7–T12).
  */
-export function YearMode({ year, onYearChange }: { year: number; onYearChange: (y: number) => void }) {
-  const yearsState = useApiArray<YearItem>(`${SUMMARY_URL}/years`, undefined);
-  const years = yearsState.data ?? [];
-
-  const list = (
-    <section className="bg-card text-card-foreground flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-e1">
-      <div className="flex items-center justify-between gap-2 border-b px-5 pt-5 pb-3.5">
-        <h2 className="text-base leading-6 font-semibold">Năm báo cáo</h2>
-        <span className="text-muted-foreground text-[13px] leading-5">{years.length} năm</span>
-      </div>
-      <div role="listbox" aria-label="Năm báo cáo" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {yearsState.isLoading && <LoadingState label="Đang tải…" />}
-        {!yearsState.isLoading && years.length === 0 && (
-          <EmptyState
-            icon={FileSpreadsheet}
-            title="Chưa có năm báo cáo nào"
-            description="Hãy tạo lịch ở màn Lịch và kỳ báo cáo trước."
-          />
-        )}
-        {years.map((item) => {
-          const selected = item.year === year;
-          const st = yearStatus(item);
-          return (
-            <button
-              key={item.year}
-              type="button"
-              role="option"
-              aria-selected={selected}
-              onClick={() => onYearChange(item.year)}
-              className={cn(
-                "relative flex min-h-14 w-full shrink-0 items-center justify-between gap-2 rounded-md py-2 ps-3.5 pe-2.5 text-left",
-                "transition-colors duration-150 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                selected ? "bg-accent" : "hover:bg-accent/60"
-              )}
-            >
-              {selected && (
-                <span aria-hidden className="bg-primary absolute top-1/2 left-0 h-7 w-0.75 -translate-y-1/2 rounded-sm" />
-              )}
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-foreground truncate text-sm leading-5 font-medium">Năm {item.year}</span>
-                <span className="text-muted-foreground truncate text-xs leading-4">01/01 – 31/12/{item.year}</span>
-              </span>
-              <StatusBadge tone={st.tone} className="shrink-0">
-                {st.label}
-              </StatusBadge>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-
+export function YearMode({ year }: { year: number }) {
+  const inFill = useAsxhFill();
   return (
-    <MasterDetailLayout aside={list}>
-      <YearPanel key={year} year={year} onYearsChanged={() => void yearsState.refetch()} />
-    </MasterDetailLayout>
+    <div
+      className={cn(
+        "flex min-w-0 flex-col [&>*]:min-h-0 [&>*:only-child]:flex-1",
+        inFill ? "min-h-0 flex-1" : ASXH_FILL_HEIGHT
+      )}
+    >
+      <YearPanel key={year} year={year} />
+    </div>
   );
 }
 
-function YearPanel({ year, onYearsChanged }: { year: number; onYearsChanged: () => void }) {
+function YearPanel({ year }: { year: number }) {
   const navigate = useNavigate();
   const overviewState = useApiObject<YearOverview>(`${SUMMARY_URL}/year`, { year }, "sheets");
   const overview = overviewState.data;
@@ -246,7 +199,6 @@ function YearPanel({ year, onYearsChanged }: { year: number; onYearsChanged: () 
       const report = await submitAnnualReport(year, input);
       toast.success(`Đã ${resubmit ? "gửi lại" : "nộp"} Phiếu ${report.revisionNo} báo cáo năm ${year} lên UBND.`);
       await Promise.all([overviewState.refetch(), annualState.refetch()]);
-      onYearsChanged();
       return null;
     } catch (error) {
       return errorMessage(error, "Chưa nộp được báo cáo năm. Bạn thử lại sau ít phút.");
@@ -377,7 +329,7 @@ function YearPanel({ year, onYearsChanged }: { year: number; onYearsChanged: () 
           key={`${year}-${data.templateId}-${data.ledgerVersion}`}
           workbook={workbook}
           readOnly
-          hideTabs
+          // Biểu tổng hợp năm (01-TongHop) gồm nhiều trang 1a, 1b, 1c… — phải thấy thanh trang để chuyển.
           scriptText={data.scriptText}
           scriptContext={scriptContext}
           onReady={(api) => {
@@ -415,8 +367,8 @@ function YearPanel({ year, onYearsChanged }: { year: number; onYearsChanged: () 
         open={dialog === "blocked"}
         onOpenChange={(o) => !o && setDialog(null)}
         year={year}
-        title="Số liệu chưa hoàn tất"
-        message={`Còn ${joinVi(unfinished)} đang sửa dở. Hoàn tất các biểu này ở Theo kỳ rồi bấm Nộp báo cáo năm.`}
+        title="Còn số liệu chưa Lưu"
+        message={`Còn ${joinVi(unfinished)} đang sửa dở, chưa Lưu. Lưu hoặc bỏ các số đang sửa ở Theo kỳ rồi bấm Nộp báo cáo năm.`}
       />
       <YearHistoryDialog open={dialog === "history"} onOpenChange={(o) => !o && setDialog(null)} year={year} />
       <SubmitYearDialog

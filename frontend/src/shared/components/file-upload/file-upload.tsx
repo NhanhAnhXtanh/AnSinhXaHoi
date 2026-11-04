@@ -59,6 +59,11 @@ export type FileUploadProps = {
   hint?: ReactNode;
   /** Câu hiện khi chỉ xem mà chưa có tệp nào. */
   emptyText?: ReactNode;
+  /**
+   * Danh sách gọn cho hộp thoại nhiều tệp: mỗi tệp một dòng thấp trong một khung chung,
+   * dòng đếm số tệp + tổng dung lượng, cao tối đa khoảng 4 dòng rồi cuộn trong khung.
+   */
+  compact?: boolean;
   className?: string;
 };
 
@@ -92,6 +97,7 @@ export function FileUpload({
   pickLabel = "Chọn tệp",
   hint,
   emptyText = "Chưa có tệp nào.",
+  compact = false,
   className,
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -243,6 +249,66 @@ export function FileUpload({
             {emptyText}
           </p>
         )
+      ) : compact ? (
+        <div className="overflow-hidden rounded-md border">
+          <p className="bg-surface-subtle text-muted-foreground border-b px-3 py-1.5 text-xs">
+            {files.length} file · {formatFileSize(files.reduce((sum, f) => sum + f.size, 0))}
+          </p>
+          <ul className="max-h-40 divide-y overflow-y-auto">
+            {files.map((f) => (
+              <li key={f.id} className="flex h-9 items-center gap-2 pr-1 pl-3">
+                <FileText aria-hidden className="text-muted-foreground size-4 shrink-0" />
+                {/* w-0: tên dài không kéo rộng hộp thoại (lưới tự co theo nội dung), chỉ cắt "…". */}
+                <span className="w-0 flex-1 truncate text-sm" title={f.name}>
+                  {f.name}
+                </span>
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {f.detail ?? formatFileSize(f.size)}
+                </span>
+                {onPreview && f.previewable && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Xem tệp ${f.name}`}
+                    title="Xem"
+                    onClick={() => void onPreview(f)}
+                  >
+                    <Eye aria-hidden />
+                  </Button>
+                )}
+                {onDownload && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Tải về tệp ${f.name}`}
+                    title="Tải về"
+                    onClick={() => void onDownload(f)}
+                  >
+                    <Download aria-hidden />
+                  </Button>
+                )}
+                {!readOnly && onRemove && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={disabled}
+                    aria-label={`Gỡ tệp ${f.name}`}
+                    title="Gỡ"
+                    onClick={() => {
+                      setRejectMessages([]);
+                      void onRemove(f);
+                    }}
+                  >
+                    <Trash2 aria-hidden />
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : (
         <ul className="flex flex-col gap-2">
           {files.map((f) => (

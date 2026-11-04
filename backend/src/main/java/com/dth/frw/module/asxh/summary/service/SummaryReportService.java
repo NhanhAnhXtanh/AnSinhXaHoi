@@ -73,6 +73,7 @@ public class SummaryReportService {
     private final DeptYearLockService yearLockService;
 
     private final TemplateScriptService scriptService;
+    private final PeriodVersionResolver versionResolver;
 
     public SummaryReportService(SummaryAggregationService aggregation,
                                 SummaryQueries queries,
@@ -82,8 +83,10 @@ public class SummaryReportService {
                                 DeptPeriodService deptPeriodService,
                                 DeptYearDataQuery deptYearData,
                                 DeptYearLockService yearLockService,
-                                TemplateScriptService scriptService) {
+                                TemplateScriptService scriptService,
+                                PeriodVersionResolver versionResolver) {
         this.scriptService = scriptService;
+        this.versionResolver = versionResolver;
         this.aggregation = aggregation;
         this.queries = queries;
         this.periodService = periodService;
@@ -184,7 +187,7 @@ public class SummaryReportService {
         return result;
     }
 
-    /** Một kỳ: biểu đã thiết lập (phiên bản theo ngày đầu kỳ), đơn vị có phiếu, số liệu Sở. */
+    /** Một kỳ: biểu đã thiết lập (phiên bản ghim trong phiếu của kỳ — PeriodVersionResolver), đơn vị có phiếu, số liệu Sở. */
     public PeriodOverview overview(Long periodId) {
         ReportPeriod period = periodService.get(periodId);
         List<Long> leaves = aggregation.resolveLeafPeriodIds(periodId);
@@ -197,7 +200,12 @@ public class SummaryReportService {
         List<SheetOption> sheets = new ArrayList<>();
         for (Template template : queries.assignedTemplates(periodId)) {
             if (template.getKind() == TemplateKind.CHI_TIET) {
-                sheets.add(sheetOption(template, period.getFromDate()));
+                Optional<PeriodVersionResolver.Resolved> resolved = versionResolver.resolve(period, leaves, template.getId());
+                sheets.add(new SheetOption(template.getId(), template.getCode(), template.getShortName(), template.getName(),
+                        resolved.map(r -> r.version().getId()).orElse(null),
+                        resolved.map(r -> r.version().getVersionNo()).orElse(null),
+                        resolved.map(r -> r.version().getEffectiveFrom()).orElse(null),
+                        resolved.map(r -> r.borrowedEarliest(period)).orElse(false)));
             }
         }
         List<UnitOption> units = queries.assignedUnits(leaves, null, null).stream().map(this::unitOption).toList();
@@ -208,18 +216,20 @@ public class SummaryReportService {
     }
 
     /**
-     * Một biểu của kỳ: workbook phiên bản theo ngày đầu kỳ + script + số liệu tổng hợp sống theo phạm vi.
+     * Một biểu của kỳ: workbook phiên bản ghim trong phiếu của kỳ (PeriodVersionResolver) + script + số liệu
+     * tổng hợp sống theo phạm vi.
      * Biểu nhập hộ (1g) trả số theo từng đơn vị.
      */
     public PeriodSheet periodSheet(Long periodId, Long templateId, ScopeKind scopeKind, Long organizationId,
                                    String orgType, String block) {
         ReportPeriod period = periodService.get(periodId);
         Template template = templateService.get(templateId);
-        TemplateVersion version = templateVersionService.resolveOrEarliest(templateId, period.getFromDate())
-                .orElseThrow(() -> new ResourceNotFoundException("Phiên bản biểu mẫu áp dụng cho kỳ", templateId));
-        boolean borrowed = version.getEffectiveFrom() != null && version.getEffectiveFrom().isAfter(period.getFromDate());
-        boolean perUnit = isPerUnit(template);
         List<Long> leaves = aggregation.resolveLeafPeriodIds(periodId);
+        PeriodVersionResolver.Resolved resolved = versionResolver.resolve(period, leaves, templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Phiên bản biểu mẫu áp dụng cho kỳ", templateId));
+        TemplateVersion version = resolved.version();
+        boolean borrowed = resolved.borrowedEarliest(period);
+        boolean perUnit = isPerUnit(template);
         Set<Long> unitIds = aggregation.resolveScope(scopeKind, organizationId, orgType, block);
         List<SummaryRow> rows = aggregation.data(leaves, unitIds, templateId, perUnit);
         int periodCount = rows.stream().mapToInt(SummaryRow::periodCount).max().orElse(0);

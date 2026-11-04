@@ -5,8 +5,6 @@ import {
   CodeXml,
   CopyPlus,
   Eye,
-  Lock,
-  LockOpen,
   Pencil,
   Send,
   Trash,
@@ -25,9 +23,9 @@ import type { TemplateVersion } from "../types";
 import {
   canClone,
   canDelete,
-  canLock,
   canPublish,
   canRevoke,
+  FORM_LOCKED_REASON,
   isEditable,
   previousLiveVersion,
   versionLabel,
@@ -48,6 +46,7 @@ export function useVersionCommands({
   onDeleted,
   onPublished,
   onChanged,
+  isFormLocked,
 }: {
   actions: TemplateActions;
   /** Chuỗi phiên bản của biểu chứa phiên bản này, mới nhất trước. */
@@ -56,15 +55,15 @@ export function useVersionCommands({
   onCloned?: (version: TemplateVersion) => void;
   onDeleted?: (version: TemplateVersion) => void;
   onPublished?: (version: TemplateVersion) => void;
-  /** Sau mọi thao tác đổi trạng thái thành công (khoá, mở khoá, thu hồi). */
+  /** Sau mọi thao tác đổi trạng thái thành công (thu hồi). */
   onChanged?: (version: TemplateVersion) => void;
+  /** Biểu chứa phiên bản đang khoá cả biểu — làm mờ Ban hành / Thu hồi. */
+  isFormLocked?: (version: TemplateVersion) => boolean;
 }) {
   const [publishing, setPublishing] = useState<TemplateVersion | null>(null);
-  const [locking, setLocking] = useState<TemplateVersion | null>(null);
   const [revoking, setRevoking] = useState<TemplateVersion | null>(null);
   const [deleting, setDeleting] = useState<TemplateVersion | null>(null);
   // Tên phiên bản trên hộp xác nhận giữ nguyên trong lúc hộp mờ dần khi đóng.
-  const [lastLock, setLastLock] = useState<TemplateVersion | null>(null);
   const [lastRevoke, setLastRevoke] = useState<TemplateVersion | null>(null);
   const [lastDelete, setLastDelete] = useState<TemplateVersion | null>(null);
   const [busy, setBusy] = useState(false);
@@ -91,7 +90,7 @@ export function useVersionCommands({
 
   async function change(
     version: TemplateVersion,
-    action: "lock" | "unlock" | "revoke",
+    action: "revoke",
     done: string
   ) {
     if (busy) return;
@@ -104,16 +103,6 @@ export function useVersionCommands({
     }
     toast.success(done);
     onChanged?.(result.value);
-  }
-
-  function lockOrUnlock(version: TemplateVersion) {
-    if (version.status === "published") {
-      setLastLock(version);
-      setLocking(version);
-      return;
-    }
-    // Mở khoá không hỏi lại (UC-15).
-    void change(version, "unlock", `Đã mở khoá ${versionLabel(version).toLowerCase()}.`);
   }
 
   /** Mục menu ⋯ của một phiên bản (khung 311:82742). */
@@ -130,12 +119,13 @@ export function useVersionCommands({
     }
     const chain = chainOf(version);
     const editable = isEditable(version.status);
-    const publish = canPublish(version);
+    // Biểu đang khoá để sửa: vẫn thiết kế, tạo / xoá bản nháp; không ban hành, không thu hồi.
+    const formLocked = isFormLocked?.(version) === true;
+    const lockedOut = { ok: false as const, reason: FORM_LOCKED_REASON };
+    const publish = formLocked && isEditable(version.status) ? lockedOut : canPublish(version);
     const cloneable = canClone(chain, version);
-    const lockable = canLock(chain, version);
-    const revocable = canRevoke(chain, version);
+    const revocable = formLocked && version.status === "published" ? lockedOut : canRevoke(chain, version);
     const removable = canDelete(chain, version);
-    const locked = version.status === "locked";
     const items: ActionItem[] = [
       {
         key: "design",
@@ -166,14 +156,6 @@ export function useVersionCommands({
         disabled: !cloneable.ok || busy,
         reason: cloneable.ok ? undefined : cloneable.reason,
         onSelect: () => void clone(version),
-      },
-      {
-        key: "lock",
-        label: locked ? "Mở khoá phiên bản" : "Khoá phiên bản",
-        icon: locked ? LockOpen : Lock,
-        disabled: !lockable.ok || busy,
-        reason: lockable.ok ? undefined : lockable.reason,
-        onSelect: () => lockOrUnlock(version),
       },
       {
         key: "revoke",
@@ -229,20 +211,6 @@ export function useVersionCommands({
       />
 
       <ConfirmDialog
-        open={locking !== null}
-        onOpenChange={(open) => !open && setLocking(null)}
-        title={`Khoá ${lastLock ? versionLabel(lastLock).toLowerCase() : "phiên bản"}?`}
-        description="Sau khi khoá, phiên bản này không còn được chọn cho các đợt báo cáo mới. Phiếu đã lập theo phiên bản này vẫn nhập và duyệt bình thường. Bạn có thể mở khoá lại bất cứ lúc nào."
-        confirmLabel="Khoá phiên bản"
-        onConfirm={() => {
-          if (!locking) return;
-          const target = locking;
-          setLocking(null);
-          void change(target, "lock", `Đã khoá ${versionLabel(target).toLowerCase()}.`);
-        }}
-      />
-
-      <ConfirmDialog
         open={revoking !== null}
         onOpenChange={(open) => !open && setRevoking(null)}
         title={`Thu hồi ${lastRevoke ? versionLabel(lastRevoke).toLowerCase() : "phiên bản"}?`}
@@ -288,10 +256,15 @@ export function useVersionCommands({
     itemsFor,
     dialogs,
     busy,
-    /** Có quyền sửa phiên bản (ban hành, tạo phiên bản kế tiếp, khoá…). */
+    /** Có quyền sửa phiên bản (ban hành, tạo phiên bản kế tiếp, khoá biểu…). */
     canWrite,
     requestPublish: (v: TemplateVersion) => {
-      if (canWrite) setPublishing(v);
+      if (!canWrite) return;
+      if (isFormLocked?.(v)) {
+        toast.error(FORM_LOCKED_REASON);
+        return;
+      }
+      setPublishing(v);
     },
     clone: (v: TemplateVersion) => void clone(v),
   };

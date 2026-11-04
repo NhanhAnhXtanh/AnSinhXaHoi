@@ -374,11 +374,10 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
 
   /**
    * Kiểm tra & hoàn tất biểu đang mở (UC-35): chạy bước kiểm tra của mẫu ngay
-   * trên trình duyệt, lưu, rồi đánh dấu xong. `thenSubmit`: phiếu bị trả lại
-   * dùng một nút "Sửa & nộp lại" — hoàn tất biểu rồi, nếu mọi biểu đã xong,
-   * chuyển luôn sang nộp phiếu.
+   * trên trình duyệt, lưu, rồi đánh dấu xong. Không tự nộp — kể cả phiếu bị trả lại:
+   * xong hết các biểu thì người dùng bấm Nộp lại phiếu riêng.
    */
-  const complete = async (thenSubmit: boolean) => {
+  const complete = async () => {
     const api = apiRef.current;
     if (!api || !sheet || busy) return;
     const code = sheet.template.shortName;
@@ -399,13 +398,10 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
       if (!(await runSheetAction("complete"))) return;
 
       const left = remaining.filter((s) => s.id !== sheet.id);
-      if (thenSubmit && left.length === 0) {
-        void startSubmit();
-        return;
-      }
+      const submitLabel = report.status === "RETURNED" ? "Nộp lại phiếu" : "Nộp phiếu";
       toast.success(
         left.length === 0
-          ? `Đã đánh dấu biểu ${code} là nhập xong. Mọi biểu đã xong — bạn bấm Nộp phiếu để gửi Sở.`
+          ? `Đã đánh dấu biểu ${code} là nhập xong. Mọi biểu đã xong — bạn bấm ${submitLabel} để gửi Sở.`
           : `Đã đánh dấu biểu ${code} là nhập xong. Biểu chuyển sang chỉ xem; bấm "Sửa lại" nếu cần nhập tiếp.`
       );
     } finally {
@@ -600,12 +596,10 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const code = sheet?.template.shortName ?? "";
 
   if (sheetEditable) {
-    // Biểu đang mở chưa xong: [Lưu dữ liệu] [Kiểm tra & hoàn tất | Sửa & nộp lại] ⋯
+    // Biểu đang mở chưa xong: [Lưu dữ liệu] [Kiểm tra & hoàn tất] ⋯ — phiếu bị trả lại cũng vậy:
+    // sửa xong từng biểu thì kiểm tra & hoàn tất, xong hết mới có nút Nộp lại phiếu (không gộp).
     secondary = [{ label: "Lưu dữ liệu", icon: Save, onClick: () => void save(), loading: busy === "save" }];
-    primary =
-      report.status === "RETURNED"
-        ? { label: "Sửa & nộp lại", onClick: () => void complete(true), loading: busy === "complete" }
-        : { label: "Kiểm tra & hoàn tất", onClick: () => void complete(false), loading: busy === "complete" };
+    primary = { label: "Kiểm tra & hoàn tất", onClick: () => void complete(), loading: busy === "complete" };
     items = [
       { key: "no-data", label: "Không phát sinh số liệu", icon: CircleOff, onSelect: () => setNoDataOpen(true) },
       ...commonItems,
@@ -623,10 +617,8 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
       reason: blockedReason,
       loading: busy === "validate" || busy === "submit",
     };
-    items = [
-      { key: "reopen", label: `Sửa lại biểu ${code}`, icon: Pencil, onSelect: () => void reopen() },
-      ...commonItems,
-    ];
+    // "Sửa lại biểu" là nút ngoài cạnh nút chính, không giấu trong menu ⋯.
+    secondary = [{ label: `Sửa lại biểu ${code}`, icon: Pencil, onClick: () => void reopen() }];
   }
 
   if (!paneReady || busy !== null) {

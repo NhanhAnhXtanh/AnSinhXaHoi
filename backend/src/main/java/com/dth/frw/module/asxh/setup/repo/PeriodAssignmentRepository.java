@@ -21,4 +21,12 @@ public interface PeriodAssignmentRepository extends SecuredRepository<PeriodAssi
 
     @Query("select count(a) from PeriodAssignment a where a.period.id = :periodId")
     long countByPeriodId(@Param("periodId") Long periodId);
+
+    /** Ô dùng được của kỳ: bỏ ô của biểu đang khoá (để sửa). */
+    @Query("select count(a) from PeriodAssignment a where a.period.id = :periodId and a.template.locked = false")
+    long countUsableByPeriodId(@Param("periodId") Long periodId);
+
+    /** Kỳ có ô của biểu {@code templateId} — để tính lại trạng thái thiết lập khi biểu khoá / mở khoá. */
+    @Query("select distinct a.period.id from PeriodAssignment a where a.template.id = :templateId")
+    List<Long> findPeriodIdsByTemplateId(@Param("templateId") Long templateId);
 }

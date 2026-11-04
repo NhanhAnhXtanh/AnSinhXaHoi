@@ -54,7 +54,8 @@ export type ApiAssignment = {
   id: number;
   period: { id: number; name: string };
   unit: { id: number; budgetCode: string; name: string };
-  template: { id: number; shortName: string; name: string };
+  /** `locked` = biểu đang khoá để sửa: màn ma trận bỏ qua ô của biểu đó. */
+  template: { id: number; shortName: string; name: string; locked: boolean };
 };
 
 /** `PeriodSetupResponse` — `GET /api/report_periods/{id}/setup`. */

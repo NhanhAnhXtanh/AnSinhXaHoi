@@ -128,8 +128,40 @@ public class PeriodAssignmentService {
         return repository.findAll(rowLevel.byIds(PeriodAssignment.class, Action.READ, ids));
     }
 
+    /** Số ô dùng được của kỳ — không tính ô của biểu đang khoá (để sửa). */
     public long countForPeriod(Long periodId) {
-        return repository.countByPeriodId(periodId);
+        return repository.countUsableByPeriodId(periodId);
+    }
+
+    /**
+     * Tự chuyển Chưa thiết lập ⇄ Đã thiết lập theo số ô DÙNG ĐƯỢC (UC-22 bước 7): kỳ chưa mở đợt
+     * mà chỉ còn ô của biểu đang khoá thì coi như chưa chọn biểu nào. Kỳ đã mở đợt trở đi giữ
+     * nguyên.
+     *
+     * @return kỳ sau khi tính lại
+     */
+    @Transactional
+    public ReportPeriod syncSetupStatus(Long periodId) {
+        ReportPeriod period = periodService.get(periodId);
+        if (!CONFIGURABLE.contains(period.getStatus())) {
+            return period;
+        }
+        long usable = repository.countUsableByPeriodId(periodId);
+        if (usable > 0 && period.getStatus() == PeriodStatus.DRAFT) {
+            return periodService.transition(periodId, PeriodStatus.READY);
+        }
+        if (usable == 0 && period.getStatus() == PeriodStatus.READY) {
+            return periodService.transition(periodId, PeriodStatus.DRAFT);
+        }
+        return period;
+    }
+
+    /** Biểu vừa khoá / mở khoá: tính lại trạng thái thiết lập của mọi kỳ có ô của biểu đó. */
+    @Transactional
+    public void syncSetupStatusOfTemplate(Long templateId) {
+        for (Long periodId : repository.findPeriodIdsByTemplateId(templateId)) {
+            syncSetupStatus(periodId);
+        }
     }
 
     /**
@@ -216,12 +248,7 @@ public class PeriodAssignmentService {
 
         // ---- trạng thái kỳ: tự chuyển DRAFT ⇄ READY (UC-22 bước 7)
         if (!open) {
-            long count = repository.countByPeriodId(periodId);
-            if (count > 0 && status == PeriodStatus.DRAFT) {
-                period = periodService.transition(periodId, PeriodStatus.READY);
-            } else if (count == 0 && status == PeriodStatus.READY) {
-                period = periodService.transition(periodId, PeriodStatus.DRAFT);
-            }
+            period = syncSetupStatus(periodId);
         }
 
         // ---- kỳ đang mở: phát ngay đợt bổ sung (UC-26)
@@ -329,9 +356,7 @@ public class PeriodAssignmentService {
                 added++;
             }
             repository.flush();
-            if (target.getStatus() == PeriodStatus.DRAFT && !existing.isEmpty()) {
-                periodService.transition(target.getId(), PeriodStatus.READY);
-            }
+            syncSetupStatus(target.getId());
         }
 
         String message = "Đã áp dụng %d ô cho %d kỳ.".formatted(added, targets.size());
@@ -362,7 +387,8 @@ public class PeriodAssignmentService {
 
     /**
      * Chỉ biểu chi tiết mới giao cho đơn vị nhập; biểu tổng hợp chỉ dùng ở màn Tổng hợp
-     * (BR-22.1). Màn ma trận đã lọc cột theo loại, máy chủ chặn lại cho lời gọi thẳng API.
+     * (BR-22.1). Biểu đang khoá không gán được. Màn ma trận đã lọc cột theo loại và bỏ biểu
+     * đang khoá, máy chủ chặn lại cho lời gọi thẳng API.
      */
     private Map<Long, Template> resolveTemplates(List<Cell> cells) {
         Map<Long, Template> templates = new HashMap<>();
@@ -375,6 +401,13 @@ public class PeriodAssignmentService {
                 .ifPresent(template -> {
                     throw new ConflictException("Biểu " + template.getShortName()
                             + " là biểu tổng hợp, không giao cho đơn vị nhập được.");
+                });
+        templates.values().stream()
+                .filter(Template::isLocked)
+                .findFirst()
+                .ifPresent(template -> {
+                    throw new ConflictException("Biểu " + template.getShortName()
+                            + " đang khoá để sửa nên không gán được. Hãy mở khoá biểu trước.");
                 });
         return templates;
     }

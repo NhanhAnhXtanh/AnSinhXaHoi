@@ -24,7 +24,7 @@ import com.dth.frw.module.asxh.period.service.ReportPeriodService;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries.ReportRow;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregationService;
-import com.dth.frw.module.asxh.template.service.TemplateVersionService;
+import com.dth.frw.module.asxh.summary.service.PeriodVersionResolver;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -69,7 +69,7 @@ class DeptSourceStaleTest {
         service = new DeptPeriodService(mock(DeptReportRepository.class), mock(DeptReportSheetRepository.class),
                 mock(DeptLedgerLineRepository.class), sourceRepository, mock(DeptChangeRepository.class),
                 mock(DeptLedgerVersionService.class), mock(DeptYearLockService.class), aggregation, queries,
-                mock(ReportPeriodService.class), mock(TemplateVersionService.class), mock(EntityManager.class));
+                mock(ReportPeriodService.class), mock(PeriodVersionResolver.class), mock(EntityManager.class));
     }
 
     private static ReportRow current(long reportId, int revisionNo, ReportStatus status) {

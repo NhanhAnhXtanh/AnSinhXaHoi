@@ -35,7 +35,7 @@ import type {
  * - `GET/POST/PATCH/DELETE /api/template_sets`
  * - `GET/POST/PATCH/DELETE /api/templates` + `POST /api/templates/{id}/next_version`
  * - `GET/PATCH/DELETE /api/template_versions` + `POST /api/template_versions/{id}/
- *   publish|lock|unlock|revoke`
+ *   publish|revoke`; khoá / mở khoá cả biểu: `POST /templates/{id}/lock|unlock`
  * - `GET /api/template_versions/{id}/scripts` (kịch bản; lưu cùng `PATCH` phiên bản)
  *
  * Danh sách phiên bản không có workbook (máy chủ không đọc cột đó); chỉ `getOne`
@@ -164,8 +164,6 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 export type VersionAction =
   | "publish"
-  | "lock"
-  | "unlock"
   | "revoke";
 
 const JSON_HEADERS = { headers: { "Content-Type": "application/json" } };
@@ -298,6 +296,23 @@ export function useTemplateActions() {
         });
         return toVersion(res.data as unknown as ApiTemplateVersion);
       }, "Không thực hiện được. Hãy thử lại."),
+
+    /**
+     * Khoá / mở khoá cả biểu. Nạp lại cả chi tiết phiên bản (màn thiết kế đọc cờ khoá của biểu
+     * trong phiên bản) ngoài các danh sách.
+     */
+    setFormLocked: (formId: string, locked: boolean) =>
+      run(async () => {
+        const res = await custom({
+          url: `${API_URL}/${RESOURCE.forms}/${formId}/${locked ? "lock" : "unlock"}`,
+          method: "post",
+          values: {},
+          config: JSON_HEADERS,
+          ...quiet,
+        });
+        await invalidate({ resource: RESOURCE.versions, invalidates: ["detail"] });
+        return toForm(res.data as unknown as ApiTemplate);
+      }, locked ? "Không khoá được biểu. Hãy thử lại." : "Không mở khoá được biểu. Hãy thử lại."),
 
     deleteVersion: (versionId: string) =>
       run(async () => {

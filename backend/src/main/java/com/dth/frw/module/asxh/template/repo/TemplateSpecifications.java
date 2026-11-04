@@ -19,7 +19,7 @@ import org.springframework.data.jpa.domain.Specification;
  * {@code kind}, {@code sortOrder}, {@code set.id} (cũng nhận {@code setId},
  * {@code templateSet.id}), và hai bộ lọc suy ra:
  * <ul>
- *   <li>{@code applicableOn=yyyy-MM-dd} — biểu có bản đã ban hành áp dụng từ
+ *   <li>{@code applicableOn=yyyy-MM-dd} — biểu KHÔNG khoá, có bản đã ban hành áp dụng từ
  *       ngày đó trở về trước (cột biểu của ma trận thiết lập, UC-22 / UC-19);</li>
  *   <li>{@code published=true|false} — biểu có / chưa có bản đã ban hành nào.</li>
  * </ul>
@@ -79,7 +79,8 @@ public final class TemplateSpecifications {
                     cb.equal(version.get("template"), root),
                     cb.equal(version.get("status"), TemplateStatus.PUBLISHED),
                     cb.lessThanOrEqualTo(version.<LocalDate>get("effectiveFrom"), date));
-            return cb.exists(sub);
+            // Biểu đang khoá (để sửa) không dùng được cho kỳ nào.
+            return cb.and(cb.isFalse(root.get("locked")), cb.exists(sub));
         };
     }
 

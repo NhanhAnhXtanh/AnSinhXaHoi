@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCheck, LoaderCircle, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronUp, LoaderCircle, Save, TriangleAlert } from "lucide-react";
 
 import { LoadingState, formatNumber } from "@/shared/components/asxh";
 import { Button } from "@/shared/ui/button";
@@ -17,11 +17,19 @@ import { Textarea } from "@/shared/ui/textarea";
 
 import { deptSheetUrl, errorMessage, useApiArray, type PendingChange } from "./api";
 
-/** Hiện tối đa bấy nhiêu dòng đổi trong hộp; còn lại ghi "và N dòng khác". */
-const PREVIEW_LIMIT = 8;
+/**
+ * Phần đổi của một dòng: số lượng và / hoặc kinh phí — chỉ phần nào khác mới hiện (trước đây chỉ hiện
+ * kinh phí, đổi số lượng mà kinh phí giữ nguyên thì dòng trông như không đổi).
+ */
+function changedParts(c: PendingChange): { label: string; from: number | null; to: number | null }[] {
+  const parts: { label: string; from: number | null; to: number | null }[] = [];
+  if (c.currentQuantity !== c.quantity) parts.push({ label: "Số lượng", from: c.currentQuantity, to: c.quantity });
+  if (c.currentAmount !== c.amount) parts.push({ label: "Kinh phí", from: c.currentAmount, to: c.amount });
+  return parts;
+}
 
 /**
- * "Kiểm tra & hoàn tất biểu …?" (UC-55 bước 4): đọc bảng đã lưu, cho biết có bao
+ * "Lưu số liệu biểu …?" (Sở sửa → Lưu): đọc bảng đang sửa, cho biết có bao
  * nhiêu dòng khác số liệu hiện hành, ô lý do điều chỉnh không bắt buộc.
  */
 export function CompleteDialog({
@@ -44,8 +52,13 @@ export function CompleteDialog({
   onConfirm: (reason: string) => void;
 }) {
   const [reason, setReason] = useState("");
+  // Danh sách dòng đổi mặc định thu gọn — chỉ một dòng tóm tắt, bấm "Xem chi tiết" mới liệt kê.
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
-    if (open) setReason("");
+    if (open) {
+      setReason("");
+      setExpanded(false);
+    }
   }, [open]);
 
   const preview = useApiArray<PendingChange>(
@@ -58,10 +71,10 @@ export function CompleteDialog({
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Kiểm tra & hoàn tất biểu {sheetLabel}?</DialogTitle>
+          <DialogTitle>Lưu số liệu biểu {sheetLabel}?</DialogTitle>
           <DialogDescription>
-            Số liệu biểu {sheetLabel} của {periodName} sẽ được lưu thành phiên bản mới và biểu
-            được khoá lại. Muốn sửa tiếp thì bấm "Sửa lại".
+            Số liệu biểu {sheetLabel} của {periodName} sẽ được lưu thành phiên bản mới. Lưu xong
+            bạn vẫn sửa tiếp được.
           </DialogDescription>
         </DialogHeader>
 
@@ -77,34 +90,49 @@ export function CompleteDialog({
           </div>
         ) : changes.length === 0 ? (
           <p className="bg-surface-subtle text-muted-foreground rounded-lg px-3.5 py-3 text-sm">
-            Biểu không có số nào khác số liệu đã lưu. Hoàn tất để đánh dấu biểu đã xong.
+            Biểu không có số nào khác số liệu đã lưu, bấm Lưu sẽ không đổi gì.
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm">
-              Có <span className="font-semibold">{formatNumber(changes.length)}</span> dòng sẽ được
-              lưu vào số liệu tổng hợp:
-            </p>
-            <ul className="divide-y overflow-hidden rounded-lg border text-sm">
-              {changes.slice(0, PREVIEW_LIMIT).map((c, i) => (
-                <li key={`${c.indicatorCode}-${c.unitName}-${i}`} className="flex items-center gap-3 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate" title={`${c.indicatorName} · ${c.unitName}`}>
-                    {c.indicatorName}
-                    <span className="text-muted-foreground"> · {c.unitName}</span>
-                  </span>
-                  <span className="text-muted-foreground shrink-0 tabular-nums line-through">
-                    {formatNumber(c.currentAmount ?? c.currentQuantity)}
-                  </span>
-                  <span className="shrink-0 font-medium tabular-nums">
-                    {formatNumber(c.amount ?? c.quantity)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {changes.length > PREVIEW_LIMIT && (
-              <p className="text-muted-foreground text-xs">
-                và {formatNumber(changes.length - PREVIEW_LIMIT)} dòng khác.
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <p>
+                Có <span className="font-semibold">{formatNumber(changes.length)}</span> dòng sẽ được
+                lưu vào số liệu tổng hợp.
               </p>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto shrink-0 px-0"
+                aria-expanded={expanded}
+                onClick={() => setExpanded((v) => !v)}
+              >
+                {expanded ? "Thu gọn" : "Xem chi tiết"}
+                {expanded ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+              </Button>
+            </div>
+            {expanded && (
+              <ul className="max-h-72 w-full min-w-0 divide-y overflow-y-auto rounded-lg border text-sm">
+                {changes.map((c, i) => (
+                  <li
+                    key={`${c.indicatorCode}-${c.unitName}-${i}`}
+                    className="flex min-w-0 flex-col gap-0.5 px-3 py-2"
+                  >
+                    <span className="truncate" title={`${c.indicatorName} · ${c.unitName}`}>
+                      {c.indicatorName}
+                      <span className="text-muted-foreground"> · {c.unitName}</span>
+                    </span>
+                    <span className="text-muted-foreground flex flex-wrap gap-x-4 text-xs tabular-nums">
+                      {changedParts(c).map((part) => (
+                        <span key={part.label}>
+                          {part.label}: <span className="line-through">{formatNumber(part.from)}</span> →{" "}
+                          <span className="text-foreground font-medium">{formatNumber(part.to)}</span>
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}
@@ -132,8 +160,8 @@ export function CompleteDialog({
             disabled={busy || preview.isLoading || preview.error !== null}
             onClick={() => onConfirm(reason.trim())}
           >
-            {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : <CheckCheck aria-hidden />}
-            Kiểm tra & hoàn tất
+            {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : <Save aria-hidden />}
+            Lưu
           </Button>
         </DialogFooter>
       </DialogContent>

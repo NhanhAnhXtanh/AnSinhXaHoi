@@ -103,6 +103,9 @@ export function toForm(api: ApiTemplate): TemplateForm {
     sortOrder: api.sortOrder,
     createdAt: api.createdAt,
     latestVersionId: api.latestVersion ? String(api.latestVersion.id) : null,
+    locked: api.locked,
+    lockedAt: api.lockedAt,
+    lockedBy: api.lockedBy,
   };
 }
 
@@ -117,6 +120,9 @@ export function formOfVersion(api: ApiTemplateVersion): TemplateForm {
     sortOrder: 0,
     createdAt: api.createdAt,
     latestVersionId: null,
+    locked: api.template.locked,
+    lockedAt: null,
+    lockedBy: null,
   };
 }
 
@@ -197,7 +203,6 @@ const no = (reason: string): Availability => ({ ok: false, reason });
 export function canPublish(version: TemplateVersion): Availability {
   if (isEditable(version.status)) return yes;
   if (version.status === "published") return no("Phiên bản này đã ban hành.");
-  if (version.status === "locked") return no("Phiên bản này đang khoá.");
   return no("Phiên bản này không còn dùng được.");
 }
 
@@ -216,25 +221,6 @@ export function canClone(
   return yes;
 }
 
-export function canLock(
-  list: TemplateVersion[],
-  version: TemplateVersion
-): Availability {
-  if (version.status === "locked") return yes;
-  if (version.status !== "published")
-    return no("Chỉ khoá được bản đã ban hành mới nhất.");
-  const newer = list.find(
-    (x) =>
-      x.id !== version.id &&
-      x.status === "published" &&
-      x.effectiveFrom !== null &&
-      version.effectiveFrom !== null &&
-      x.effectiveFrom > version.effectiveFrom
-  );
-  if (newer) return no("Chỉ khoá được bản đã ban hành mới nhất.");
-  return yes;
-}
-
 /**
  * Thu hồi (UC-17): chỉ bản đã ban hành, lần lượt từ bản mới
  * nhất xuống, không phải bản đã ban hành cuối cùng, chuỗi không còn nháp khác.
@@ -243,8 +229,6 @@ export function canRevoke(
   list: TemplateVersion[],
   version: TemplateVersion
 ): Availability {
-  if (version.status === "locked")
-    return no("Đang khoá — mở khoá trước khi thu hồi.");
   if (version.status !== "published")
     return no(
       isEditable(version.status)
@@ -279,7 +263,7 @@ export function canDelete(
 /** Xoá biểu: chỉ khi chưa từng có phiên bản rời trạng thái nháp. */
 export function canDeleteForm(chain: TemplateVersion[]): Availability {
   if (chain.some((x) => !isEditable(x.status)))
-    return no("Biểu đã ban hành — chỉ khoá phiên bản được.");
+    return no("Biểu đã ban hành nên không xoá được — chỉ khoá biểu được.");
   return yes;
 }
 
@@ -423,3 +407,6 @@ export function nextDay(iso: string): string {
 export function firstOfNextMonth(today = new Date()): string {
   return toIsoDate(new Date(today.getFullYear(), today.getMonth() + 1, 1));
 }
+
+/** Lý do làm mờ Ban hành / Thu hồi khi cả biểu đang khoá. */
+export const FORM_LOCKED_REASON = "Biểu đang khoá để sửa — mở khoá biểu rồi mới ban hành hoặc thu hồi.";

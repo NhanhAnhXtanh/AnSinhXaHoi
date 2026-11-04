@@ -31,7 +31,7 @@ import com.dth.frw.module.asxh.dept.service.DeptYearLockService;
 import com.dth.frw.module.asxh.period.service.ReportPeriodService;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregationService;
-import com.dth.frw.module.asxh.template.service.TemplateVersionService;
+import com.dth.frw.module.asxh.summary.service.PeriodVersionResolver;
 import com.dth.frw.shared.exception.ConflictException;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
@@ -67,7 +67,7 @@ class DeptPeriodSaveRaceTest {
         SummaryAggregationService aggregation = mock(SummaryAggregationService.class);
         SummaryQueries queries = mock(SummaryQueries.class);
         ReportPeriodService periodService = mock(ReportPeriodService.class);
-        TemplateVersionService templateVersions = mock(TemplateVersionService.class);
+        PeriodVersionResolver templateVersions = mock(PeriodVersionResolver.class);
 
         quarter = new ReportPeriod(CALENDAR, PeriodKind.QUY, 1, "Q1-2026", "Quý I/2026",
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), LocalDate.of(2026, 1, 1),
@@ -82,7 +82,8 @@ class DeptPeriodSaveRaceTest {
         when(form.getId()).thenReturn(1L);
         when(form.getKind()).thenReturn(TemplateKind.CHI_TIET);
         when(queries.assignedTemplates(11L)).thenReturn(List.of(form));
-        when(templateVersions.resolveOrEarliest(eq(1L), any())).thenReturn(Optional.of(mock(TemplateVersion.class)));
+        when(templateVersions.resolve(any(), any(), eq(1L)))
+                .thenReturn(Optional.of(new PeriodVersionResolver.Resolved(mock(TemplateVersion.class), true)));
 
         service = new DeptPeriodService(reportRepository, mock(DeptReportSheetRepository.class),
                 mock(DeptLedgerLineRepository.class), mock(DeptReportSourceRepository.class),

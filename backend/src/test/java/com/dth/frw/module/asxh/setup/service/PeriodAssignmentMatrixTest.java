@@ -154,6 +154,49 @@ class PeriodAssignmentMatrixTest {
     }
 
     @Test
+    @DisplayName("Kỳ Đã thiết lập chỉ còn ô của biểu đang khoá: về Chưa thiết lập; có lại ô dùng được thì về Đã thiết lập")
+    void setupStatusFollowsUsableCells() {
+        ReportPeriod ready = period(31, "Tháng 4/2024", PeriodKind.THANG, "2024-04-01", "2024-04-30", PeriodStatus.READY);
+        ReportPeriod draft = period(32, "Tháng 5/2024", PeriodKind.THANG, "2024-05-01", "2024-05-31", PeriodStatus.DRAFT);
+        when(periodService.get(ready.getId())).thenReturn(ready);
+        when(periodService.get(draft.getId())).thenReturn(draft);
+        when(repository.countUsableByPeriodId(ready.getId())).thenReturn(0L);
+        when(repository.countUsableByPeriodId(draft.getId())).thenReturn(2L);
+
+        service.syncSetupStatus(ready.getId());
+        service.syncSetupStatus(draft.getId());
+
+        verify(periodService).transition(ready.getId(), PeriodStatus.DRAFT);
+        verify(periodService).transition(draft.getId(), PeriodStatus.READY);
+    }
+
+    @Test
+    @DisplayName("Kỳ đã mở đợt: khoá biểu không đổi trạng thái kỳ")
+    void openPeriodKeepsStatus() {
+        when(repository.countUsableByPeriodId(quy4.getId())).thenReturn(0L);
+
+        service.syncSetupStatus(quy4.getId());
+
+        verify(periodService, never()).transition(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("Gán biểu đang khoá qua API: từ chối, không ghi ô nào")
+    void refusesLockedTemplate() {
+        Template locked = template(7, "test");
+        locked.lockForm("admin", java.time.Instant.now());
+        when(templateService.get(locked.getId())).thenReturn(locked);
+
+        ConflictException error = assertThrows(ConflictException.class, () -> service.applyMatrix(
+                thang12.getId(),
+                List.of(new PeriodAssignmentService.Cell(bienHoa.getId(), locked.getId())),
+                List.of()));
+
+        assertEquals("Biểu test đang khoá để sửa nên không gán được. Hãy mở khoá biểu trước.", error.getMessage());
+        verify(repository, never()).persist(any());
+    }
+
+    @Test
     @DisplayName("Áp dụng sang kỳ khác bỏ qua ô biểu tổng hợp lỡ có ở kỳ nguồn")
     void copySkipsSummaryTemplate() {
         when(repository.findByPeriodId(thang11.getId())).thenReturn(List.of(

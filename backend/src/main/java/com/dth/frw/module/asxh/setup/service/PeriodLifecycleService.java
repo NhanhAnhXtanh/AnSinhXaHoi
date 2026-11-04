@@ -254,6 +254,8 @@ public class PeriodLifecycleService {
         // Phiếu trước (chúng trỏ về đợt), đợt sau, trạng thái kỳ cuối cùng.
         inputReportService.deleteAllForPeriod(periodId);
         publicationService.cancelAll(periodId);
-        return periodService.transition(periodId, PeriodStatus.READY);
+        periodService.transition(periodId, PeriodStatus.READY);
+        // Chỉ còn ô của biểu đang khoá thì về Chưa thiết lập.
+        return assignmentService.syncSetupStatus(periodId);
     }
 }
