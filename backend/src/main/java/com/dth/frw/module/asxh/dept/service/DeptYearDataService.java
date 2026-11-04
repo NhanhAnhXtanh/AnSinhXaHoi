@@ -3,7 +3,6 @@ package com.dth.frw.module.asxh.dept.service;
 import com.dth.frw.domain.asxh.dept.DeptLedgerLine;
 import com.dth.frw.domain.asxh.dept.DeptReport;
 import com.dth.frw.domain.asxh.dept.DeptReportSheet;
-import com.dth.frw.domain.asxh.dept.DeptSheetCompletion;
 import com.dth.frw.domain.asxh.period.PeriodStatus;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.template.Template;
@@ -20,7 +19,6 @@ import com.dth.frw.module.asxh.summary.query.SummaryRow;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregationService;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregator;
-import com.dth.frw.module.asxh.template.service.TemplateScriptService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -57,8 +55,6 @@ public class DeptYearDataService implements DeptYearDataQuery {
     private final SummaryAggregationService aggregation;
     private final SummaryQueries queries;
 
-    private final TemplateScriptService scriptService;
-
     public DeptYearDataService(DeptPeriodService periodService,
                                DeptReportSheetRepository sheetRepository,
                                DeptLedgerLineRepository lineRepository,
@@ -66,9 +62,7 @@ public class DeptYearDataService implements DeptYearDataQuery {
                                DeptLedgerVersionService versionService,
                                DeptYearLockService yearLockService,
                                SummaryAggregationService aggregation,
-                               SummaryQueries queries,
-                               TemplateScriptService scriptService) {
-        this.scriptService = scriptService;
+                               SummaryQueries queries) {
         this.periodService = periodService;
         this.sheetRepository = sheetRepository;
         this.lineRepository = lineRepository;
@@ -125,11 +119,9 @@ public class DeptYearDataService implements DeptYearDataQuery {
                     .filter(template -> sheets.stream().noneMatch(sheet -> sheet.getTemplate().getId().equals(template.getId())))
                     .map(Template::getShortName)
                     .toList();
-            List<String> open = sheets.stream()
-                    .filter(sheet -> sheet.getCompletion() != DeptSheetCompletion.COMPLETED
-                            && scriptService.hasSummaryHook(sheet.getTemplateVersion()))
-                    .map(sheet -> sheet.getTemplate().getShortName())
-                    .toList();
+            // Không còn bước "hoàn tất" theo biểu ở Tổng hợp (Sở sửa → Lưu là xong): chỉ bảng sửa dở chưa
+            // Lưu (pending) mới chặn nộp báo cáo năm.
+            List<String> open = List.of();
             List<String> pending = sheets.stream().filter(DeptReportSheet::hasPendingDraft)
                     .map(sheet -> sheet.getTemplate().getShortName()).toList();
             result.add(new DeptYearPeriod(period.getId(), period.getName(), period.getKind().name(),

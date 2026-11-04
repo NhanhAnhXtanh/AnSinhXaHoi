@@ -323,15 +323,14 @@ public class DeptSheetService {
     // ------------------------------------------------------------------ ghi
 
     /**
-     * "Lưu dữ liệu": cất bảng đang sửa (chưa vào số liệu). {@code revision} = số hiệu bản lưu màn đang
-     * giữ — khác thì từ chối (hai phiên sửa cùng biểu).
+     * Cất bảng đang sửa (chưa vào số liệu) — màn gọi khi đổi tab biểu giữa chừng, để không mất số đang gõ.
+     * {@code revision} = số hiệu bản lưu màn đang giữ — khác thì từ chối (hai phiên sửa cùng biểu).
      */
     @Transactional
     public DraftResult saveDraft(Long reportId, String sheetRef, String workbookJson, long revision) {
         DeptReport report = lockReport(reportId);
         DeptReportSheet sheet = sheetOf(report, sheetRef);
         assertEditable(report);
-        assertSheetOpen(sheet);
         if (!scriptService.hasSummaryHook(sheet.getTemplateVersion())) {
             throw new ConflictException("Biểu này chưa được thiết lập để Sở sửa số trực tiếp.");
         }
@@ -350,8 +349,9 @@ public class DeptSheetService {
     }
 
     /**
-     * "Kiểm tra &amp; hoàn tất" một biểu: trích số từ bảng đã cất, ghi phiên bản mới của năm nếu có ô đổi,
-     * rồi khoá biểu. Chưa mở biểu lần nào (không có bảng đã cất) ⇒ chỉ đánh dấu hoàn tất (UC-55 4b).
+     * "Lưu" số Sở sửa ở một biểu: trích số từ bảng đã cất, ghi phiên bản mới của năm nếu có ô đổi. Không
+     * còn bước "hoàn tất / sửa lại" theo biểu — Sở sửa → Lưu là xong; lưu xong vẫn sửa tiếp được. Chưa có
+     * bảng đã cất (không sửa gì) ⇒ không đổi gì.
      */
     @Transactional
     public SaveResult complete(Long reportId, String sheetRef, String reason) {
@@ -359,10 +359,7 @@ public class DeptSheetService {
         DeptReport report = lockReport(reportId);
         DeptReportSheet sheet = sheetOf(report, sheetRef);
         assertEditable(report);
-        assertSheetOpen(sheet);
         if (sheet.getDraftJson() == null || sheet.getDraftJson().isBlank()) {
-            markCompleted(sheet);
-            sheetRepository.save(sheet);
             return new SaveResult(report.getLedgerVersion(), false, List.of(), 0);
         }
         PlannedSheet planned = plan(report, sheet, text, true);
@@ -400,7 +397,6 @@ public class DeptSheetService {
         assertEditable(report);
         List<PlannedSheet> planned = new ArrayList<>();
         for (DeptReportSheet sheet : pendingSheets(reportId)) {
-            assertSheetOpen(sheet);
             planned.add(plan(report, sheet, text, true));
         }
         int before = report.getLedgerVersion();
@@ -782,9 +778,6 @@ public class DeptSheetService {
         if (!hook) {
             return "Biểu này chưa được thiết lập để Sở sửa số trực tiếp.";
         }
-        if (sheet.getCompletion() == DeptSheetCompletion.COMPLETED) {
-            return "Biểu đã hoàn tất. Bấm \"Sửa lại\" để sửa tiếp.";
-        }
         if (!CurrentUser.has(SummaryPermissions.SUMMARY_WRITE)) {
             return "Bạn chưa được giao quyền sửa số liệu tổng hợp.";
         }
@@ -875,13 +868,6 @@ public class DeptSheetService {
 
     private void assertEditable(DeptReport report) {
         yearLockService.assertOpen(report.getReportYear());
-    }
-
-    private static void assertSheetOpen(DeptReportSheet sheet) {
-        if (sheet.getCompletion() == DeptSheetCompletion.COMPLETED) {
-            throw new ConflictException("Biểu " + sheet.getTemplate().getShortName()
-                    + " đã hoàn tất. Bấm \"Sửa lại\" rồi mới sửa tiếp được.");
-        }
     }
 
     private static void markCompleted(DeptReportSheet sheet) {
