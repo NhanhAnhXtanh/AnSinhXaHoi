@@ -8,14 +8,12 @@ import {
   FileDown,
   FileUp,
   FileX,
-  FlaskConical,
   Maximize,
   Minimize,
   Pencil,
   Save,
   Send,
   TriangleAlert,
-  Undo2,
 } from "lucide-react";
 import { useCan, useWarnAboutChange } from "@refinedev/core";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
@@ -79,7 +77,7 @@ const TITLE = "Thiết kế mẫu";
  * Thiết kế mẫu (UC-11, UC-12; khung 311:87785, xem trước 311:88607, quy tắc
  * 311:88923). Đường dẫn /templates/designer/:id với id là phiên bản mẫu.
  *
- * Phiên bản nháp / đang thử nghiệm: SpreadJS Designer (ribbon) sửa được, Lưu
+ * Phiên bản nháp: SpreadJS Designer (ribbon) sửa được, Lưu
  * (workbook + cả danh sách kịch bản trong một lần, như bản Jmix), Xem trước,
  * nhập file Excel, Ban hành. Phiên bản đã ban hành / khoá / thu hồi: chỉ xem
  * (BR-11.2, BR-12.4) — riêng kịch bản tổng hợp (getSummaryData) của bản đã ban
@@ -178,7 +176,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     if (drafts == null && scriptsQuery.scripts) setDrafts(scriptsQuery.scripts.map(toDraft));
   }, [drafts, scriptsQuery.scripts]);
 
-  // Chỉ bản Nháp / Đang thử nghiệm sửa được kịch bản; bản đã ban hành trở đi chỉ xem (kể cả
+  // Chỉ bản Nháp sửa được kịch bản; bản đã ban hành trở đi chỉ xem (kể cả
   // kịch bản tổng hợp — khác Jmix, người dùng chốt: muốn đổi thì tạo phiên bản kế tiếp).
   const scriptMode: ScriptPanelMode = editable ? "edit" : "read";
 
@@ -348,7 +346,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
   });
 
   const cloneable = canClone(chain, version);
-  const testing = version.status === "testing";
 
   const primary: PrimaryAction | undefined = editable
     ? {
@@ -377,7 +374,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
         ];
 
   const versionItems = commands.itemsFor(version);
-  const testingItem = versionItems.find((i) => i.key === "testing");
   const lockItem = versionItems.find((i) => i.key === "lock");
 
   const menu: ActionItem[] = [
@@ -408,17 +404,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       disabled: mode === "preview",
       onSelect: () => void exportFile(),
     },
-    ...(testingItem
-      ? [
-          {
-            ...testingItem,
-            icon: testing ? Undo2 : FlaskConical,
-            disabled: testingItem.disabled || dirty,
-            reason: dirty ? "Lưu thay đổi trước đã." : testingItem.reason,
-            separatorBefore: true,
-          },
-        ]
-      : []),
     ...(lockItem && !editable ? [{ ...lockItem, separatorBefore: true }] : []),
     {
       key: "fullscreen",

@@ -50,7 +50,10 @@ export function versionLabel(v: Pick<TemplateVersion, "number">): string {
   return `Phiên bản ${v.number}`;
 }
 
-/** Nháp và Đang thử nghiệm còn sửa được thiết kế, quy tắc, và ban hành được. */
+/**
+ * Nháp còn sửa được thiết kế, quy tắc, và ban hành được. "Đang thử nghiệm" đã bỏ (Q-22);
+ * bản cũ còn ở trạng thái đó được xử lý y như nháp.
+ */
 export function isEditable(status: VersionStatus): boolean {
   return status === "draft" || status === "testing";
 }
@@ -233,7 +236,7 @@ export function canLock(
 }
 
 /**
- * Thu hồi (UC-17): chỉ bản đã ban hành / đang thử nghiệm, lần lượt từ bản mới
+ * Thu hồi (UC-17): chỉ bản đã ban hành, lần lượt từ bản mới
  * nhất xuống, không phải bản đã ban hành cuối cùng, chuỗi không còn nháp khác.
  */
 export function canRevoke(
@@ -242,9 +245,9 @@ export function canRevoke(
 ): Availability {
   if (version.status === "locked")
     return no("Đang khoá — mở khoá trước khi thu hồi.");
-  if (version.status !== "published" && version.status !== "testing")
+  if (version.status !== "published")
     return no(
-      version.status === "draft"
+      isEditable(version.status)
         ? "Bản nháp thì xoá, không cần thu hồi."
         : "Phiên bản này không còn dùng được."
     );

@@ -64,7 +64,7 @@ const LOG_LIMIT = 150;
 const ALL_SHEETS = "__moi_bieu__";
 
 /**
- * - `edit`: phiên bản Nháp / Đang thử nghiệm — thêm, xoá, sửa mọi kịch bản, lưu cùng nút Lưu.
+ * - `edit`: phiên bản Nháp — thêm, xoá, sửa mọi kịch bản, lưu cùng nút Lưu.
  * - `read`: mọi trạng thái khác (đã ban hành, đang khoá, đã thu hồi) — chỉ xem, vẫn Chạy / Dừng
  *   để xem hiệu lực. Khác Jmix: bản đã ban hành KHÔNG còn sửa riêng kịch bản tổng hợp; muốn đổi
  *   thì tạo phiên bản kế tiếp rồi ban hành lại.
