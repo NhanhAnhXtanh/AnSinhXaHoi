@@ -329,7 +329,7 @@ function YearPanel({ year }: { year: number }) {
           key={`${year}-${data.templateId}-${data.ledgerVersion}`}
           workbook={workbook}
           readOnly
-          hideTabs
+          // Biểu tổng hợp năm (01-TongHop) gồm nhiều trang 1a, 1b, 1c… — phải thấy thanh trang để chuyển.
           scriptText={data.scriptText}
           scriptContext={scriptContext}
           onReady={(api) => {
