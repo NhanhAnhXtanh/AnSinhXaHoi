@@ -106,7 +106,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * /api/report_calendars`, `PATCH /api/report_periods/{id}` (hạn nộp từng kỳ).
  */
 export function ReportCalendar() {
-  const { year, setYear, addYears } = useReportYear();
+  const { year, setYear } = useReportYear();
   const [creating, setCreating] = useState(false);
   // Người chỉ có quyền xem (vd. cán bộ duyệt): không tạo / sửa / xoá lịch — máy chủ vẫn kiểm lại.
   const { data: canWriteData } = useCan({ resource: CALENDAR_RESOURCE, action: "edit" });
@@ -123,11 +123,6 @@ export function ReportCalendar() {
   const calendars = useMemo(() => result.data ?? [], [result.data]);
   const calendar = calendars.find((c) => c.year === year);
   const takenYears = useMemo(() => new Set(calendars.map((c) => c.year)), [calendars]);
-
-  // Ô năm đầu trang chỉ có sẵn 2024–2027: thêm các năm đã có lịch (vd. 2028 vừa tạo).
-  useEffect(() => {
-    addYears(takenYears);
-  }, [addYears, takenYears]);
 
   /**
    * Mục "Tạo lịch năm mới" của ô năm: nhảy sang năm liền sau năm có lịch muộn nhất

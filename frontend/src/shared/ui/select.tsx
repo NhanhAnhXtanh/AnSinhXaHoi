@@ -51,9 +51,13 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
+  footer,
   position = "popper",
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: React.ComponentProps<typeof SelectPrimitive.Content> & {
+  /** Phần cố định dưới vùng cuộn (vd. một mục thao tác luôn thấy, không cuộn theo danh sách). */
+  footer?: React.ReactNode;
+}) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -78,6 +82,7 @@ function SelectContent({
           {children}
         </SelectPrimitive.Viewport>
         <SelectScrollDownButton />
+        {footer ? <div className="shrink-0 p-1 pt-0">{footer}</div> : null}
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );

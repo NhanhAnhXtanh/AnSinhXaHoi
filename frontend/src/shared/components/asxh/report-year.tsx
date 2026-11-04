@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useIsAuthenticated, useList } from "@refinedev/core";
 import { Calendar, CalendarPlus } from "lucide-react";
 
 import {
@@ -19,19 +20,19 @@ import { cn } from "@/shared/lib/utils";
  * Nhớ trong localStorage của trình duyệt — chỉ là tiện cho người đang dùng
  * máy đó, nên mọi lần đọc/ghi đều bọc try/catch (chế độ ẩn danh, bị chặn lưu
  * trữ) và màn vẫn chạy bình thường khi không lưu được.
+ *
+ * Danh sách năm = các năm đã có lịch báo cáo (`GET /api/report_calendars`) cộng
+ * năm đang chọn (vd. năm đang tạo lịch). Chưa đọc được lịch (chưa đăng nhập, vai
+ * trò không có quyền xem lịch, lỗi mạng) thì dùng danh sách mặc định.
  */
 const STORAGE_KEY = "asxh.reportYear";
 const DEFAULT_YEARS = [2024, 2025, 2026, 2027];
+const CALENDAR_RESOURCE = "report_calendars";
 
 type ReportYearValue = {
   year: number;
   setYear: (y: number) => void;
   years: number[];
-  /**
-   * Thêm năm vào danh sách chọn (vd. các năm đã có lịch báo cáo trong DB) — danh
-   * sách mặc định chỉ có 2024–2027, nên năm mới tạo lịch phải được thêm vào đây.
-   */
-  addYears: (ys: Iterable<number>) => void;
 };
 
 const ReportYearContext = createContext<ReportYearValue | null>(null);
@@ -59,9 +60,24 @@ function initialYear(): number {
   return readStoredYear() ?? new Date().getFullYear();
 }
 
-/** Danh sách năm luôn chứa năm đang chọn và các năm thêm vào, xếp tăng dần. */
-function withYear(years: number[], year: number, extra: number[] = []): number[] {
-  return [...new Set([...years, ...extra, year])].sort((a, b) => a - b);
+/** Danh sách năm luôn chứa năm đang chọn, xếp tăng dần. */
+function withYear(years: number[], year: number): number[] {
+  return [...new Set([...years, year])].sort((a, b) => a - b);
+}
+
+/** Năm đã có lịch báo cáo; `null` khi chưa đọc được (dùng danh sách mặc định). */
+function useCalendarYears(): number[] | null {
+  const { data: auth } = useIsAuthenticated();
+  const { result, query } = useList<{ year: number }>({
+    resource: CALENDAR_RESOURCE,
+    pagination: { currentPage: 1, pageSize: 100 },
+    errorNotification: false,
+    queryOptions: { enabled: auth?.authenticated === true, retry: false },
+  });
+  return useMemo(
+    () => (query.isSuccess ? (result.data ?? []).map((c) => c.year) : null),
+    [query.isSuccess, result.data]
+  );
 }
 
 export function ReportYearProvider({
@@ -69,28 +85,32 @@ export function ReportYearProvider({
   years = DEFAULT_YEARS,
 }: {
   children: ReactNode;
-  /** Các năm cho chọn; mặc định 2024–2027. */
+  /** Các năm cho chọn khi chưa đọc được lịch báo cáo; mặc định 2024–2027. */
   years?: number[];
 }) {
   const [year, setYearState] = useState<number>(initialYear);
-  const [extraYears, setExtraYears] = useState<number[]>([]);
+  const calendarYears = useCalendarYears();
 
   const setYear = useCallback((y: number) => {
     setYearState(y);
     writeStoredYear(y);
   }, []);
 
-  const addYears = useCallback((ys: Iterable<number>) => {
-    setExtraYears((prev) => {
-      const next = new Set(prev);
-      for (const y of ys) next.add(y);
-      return next.size === prev.length ? prev : [...next];
-    });
-  }, []);
+  // Lần đầu đọc được lịch: năm nhớ trong trình duyệt mà chưa có lịch (vd. 2024) thì
+  // chuyển sang năm nay, năm nay chưa có lịch thì năm có lịch muộn nhất. Chỉ làm một
+  // lần — sau đó năm chưa có lịch là do người dùng chủ ý chọn (vd. đang tạo lịch mới).
+  const snapped = useRef(false);
+  useEffect(() => {
+    if (snapped.current || calendarYears === null) return;
+    snapped.current = true;
+    if (calendarYears.length === 0 || calendarYears.includes(year)) return;
+    const now = new Date().getFullYear();
+    setYear(calendarYears.includes(now) ? now : Math.max(...calendarYears));
+  }, [calendarYears, year, setYear]);
 
   const value = useMemo<ReportYearValue>(
-    () => ({ year, setYear, years: withYear(years, year, extraYears), addYears }),
-    [year, setYear, years, extraYears, addYears]
+    () => ({ year, setYear, years: withYear(calendarYears ?? years, year) }),
+    [year, setYear, years, calendarYears]
   );
 
   return (
@@ -109,29 +129,19 @@ ReportYearProvider.displayName = "ReportYearProvider";
 export function useReportYear(): ReportYearValue {
   const ctx = useContext(ReportYearContext);
   const [fallbackYear, setFallbackYear] = useState<number>(initialYear);
-  const [fallbackExtra, setFallbackExtra] = useState<number[]>([]);
 
   const fallbackSet = useCallback((y: number) => {
     setFallbackYear(y);
     writeStoredYear(y);
   }, []);
 
-  const fallbackAdd = useCallback((ys: Iterable<number>) => {
-    setFallbackExtra((prev) => {
-      const next = new Set(prev);
-      for (const y of ys) next.add(y);
-      return next.size === prev.length ? prev : [...next];
-    });
-  }, []);
-
   const fallback = useMemo<ReportYearValue>(
     () => ({
       year: fallbackYear,
       setYear: fallbackSet,
-      years: withYear(DEFAULT_YEARS, fallbackYear, fallbackExtra),
-      addYears: fallbackAdd,
+      years: withYear(DEFAULT_YEARS, fallbackYear),
     }),
-    [fallbackYear, fallbackSet, fallbackExtra, fallbackAdd]
+    [fallbackYear, fallbackSet]
   );
 
   return ctx ?? fallback;
@@ -180,21 +190,31 @@ export function YearSelect({
           <SelectValue />
         </span>
       </SelectTrigger>
-      <SelectContent align="end">
+      {/* Hiện khoảng 7 năm, nhiều hơn thì cuộn; mục tạo lịch nằm ngoài vùng cuộn nên luôn thấy. */}
+      <SelectContent
+        align="end"
+        className={
+          onCreateYear
+            ? "max-h-[min(17rem,var(--radix-select-content-available-height))]"
+            : "max-h-[min(15rem,var(--radix-select-content-available-height))]"
+        }
+        footer={
+          onCreateYear ? (
+            <>
+              <SelectSeparator className="mt-0" />
+              <SelectItem value={CREATE_VALUE}>
+                <CalendarPlus aria-hidden />
+                Tạo lịch năm mới
+              </SelectItem>
+            </>
+          ) : undefined
+        }
+      >
         {years.map((y) => (
           <SelectItem key={y} value={String(y)}>
             Năm {y}
           </SelectItem>
         ))}
-        {onCreateYear ? (
-          <>
-            <SelectSeparator />
-            <SelectItem value={CREATE_VALUE}>
-              <CalendarPlus aria-hidden />
-              Tạo lịch năm mới
-            </SelectItem>
-          </>
-        ) : null}
       </SelectContent>
     </Select>
   );
