@@ -57,7 +57,7 @@ test.describe("Luồng (d): báo cáo năm Sở → UBND", () => {
   async function openYear(page: Page) {
     await page.goto("/summary");
     await page.getByRole("tab", { name: "Theo năm" }).click();
-    await page.getByRole("option", { name: new RegExp(`Năm ${YEAR}`) }).click();
+    // Năm lấy từ ô năm đầu trang (useReportYear đặt sẵn) — "Theo năm" không còn cột danh sách năm.
     await expect(page.getByText(`Báo cáo năm ${YEAR}`).first()).toBeVisible();
   }
 
