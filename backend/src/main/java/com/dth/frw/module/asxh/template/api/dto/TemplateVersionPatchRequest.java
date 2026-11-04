@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * {@code PATCH /template_versions/{id}} — lưu từ Designer (UC-11, UC-12) hoặc
  * đổi ngày áp dụng. Trường {@code null} nghĩa là giữ nguyên. Chỉ phiên bản
- * Nháp / Đang thử nghiệm sửa được.
+ * Nháp sửa được.
  *
  * <p>{@code scripts} là CẢ danh sách kịch bản của phiên bản (thay toàn bộ, như nút
  * Lưu của Designer bản Jmix: bảng tính + kịch bản trong một giao dịch).

@@ -191,7 +191,7 @@ public class TemplateVersionService {
 
     /**
      * Lưu từ Designer (workbook + danh sách kịch bản cùng lúc, UC-11 / UC-12) hoặc đổi ngày
-     * áp dụng. Chỉ bản Nháp / Đang thử nghiệm (BR-11.2, BR-12.4, BR-13.2).
+     * áp dụng. Chỉ bản Nháp (BR-11.2, BR-12.4, BR-13.2).
      */
     @Transactional
     public TemplateVersion update(Long id, TemplateVersionPatchRequest request) {
@@ -276,40 +276,6 @@ public class TemplateVersionService {
     }
 
     /**
-     * Đưa bản nháp sang "Đang thử nghiệm" — nhãn cho người thiết kế biết bản này
-     * đang được chạy thử, chưa ban hành. Nội dung vẫn sửa được, vẫn ban hành /
-     * thu hồi như nháp (xem {@link TemplateStatus#TESTING}); phép chọn phiên bản
-     * theo ngày vẫn bỏ qua. Bản Jmix không có thao tác nào tạo trạng thái này —
-     * thêm ở bản mới theo yêu cầu màn Thiết kế mẫu, chờ BA xác nhận.
-     */
-    @Transactional
-    public TemplateVersion startTesting(Long id) {
-        TemplateVersion version = lockedVersion(id);
-        if (version.getStatus() == TemplateStatus.TESTING) {
-            return version;
-        }
-        if (version.getStatus() != TemplateStatus.DRAFT) {
-            throw new ConflictException("Chỉ chuyển sang thử nghiệm được phiên bản đang nháp.");
-        }
-        version.setStatus(TemplateStatus.TESTING);
-        return repository.save(version);
-    }
-
-    /** Ngược lại {@link #startTesting}: bản đang thử nghiệm trở về nháp. */
-    @Transactional
-    public TemplateVersion stopTesting(Long id) {
-        TemplateVersion version = lockedVersion(id);
-        if (version.getStatus() == TemplateStatus.DRAFT) {
-            return version;
-        }
-        if (version.getStatus() != TemplateStatus.TESTING) {
-            throw new ConflictException("Chỉ trả về nháp được phiên bản đang thử nghiệm.");
-        }
-        version.setStatus(TemplateStatus.DRAFT);
-        return repository.save(version);
-    }
-
-    /**
      * UC-15: khoá. Chỉ bản đã ban hành MỚI NHẤT của biểu (khoá lần lượt từ trên
      * xuống) — khoá một bản cũ khi bản mới hơn còn dùng không đổi được gì cho các
      * đợt mới, chỉ gây khó hiểu. Phiếu đã ghim bản này vẫn nhập/duyệt bình thường.
@@ -369,19 +335,18 @@ public class TemplateVersionService {
         if (status == TemplateStatus.LOCKED) {
             throw new ConflictException("Phiên bản đang khoá — hãy mở khoá trước khi thu hồi.");
         }
-        if (status != TemplateStatus.PUBLISHED && status != TemplateStatus.TESTING) {
-            throw new ConflictException(
-                    "Chỉ thu hồi được bản đã ban hành hoặc đang thử nghiệm; bản nháp thì xoá trực tiếp.");
+        if (status != TemplateStatus.PUBLISHED) {
+            throw new ConflictException("Chỉ thu hồi được bản đã ban hành; bản nháp thì xoá trực tiếp.");
         }
         List<TemplateVersion> chain = repository.findByTemplateIdOrderByVersionNoAsc(templateId);
 
-        // Chuỗi không còn bản nháp/thử nghiệm KHÁC — kiểm tra trước "đỉnh chuỗi":
+        // Chuỗi không còn bản nháp KHÁC — kiểm tra trước "đỉnh chuỗi":
         // bản nháp thường chính là bản kế tiếp, và "xoá nháp trước" là chỉ dẫn làm được.
         boolean otherDraft = chain.stream()
                 .anyMatch(other -> !other.getId().equals(version.getId()) && other.getStatus().editable());
         if (otherDraft) {
             throw new ConflictException(
-                    "Biểu này đang có bản nháp/thử nghiệm khác — xoá hoặc xử lý bản đó trước khi thu hồi.");
+                    "Biểu này đang có bản nháp khác — xoá hoặc xử lý bản đó trước khi thu hồi.");
         }
         if (repository.countByPreviousVersionIdAndStatusNot(version.getId(), TemplateStatus.REVOKED) > 0) {
             throw new ConflictException(

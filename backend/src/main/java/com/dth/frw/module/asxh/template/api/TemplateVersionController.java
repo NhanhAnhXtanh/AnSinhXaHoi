@@ -129,20 +129,6 @@ public class TemplateVersionController {
         return TemplateVersionResponse.full(service.publish(id, effectiveFrom));
     }
 
-    /** Nháp → Đang thử nghiệm (nhãn cho người thiết kế; vẫn sửa và ban hành được). */
-    @PostMapping("/{id}/start_testing")
-    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
-    public TemplateVersionResponse startTesting(@PathVariable Long id) {
-        return TemplateVersionResponse.full(service.startTesting(id));
-    }
-
-    /** Đang thử nghiệm → Nháp. */
-    @PostMapping("/{id}/stop_testing")
-    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
-    public TemplateVersionResponse stopTesting(@PathVariable Long id) {
-        return TemplateVersionResponse.full(service.stopTesting(id));
-    }
-
     /** UC-15: khoá. */
     @PostMapping("/{id}/lock")
     @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
@@ -174,7 +160,7 @@ public class TemplateVersionController {
     }
 
     /**
-     * Thay CẢ danh sách kịch bản của phiên bản Nháp / Đang thử nghiệm (kịch bản không còn trong
+     * Thay CẢ danh sách kịch bản của phiên bản Nháp (kịch bản không còn trong
      * danh sách bị xoá; thứ tự chạy = thứ tự gửi lên). Bản đã ban hành / khoá / thu hồi → 409.
      */
     @PutMapping("/{id}/scripts")

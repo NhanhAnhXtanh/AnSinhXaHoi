@@ -24,7 +24,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Designer lưu theo kiểu THAY CẢ DANH SÁCH (REPLACE-ALL): người soạn sửa nhiều kịch bản rồi
  * bấm Lưu một lần; kịch bản không còn trong danh sách gửi lên bị xoá, thứ tự chạy là thứ tự
- * trong danh sách. Chỉ phiên bản Nháp / Đang thử nghiệm sửa được.
+ * trong danh sách. Chỉ phiên bản Nháp sửa được.
  *
  * <p>Ngoại lệ của bản Jmix giữ nguyên: kịch bản TỔNG HỢP (mã khai {@code getSummaryData} — Sở
  * trích số đã sửa trên bảng tổng hợp) thay riêng được cả khi phiên bản đã ban hành, vì nó không
@@ -139,7 +139,7 @@ public class TemplateScriptService {
 
     // ------------------------------------------------------------------ ghi
 
-    /** Thay TOÀN BỘ danh sách kịch bản của phiên bản Nháp / Đang thử nghiệm. */
+    /** Thay TOÀN BỘ danh sách kịch bản của phiên bản Nháp. */
     @Transactional
     public List<TemplateScript> replaceAll(Long versionId, List<TemplateScriptPayload> payloads) {
         TemplateVersion version = lockedVersion(versionId);

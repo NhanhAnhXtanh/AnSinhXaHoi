@@ -4,8 +4,8 @@ package com.dth.frw.domain.asxh.template;
  * Trạng thái phiên bản mẫu — port nguyên từ {@code TemplateStatus} của bản Jmix.
  *
  * <pre>
- *   DRAFT/TESTING --ban hành--> PUBLISHED --khoá--> LOCKED --mở khoá--> PUBLISHED
- *   PUBLISHED/TESTING --thu hồi--> REVOKED (chót, không quay lại)
+ *   DRAFT --ban hành--> PUBLISHED --khoá--> LOCKED --mở khoá--> PUBLISHED
+ *   PUBLISHED --thu hồi--> REVOKED (chót, không quay lại)
  * </pre>
  *
  * <p>Chỉ {@link #PUBLISHED} được chọn khi hệ thống tìm phiên bản áp dụng theo
@@ -16,7 +16,10 @@ public enum TemplateStatus {
     /** Nháp — sửa được workbook, script, ngày áp dụng. */
     DRAFT,
 
-    /** Đang thử nghiệm — không thao tác nào tạo ra; xử lý như nháp khi ban hành / thu hồi. */
+    /**
+     * Đang thử nghiệm — ĐÃ BỎ (Q-22): không thao tác nào tạo ra nữa. Giữ hằng để dòng
+     * cũ trong DB vẫn đọc được; bản nào còn ở trạng thái này được xử lý y như nháp.
+     */
     TESTING,
 
     /** Đã ban hành — bất biến (workbook, script, ngày áp dụng). */

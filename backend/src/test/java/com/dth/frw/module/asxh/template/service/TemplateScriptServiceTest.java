@@ -10,6 +10,7 @@ import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateKind;
 import com.dth.frw.domain.asxh.template.TemplateScript;
 import com.dth.frw.domain.asxh.template.TemplateSet;
+import com.dth.frw.domain.asxh.template.TemplateStatus;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
 import com.dth.frw.module.asxh.template.api.dto.TemplateRequest;
 import com.dth.frw.module.asxh.template.api.dto.TemplateScriptPayload;
@@ -138,8 +139,8 @@ class TemplateScriptServiceTest {
     @DisplayName("Bản đã thu hồi: không sửa được kịch bản nào")
     void revokedIsFrozen() {
         TemplateVersion version = draft();
-        versionService.startTesting(version.getId());
-        versionService.revoke(version.getId());
+        version.setStatus(TemplateStatus.REVOKED);
+        versionRepository.save(version);
         assertThrows(ConflictException.class, () -> service.replaceAll(version.getId(),
                 List.of(payload(null, "Sổ cái Sở", SUMMARY_CODE))));
     }
