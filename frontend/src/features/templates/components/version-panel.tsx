@@ -15,6 +15,7 @@ import { cn } from "@/shared/lib/utils";
 
 import type { TemplateForm, TemplateVersion } from "../types";
 import {
+  FORM_LOCKED_REASON,
   KIND_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
@@ -74,13 +75,21 @@ export function VersionPanel({
       ) : (
         <>
           <div className="flex flex-col gap-0.5 px-4 pt-4 pb-3">
-            <h2 className="truncate text-base leading-6 font-semibold">
-              {formLabel(form)}
+            <h2 className="flex items-center gap-2 text-base leading-6 font-semibold">
+              <span className="truncate">{formLabel(form)}</span>
+              {form.locked && <StatusBadge tone="locked">Đã khoá</StatusBadge>}
             </h2>
             <p className="text-muted-foreground truncate text-xs leading-4">
               {[form.title, KIND_LABEL[form.kind]].filter(Boolean).join(" · ")}
             </p>
           </div>
+
+          {form.locked && (
+            <p className="text-muted-foreground mx-4 mb-3 rounded-md border px-3 py-2 text-xs leading-4">
+              Biểu đang khoá để sửa: các đợt báo cáo mới không dùng được biểu này. Bạn vẫn sửa được
+              bản nháp; mở khoá biểu rồi ban hành.
+            </p>
+          )}
 
           <h3 className="px-4 pb-2 text-sm font-semibold">Lịch sử phiên bản</h3>
 
@@ -118,6 +127,7 @@ export function VersionPanel({
                 <SecondButton
                   chain={chain}
                   version={selected}
+                  formLocked={form.locked}
                   onPublish={onPublish}
                   onClone={onClone}
                   onSelect={onSelect}
@@ -245,12 +255,14 @@ function FooterButton({
 function SecondButton({
   chain,
   version,
+  formLocked,
   onPublish,
   onClone,
   onSelect,
 }: {
   chain: TemplateVersion[];
   version: TemplateVersion;
+  formLocked: boolean;
   onPublish: (v: TemplateVersion) => void;
   onClone: (v: TemplateVersion) => void;
   onSelect: (id: string) => void;
@@ -260,6 +272,8 @@ function SecondButton({
       <FooterButton
         icon={Send}
         label={`Ban hành ${versionLabel(version).toLowerCase()}`}
+        disabled={formLocked}
+        reason={formLocked ? FORM_LOCKED_REASON : undefined}
         onClick={() => onPublish(version)}
       />
     );

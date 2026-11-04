@@ -49,6 +49,10 @@ export type ApiTemplate = {
   versionCount: number;
   currentVersion: ApiVersionSummary | null;
   latestVersion: ApiVersionSummary | null;
+  /** Cả biểu đang khoá (để sửa): không phiên bản nào được chọn cho đợt mới, không ban hành được. */
+  locked: boolean;
+  lockedAt: string | null;
+  lockedBy: string | null;
   createdAt: string;
   updatedAt: string | null;
 };
@@ -62,6 +66,7 @@ export type ApiTemplateVersion = {
     name: string;
     kind: ApiTemplateKind;
     set: { id: number; name: string };
+    locked: boolean;
   };
   versionNo: number;
   previousVersionId: number | null;
@@ -146,6 +151,10 @@ export type TemplateForm = {
   createdAt: string;
   /** Phiên bản mới nhất (mọi trạng thái) — để màn thiết kế chuyển tab biểu. */
   latestVersionId: string | null;
+  /** Cả biểu đang khoá để sửa: không ban hành / thu hồi, đợt mới không dùng được biểu. */
+  locked: boolean;
+  lockedAt: string | null;
+  lockedBy: string | null;
 };
 
 export type TemplateVersion = {

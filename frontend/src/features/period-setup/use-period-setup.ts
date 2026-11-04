@@ -185,8 +185,10 @@ export function useSelectedPeriod(period: Period | null) {
     queryOptions: { enabled: hasReports },
   });
 
+  // Ô của biểu đang khoá (để sửa) bị bỏ qua: biểu không dùng được nên không hiện cột, không
+  // tính vào số đơn vị đã thiết lập. Thiết lập vẫn còn ở máy chủ, mở khoá biểu là hiện lại.
   const assignments = useMemo(
-    () => (periodId ? (assignmentsQuery.data ?? []) : []),
+    () => (periodId ? (assignmentsQuery.data ?? []).filter((a) => !a.template.locked) : []),
     [periodId, assignmentsQuery.data]
   );
 

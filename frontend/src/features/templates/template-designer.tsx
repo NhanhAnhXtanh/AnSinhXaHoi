@@ -47,6 +47,7 @@ import {
 } from "./api";
 import type { ApiTemplateVersion } from "./types";
 import {
+  FORM_LOCKED_REASON,
   KIND_LABEL,
   MAX_WORKBOOK_BYTES,
   STATUS_LABEL,
@@ -318,6 +319,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     onCloned: (v) => navigate(`/templates/designer/${v.id}`),
     onDeleted: () => navigate(backTo),
     onPublished: () => setMode("design"),
+    isFormLocked: () => form.locked,
   });
 
   const cloneable = canClone(chain, version);
@@ -326,8 +328,8 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     ? {
         label: "Ban hành",
         icon: Send,
-        disabled: dirty || saving,
-        reason: dirty ? "Lưu thay đổi trước đã." : undefined,
+        disabled: dirty || saving || form.locked,
+        reason: form.locked ? FORM_LOCKED_REASON : dirty ? "Lưu thay đổi trước đã." : undefined,
         onClick: () => commands.requestPublish(version),
       }
     : canWrite && version.status === "published" && cloneable.ok
@@ -348,8 +350,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
           { label: "Xem trước", icon: Eye, onClick: openPreview },
         ];
 
-  const versionItems = commands.itemsFor(version);
-  const lockItem = versionItems.find((i) => i.key === "lock");
 
   const menu: ActionItem[] = [
     ...(mode === "design"
@@ -374,7 +374,6 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
           },
         ]
       : []),
-    ...(lockItem && !editable ? [{ ...lockItem, separatorBefore: true }] : []),
     {
       key: "fullscreen",
       label: fullscreen ? "Thoát toàn màn hình" : "Toàn màn hình",
@@ -471,9 +470,12 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     <AsxhPage
       title={title}
       badge={
-        <StatusBadge tone={STATUS_TONE[version.status]}>
-          {STATUS_LABEL[version.status]}
-        </StatusBadge>
+        <>
+          <StatusBadge tone={STATUS_TONE[version.status]}>
+            {STATUS_LABEL[version.status]}
+          </StatusBadge>
+          {form.locked && <StatusBadge tone="locked">Biểu đang khoá</StatusBadge>}
+        </>
       }
       description={description}
       backTo={backTo}
