@@ -36,6 +36,9 @@ export default defineConfig({
     // dưới đây vượt ngưỡng cảnh báo mặc định (500 kB) là bình thường — chúng chỉ tải
     // khi màn có bảng tính mở (React.lazy trong shared/components/spreadsheet/lazy.tsx).
     chunkSizeWarningLimit: 22000,
+    // Trên CI bỏ tính cỡ gzip từng chunk khi in bảng kết quả (chunk SpreadJS hàng chục MB, nén
+    // lại chỉ để in log). `npm run verify:bundle` tự đo gzip trang đầu; ANALYZE=1 cho treemap.
+    reportCompressedSize: !process.env.CI,
     rollupOptions: {
       output: {
         // Tách SpreadJS khỏi chunk của màn hình: màn nhập/xem chỉ kéo "spreadjs",

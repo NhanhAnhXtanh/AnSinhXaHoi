@@ -3,6 +3,10 @@
 # Repo riêng tư chưa bật GitHub Code Security nên KHÔNG gửi kết quả lên tab Security được
 # (upload: never). Thay vào đó: in danh sách phát hiện lên trang lượt chạy, lưu file SARIF làm
 # artifact, và làm đỏ job khi có phát hiện mức "error".
+#
+# Trên PR chỉ quét ngôn ngữ có đổi (backend/** → Java, frontend/** → TypeScript, .github/** →
+# workflow): phần Java mất ~5 phút, PR chỉ sửa giao diện không phải chờ nó. Push lên main, lịch
+# hằng tuần và bấm tay vẫn quét đủ cả ba.
 name: CodeQL
 
 on:
@@ -20,8 +24,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  languages:
+    name: Ngôn ngữ cần quét
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      list: ${{ steps.pick.outputs.list }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            java:
+              - 'backend/**'
+              - '.github/workflows/codeql.yml'
+            js:
+              - 'frontend/**'
+              - '.github/workflows/codeql.yml'
+            actions:
+              - '.github/**'
+      - name: Chọn danh sách
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          JAVA: ${{ steps.filter.outputs.java }}
+          JS: ${{ steps.filter.outputs.js }}
+          ACTIONS: ${{ steps.filter.outputs.actions }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            list='["actions","java-kotlin","javascript-typescript"]'
+          else
+            items=()
+            [ "$ACTIONS" = "true" ] && items+=('"actions"')
+            [ "$JAVA" = "true" ] && items+=('"java-kotlin"')
+            [ "$JS" = "true" ] && items+=('"javascript-typescript"')
+            list="[$(IFS=,; echo "${items[*]}")]"
+          fi
+          echo "Quét: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
   analyze:
     name: Analyze (${{ matrix.language }})
+    needs: languages
+    # PR không đổi mã (chỉ tài liệu…) thì không quét.
+    if: needs.languages.outputs.list != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -31,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [actions, java-kotlin, javascript-typescript]
+        language: ${{ fromJSON(needs.languages.outputs.list) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
