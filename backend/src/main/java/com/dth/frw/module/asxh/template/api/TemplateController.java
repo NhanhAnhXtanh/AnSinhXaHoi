@@ -32,7 +32,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code /api/templates} — resource {@code templates} (biểu trong bộ mẫu, UC-10),
- * kèm thao tác {@code POST /{id}/next_version} (UC-14).
+ * kèm thao tác {@code POST /{id}/next_version} (UC-14) và {@code POST /{id}/lock|unlock}
+ * (khoá / mở khoá cả biểu).
  */
 @RestController
 @RequestMapping("/api/templates")
@@ -100,6 +101,23 @@ public class TemplateController {
         return ResponseEntity
                 .created(URI.create("/api/template_versions/" + created.getId()))
                 .body(TemplateVersionResponse.full(created));
+    }
+
+    /**
+     * UC-15 (đổi): khoá cả biểu để chữa lỗi — không phiên bản nào được chọn cho đợt mới, không
+     * ban hành / thu hồi được; vẫn tạo và sửa bản nháp. Cùng quyền với thao tác trên phiên bản.
+     */
+    @PostMapping("/{id}/lock")
+    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
+    public TemplateResponse lock(@PathVariable Long id) {
+        return respond(service.lockForm(id));
+    }
+
+    /** Mở khoá cả biểu. */
+    @PostMapping("/{id}/unlock")
+    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
+    public TemplateResponse unlock(@PathVariable Long id) {
+        return respond(service.unlockForm(id));
     }
 
     private TemplateResponse respond(Template template) {

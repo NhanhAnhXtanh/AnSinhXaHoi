@@ -64,6 +64,19 @@ public class Template {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    /**
+     * Cả biểu đang khoá (để chữa lỗi): không phiên bản nào được chọn cho đợt báo cáo mới, không
+     * ban hành / thu hồi được; vẫn xem, vẫn tạo và sửa bản nháp. Mở khoá rồi ban hành.
+     */
+    @Column(nullable = false)
+    private boolean locked;
+
+    @Column(name = "locked_at")
+    private Instant lockedAt;
+
+    @Column(name = "locked_by", length = 100)
+    private String lockedBy;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -147,6 +160,32 @@ public class Template {
 
     public void setSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public boolean isLocked() {
+        return locked;
+    }
+
+    public Instant getLockedAt() {
+        return lockedAt;
+    }
+
+    public String getLockedBy() {
+        return lockedBy;
+    }
+
+    /** Khoá cả biểu, ghi người và lúc khoá. */
+    public void lockForm(String username, Instant at) {
+        this.locked = true;
+        this.lockedBy = username;
+        this.lockedAt = at;
+    }
+
+    /** Mở khoá cả biểu. */
+    public void unlockForm() {
+        this.locked = false;
+        this.lockedBy = null;
+        this.lockedAt = null;
     }
 
     public Instant getCreatedAt() {

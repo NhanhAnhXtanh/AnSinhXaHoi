@@ -32,8 +32,9 @@ public record TemplateVersionResponse(
         Instant createdAt,
         Instant updatedAt) {
 
+    /** {@code locked} = cả biểu đang khoá — màn thiết kế dùng để chặn Ban hành. */
     public record TemplateSummary(Long id, String code, String shortName, String name,
-                                  TemplateKind kind, SetSummary set) {
+                                  TemplateKind kind, SetSummary set, boolean locked) {
 
         static TemplateSummary from(Template template) {
             return new TemplateSummary(
@@ -42,7 +43,8 @@ public record TemplateVersionResponse(
                     template.getShortName(),
                     template.getName(),
                     template.getKind(),
-                    new SetSummary(template.getTemplateSet().getId(), template.getTemplateSet().getName()));
+                    new SetSummary(template.getTemplateSet().getId(), template.getTemplateSet().getName()),
+                    template.isLocked());
         }
     }
 

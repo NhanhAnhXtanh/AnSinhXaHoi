@@ -129,20 +129,6 @@ public class TemplateVersionController {
         return TemplateVersionResponse.full(service.publish(id, effectiveFrom));
     }
 
-    /** UC-15: khoá. */
-    @PostMapping("/{id}/lock")
-    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
-    public TemplateVersionResponse lock(@PathVariable Long id) {
-        return TemplateVersionResponse.full(service.lock(id));
-    }
-
-    /** UC-15: mở khoá. */
-    @PostMapping("/{id}/unlock")
-    @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")
-    public TemplateVersionResponse unlock(@PathVariable Long id) {
-        return TemplateVersionResponse.full(service.unlock(id));
-    }
-
     /** UC-17: thu hồi (vĩnh viễn). */
     @PostMapping("/{id}/revoke")
     @PreAuthorize("hasAuthority('" + TemplatePermissions.TEMPLATE_VERSIONS_WRITE + "')")

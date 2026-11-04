@@ -4,12 +4,12 @@ package com.dth.frw.domain.asxh.template;
  * Trạng thái phiên bản mẫu — port nguyên từ {@code TemplateStatus} của bản Jmix.
  *
  * <pre>
- *   DRAFT --ban hành--> PUBLISHED --khoá--> LOCKED --mở khoá--> PUBLISHED
- *   PUBLISHED --thu hồi--> REVOKED (chót, không quay lại)
+ *   DRAFT --ban hành--> PUBLISHED --thu hồi--> REVOKED (chót, không quay lại)
  * </pre>
  *
  * <p>Chỉ {@link #PUBLISHED} được chọn khi hệ thống tìm phiên bản áp dụng theo
- * ngày (UC-19, BR-19.2) — khoá, thu hồi, nháp đều bị bỏ qua.
+ * ngày (UC-19, BR-19.2) — thu hồi, nháp đều bị bỏ qua. Khoá giờ là khoá cả biểu
+ * ({@code Template.locked}), không còn là trạng thái của từng phiên bản.
  */
 public enum TemplateStatus {
 
@@ -26,8 +26,8 @@ public enum TemplateStatus {
     PUBLISHED,
 
     /**
-     * Đã khoá — tạm cất: không còn được chọn cho đợt báo cáo mới, phiếu đã lập
-     * vẫn nhập/duyệt bình thường; mở khoá được.
+     * Đã khoá từng phiên bản — ĐÃ BỎ: thay bằng khoá cả biểu ({@code Template.locked}); changeset
+     * 175 chuyển các bản LOCKED cũ về PUBLISHED. Giữ hằng để giá trị cũ vẫn đọc được.
      */
     LOCKED,
 

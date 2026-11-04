@@ -15,6 +15,7 @@ import java.time.LocalDate;
  * dụng hôm nay theo quy tắc UC-19 (trống nếu chưa có bản đã ban hành nào áp
  * dụng tới hôm nay); {@code latestVersion} là bản có số thứ tự lớn nhất, bất kể
  * trạng thái — thứ màn "Lịch sử phiên bản" cần để biết nút nào hiện.
+ * {@code locked} = cả biểu đang khoá (không phiên bản nào được chọn cho đợt mới).
  */
 public record TemplateResponse(
         Long id,
@@ -27,6 +28,9 @@ public record TemplateResponse(
         long versionCount,
         VersionSummary currentVersion,
         VersionSummary latestVersion,
+        boolean locked,
+        Instant lockedAt,
+        String lockedBy,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -54,6 +58,9 @@ public record TemplateResponse(
                 versionCount,
                 currentVersion,
                 latestVersion,
+                template.isLocked(),
+                template.getLockedAt(),
+                template.getLockedBy(),
                 template.getCreatedAt(),
                 template.getUpdatedAt());
     }

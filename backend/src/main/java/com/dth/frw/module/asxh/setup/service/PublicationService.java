@@ -175,9 +175,18 @@ public class PublicationService {
      * lai không được lọt vào phiếu hôm nay (BR-24.1).
      */
     private Publication issue(ReportPeriod period, PublicationKind kind) {
-        List<PeriodAssignment> assignments = assignmentRepository.findByPeriodId(period.getId());
-        if (assignments.isEmpty()) {
+        List<PeriodAssignment> assigned = assignmentRepository.findByPeriodId(period.getId());
+        if (assigned.isEmpty()) {
             throw new ConflictException("Hãy gán biểu mẫu cho ít nhất một đơn vị rồi mới mở đợt được.");
+        }
+        // Biểu đang khoá (để sửa) không được dùng: bỏ qua ô của biểu đó, giữ nguyên thiết lập để
+        // mở khoá xong thì dùng lại được.
+        List<PeriodAssignment> assignments = assigned.stream()
+                .filter(assignment -> !assignment.getTemplate().isLocked())
+                .toList();
+        if (assignments.isEmpty()) {
+            throw new ConflictException("Chưa mở đợt được: kỳ " + period.getName()
+                    + " chưa chọn biểu nào dùng được (các biểu đã chọn đều đang khoá để sửa).");
         }
 
         // "Hôm nay" theo giờ Việt Nam, không theo múi giờ máy chủ (máy chủ UTC thì 0h–7h lệch một ngày

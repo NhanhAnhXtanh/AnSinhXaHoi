@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Luật vòng đời phiên bản mẫu (UC-13..19): ban hành, phiên bản kế tiếp, khoá ⇄
- * mở khoá, thu hồi LIFO, xoá, chọn phiên bản theo ngày, chuẩn hoá workbook.
+ * mở khoá cả biểu, thu hồi LIFO, xoá, chọn phiên bản theo ngày, chuẩn hoá workbook.
  *
  * <p>Chạy trên cơ sở dữ liệu thật như các test khác của base, trong một giao
  * dịch được cuộn lại sau mỗi test. Mỗi test tự tạo bộ mẫu + biểu riêng (tên bộ
@@ -149,28 +149,37 @@ class TemplateVersionServiceTest {
     // ------------------------------------------------------------- khoá / mở khoá
 
     @Test
-    @DisplayName("Khoá chỉ bản đã ban hành mới nhất; bản khoá bị bỏ qua khi chọn theo ngày; mở khoá trả lại như cũ")
-    void lockAndUnlock() {
+    @DisplayName("Khoá cả biểu: không phiên bản nào được chọn cho đợt mới, không ban hành / thu hồi; vẫn tạo và sửa bản nháp")
+    void lockWholeForm() {
         Template template = newTemplate();
         List<TemplateVersion> chain = twoPublished(template);
-        TemplateVersion v1 = chain.get(0);
         TemplateVersion v2 = chain.get(1);
+        LocalDate aug = LocalDate.of(2026, 8, 1);
 
-        assertThrows(ConflictException.class, () -> service.lock(v1.getId()));
+        templateService.lockForm(template.getId());
+        assertTrue(templateService.get(template.getId()).isLocked());
+        assertTrue(service.findEffective(template.getId(), aug).isEmpty(), "đợt mới không chọn được bản nào");
+        assertTrue(service.findEffective(template.getId(), LocalDate.of(2026, 3, 1)).isEmpty());
+        assertEquals(TemplateStatus.PUBLISHED, service.get(v2.getId()).getStatus(), "trạng thái phiên bản giữ nguyên");
+        assertTrue(templateService.applicableOn(aug, null).stream().noneMatch(t -> t.getId().equals(template.getId())),
+                "biểu đang khoá không có trong cột ma trận thiết lập");
 
-        service.lock(v2.getId());
-        assertEquals(TemplateStatus.LOCKED, service.get(v2.getId()).getStatus());
-        assertEquals(v1.getId(), service.resolve(template.getId(), LocalDate.of(2026, 8, 1)).orElseThrow().getId());
-        assertNull(service.get(v1.getId()).getEffectiveTo(), "bản còn lại thành bản cuối, không có ngày hết hiệu lực");
+        ConflictException revoke = assertThrows(ConflictException.class, () -> service.revoke(v2.getId()));
+        assertTrue(revoke.getMessage().contains("đang khoá"));
 
-        assertThrows(ConflictException.class, () -> service.revoke(v2.getId()), "bản đang khoá không thu hồi được");
-        assertThrows(ConflictException.class, () -> service.nextVersion(template.getId()));
+        // Vẫn tạo và sửa bản nháp để chữa lỗi, nhưng chưa ban hành được.
+        TemplateVersion v3 = design(service.nextVersion(template.getId()));
+        assertEquals(TemplateStatus.DRAFT, v3.getStatus());
+        ConflictException publish = assertThrows(ConflictException.class,
+                () -> service.publish(v3.getId(), LocalDate.of(2026, 9, 1)));
+        assertTrue(publish.getMessage().contains("đang khoá"));
 
-        TemplateVersion unlocked = service.unlock(v2.getId());
-        assertEquals(TemplateStatus.PUBLISHED, unlocked.getStatus());
-        assertEquals(JUL_2026, unlocked.getEffectiveFrom());
-        assertNotNull(unlocked.getPublishedAt());
-        assertEquals(v2.getId(), service.resolve(template.getId(), LocalDate.of(2026, 8, 1)).orElseThrow().getId());
+        // Mở khoá: chọn lại như trước, ban hành được bản đã sửa.
+        templateService.unlockForm(template.getId());
+        assertEquals(v2.getId(), service.findEffective(template.getId(), aug).orElseThrow().getId());
+        assertTrue(templateService.applicableOn(aug, null).stream().anyMatch(t -> t.getId().equals(template.getId())));
+        service.publish(v3.getId(), LocalDate.of(2026, 9, 1));
+        assertEquals(v3.getId(), service.findEffective(template.getId(), LocalDate.of(2026, 9, 1)).orElseThrow().getId());
     }
 
     // ---------------------------------------------------------------- thu hồi LIFO

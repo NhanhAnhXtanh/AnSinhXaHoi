@@ -130,10 +130,13 @@ public class TemplateVersionService {
     }
 
     /**
-     * Bí danh của {@link #resolve} cho slice thiết lập kỳ (mở đợt ghim phiên bản
-     * áp dụng ở ngày mở đợt, UC-24 / UC-26) — không mượn bản sớm nhất.
+     * Như {@link #resolve} cho slice thiết lập kỳ (mở đợt ghim phiên bản áp dụng ở ngày mở đợt,
+     * UC-24 / UC-26) — không mượn bản sớm nhất, và biểu đang khoá thì không phiên bản nào được chọn.
      */
     public Optional<TemplateVersion> findEffective(Long templateId, LocalDate date) {
+        if (templateService.get(templateId).isLocked()) {
+            return Optional.empty();
+        }
         return resolve(templateId, date);
     }
 
@@ -230,6 +233,7 @@ public class TemplateVersionService {
     @Transactional
     public TemplateVersion publish(Long id, LocalDate effectiveFrom) {
         TemplateVersion version = lockedVersion(id);
+        requireFormUnlocked(version.getTemplate(), "ban hành");
         if (!version.getStatus().editable()) {
             throw new ConflictException("Chỉ ban hành được phiên bản đang nháp.");
         }
@@ -276,65 +280,15 @@ public class TemplateVersionService {
     }
 
     /**
-     * UC-15: khoá. Chỉ bản đã ban hành MỚI NHẤT của biểu (khoá lần lượt từ trên
-     * xuống) — khoá một bản cũ khi bản mới hơn còn dùng không đổi được gì cho các
-     * đợt mới, chỉ gây khó hiểu. Phiếu đã ghim bản này vẫn nhập/duyệt bình thường.
-     */
-    @Transactional
-    public TemplateVersion lock(Long id) {
-        TemplateVersion version = lockedVersion(id);
-        if (version.getStatus() == TemplateStatus.LOCKED) {
-            return version;
-        }
-        if (version.getStatus() != TemplateStatus.PUBLISHED) {
-            throw new ConflictException("Chỉ khoá được phiên bản đã ban hành.");
-        }
-        if (version.getEffectiveFrom() != null) {
-            boolean newerPublished = repository.findByTemplateIdOrderByVersionNoAsc(version.getTemplate().getId())
-                    .stream()
-                    .anyMatch(other -> !other.getId().equals(version.getId())
-                            && other.getStatus() == TemplateStatus.PUBLISHED
-                            && other.getEffectiveFrom() != null
-                            && other.getEffectiveFrom().isAfter(version.getEffectiveFrom()));
-            if (newerPublished) {
-                throw new ConflictException(
-                        "Chỉ khoá được phiên bản đã ban hành mới nhất của biểu — hãy khoá lần lượt từ bản mới nhất xuống.");
-            }
-        }
-        version.setStatus(TemplateStatus.LOCKED);
-        repository.save(version);
-        refreshEffectiveTo(version.getTemplate().getId());
-        return version;
-    }
-
-    /** UC-15: mở khoá — trở lại Đã ban hành, giữ nguyên ngày áp dụng, người và ngày ban hành cũ. */
-    @Transactional
-    public TemplateVersion unlock(Long id) {
-        TemplateVersion version = lockedVersion(id);
-        if (version.getStatus() == TemplateStatus.PUBLISHED) {
-            return version;
-        }
-        if (version.getStatus() != TemplateStatus.LOCKED) {
-            throw new ConflictException("Chỉ mở khoá được phiên bản đang khoá.");
-        }
-        version.setStatus(TemplateStatus.PUBLISHED);
-        repository.save(version);
-        refreshEffectiveTo(version.getTemplate().getId());
-        return version;
-    }
-
-    /**
      * UC-17: thu hồi bản ban hành nhầm — vĩnh viễn. Hệ thống tự lùi về bản đã ban
      * hành liền trước (vì phép chọn theo ngày chỉ xét bản đã ban hành).
      */
     @Transactional
     public TemplateVersion revoke(Long id) {
         TemplateVersion version = lockedVersion(id);
+        requireFormUnlocked(version.getTemplate(), "thu hồi phiên bản");
         Long templateId = version.getTemplate().getId();
         TemplateStatus status = version.getStatus();
-        if (status == TemplateStatus.LOCKED) {
-            throw new ConflictException("Phiên bản đang khoá — hãy mở khoá trước khi thu hồi.");
-        }
         if (status != TemplateStatus.PUBLISHED) {
             throw new ConflictException("Chỉ thu hồi được bản đã ban hành; bản nháp thì xoá trực tiếp.");
         }
@@ -392,10 +346,6 @@ public class TemplateVersionService {
                 .max(Comparator.comparingInt(TemplateVersion::getVersionNo))
                 .orElseThrow(() -> new ConflictException(
                         "Biểu này không còn phiên bản nào đang dùng được để làm bản nguồn."));
-        if (source.getStatus() == TemplateStatus.LOCKED) {
-            throw new ConflictException(
-                    "Phiên bản mới nhất của biểu đang khoá — hãy mở khoá trước khi tạo phiên bản kế tiếp.");
-        }
         if (source.getStatus() != TemplateStatus.PUBLISHED) {
             throw new ConflictException("Chỉ tạo được phiên bản kế tiếp từ phiên bản đã ban hành.");
         }
@@ -435,7 +385,7 @@ public class TemplateVersionService {
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException(
                     "Không xoá được phiên bản này: phiên bản đã được dùng để lập phiếu hoặc tổng hợp. "
-                            + "Bạn chỉ có thể khoá lại để không dùng nữa.");
+                            + "Bạn chỉ có thể khoá biểu lại để không dùng nữa.");
         }
         refreshEffectiveTo(templateId);
         return version;
@@ -476,6 +426,14 @@ public class TemplateVersionService {
                 .orElseThrow(() -> new TemplateNotFoundException("phiên bản mẫu", id));
         templateService.lock(templateId);
         return get(id);
+    }
+
+    /** Biểu đang khoá thì không đổi trạng thái phiên bản nào (ban hành, thu hồi) — mở khoá trước. */
+    private static void requireFormUnlocked(Template template, String action) {
+        if (template.isLocked()) {
+            throw new ConflictException("Biểu %s đang khoá nên chưa %s được — hãy mở khoá biểu trước."
+                    .formatted(template.getShortName(), action));
+        }
     }
 
     /** BR-13.3: chỉ bản kế tiếp mới phải bắt đầu sau bản nguồn; bản đầu chuỗi tự do. */
