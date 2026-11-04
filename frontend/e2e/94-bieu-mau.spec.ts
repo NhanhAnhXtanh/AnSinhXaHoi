@@ -381,8 +381,7 @@ test.describe("Nhóm D — biểu mẫu, phiên bản, kịch bản, Designer, b
     const a = await Raw.as(ACCOUNTS.admin);
     const V = (id: number) => `/template_versions/${id}`;
 
-    record(G, "Khoá bản Nháp", await a.send("post", `${V(v1)}/lock`), [409]);
-    record(G, "Mở khoá bản Nháp", await a.send("post", `${V(v1)}/unlock`), [409]);
+    record(G, "Khoá từng phiên bản (thao tác đã bỏ, thay bằng khoá cả biểu)", await a.send("post", `${V(v1)}/lock`), [404, 405]);
     record(G, "Thu hồi bản Nháp", await a.send("post", `${V(v1)}/revoke`), [409]);
     record(G, "Chuyển sang thử nghiệm (thao tác đã bỏ)", await a.send("post", `${V(v1)}/start_testing`), [404, 405]);
     record(G, "Sửa workbook khi đang Nháp (được phép)", await a.send("patch", V(v1), { workbookJson: (await getWorkbook(a, v1)) }), [200]);
@@ -445,20 +444,22 @@ test.describe("Nhóm D — biểu mẫu, phiên bản, kịch bản, Designer, b
     // Xoá bản đang được phiếu dùng
     record(G, "Xoá phiên bản 1 đang được phiếu Q1/2040 dùng", await a.send("delete", V(v1)), [409]);
 
-    // Khoá ⇄ mở khoá
-    const lk = await a.send("post", `${V(v1)}/lock`);
-    record(G, "Khoá bản đã ban hành mới nhất", lk, [200]);
-    record(G, "Khoá lần hai (idempotent)", await a.send("post", `${V(v1)}/lock`), [200]);
-    record(G, "Sửa bản đang khoá", await a.send("patch", V(v1), { workbookJson: workbook() }), [409]);
-    record(G, "Thu hồi bản đang khoá", await a.send("post", `${V(v1)}/revoke`), [409]);
-    record(G, "next_version khi bản mới nhất đang khoá", await a.send("post", `/templates/${templateId}/next_version`), [409]);
-    record(G, "Ban hành bản đang khoá", await a.send("post", `${V(v1)}/publish`), [409]);
-    const resLocked = await a.send("get", `/template_versions/resolve?templateId=${templateId}&date=${YEAR}-03-01`);
-    record(G, "resolve khi bản duy nhất đang khoá (không được chọn)", resLocked, [409]);
-    const ul = await a.send("post", `${V(v1)}/unlock`);
-    record(G, "Mở khoá", ul, [200]);
-    check(G, "Mở khoá giữ người ban hành cũ", json<{ status: string; publishedBy: string }>(ul).status === "PUBLISHED" && json<{ publishedBy: string }>(ul).publishedBy === "admin", "PUBLISHED/admin", `${json<{ status: string }>(ul).status}`);
-    record(G, "Mở khoá lần hai (idempotent)", await a.send("post", `${V(v1)}/unlock`), [200]);
+    // Khoá ⇄ mở khoá cả biểu
+    const T = `/templates/${templateId}`;
+    const lk = await a.send("post", `${T}/lock`);
+    record(G, "Khoá cả biểu", lk, [200]);
+    check(G, "Biểu trả về locked = true", json<{ locked: boolean }>(lk).locked === true, "true", String(json<{ locked: boolean }>(lk).locked));
+    record(G, "Khoá lần hai (idempotent)", await a.send("post", `${T}/lock`), [200]);
+    record(G, "Sửa bản đã ban hành khi biểu khoá", await a.send("patch", V(v1), { workbookJson: workbook() }), [409]);
+    record(G, "Thu hồi khi biểu đang khoá", await a.send("post", `${V(v1)}/revoke`), [409]);
+    const unitApi = await Raw.as(ACCOUNTS.donviBienHoa);
+    record(G, "Đơn vị khoá biểu", await unitApi.send("post", `${T}/lock`), [403]);
+    await unitApi.dispose();
+    const ul = await a.send("post", `${T}/unlock`);
+    record(G, "Mở khoá cả biểu", ul, [200]);
+    check(G, "Mở khoá: locked = false, phiên bản giữ nguyên Đã ban hành", json<{ locked: boolean }>(ul).locked === false
+      && json<{ status: string }>(await a.send("get", V(v1))).status === "PUBLISHED", "false/PUBLISHED", String(json<{ locked: boolean }>(ul).locked));
+    record(G, "Mở khoá lần hai (idempotent)", await a.send("post", `${T}/unlock`), [200]);
 
     // Phiên bản kế tiếp
     const nx = await a.send("post", `/templates/${templateId}/next_version`);
