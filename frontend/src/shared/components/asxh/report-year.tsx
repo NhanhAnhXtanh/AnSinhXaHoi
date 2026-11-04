@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Calendar } from "lucide-react";
+import { Calendar, CalendarPlus } from "lucide-react";
 
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
@@ -26,6 +27,11 @@ type ReportYearValue = {
   year: number;
   setYear: (y: number) => void;
   years: number[];
+  /**
+   * Thêm năm vào danh sách chọn (vd. các năm đã có lịch báo cáo trong DB) — danh
+   * sách mặc định chỉ có 2024–2027, nên năm mới tạo lịch phải được thêm vào đây.
+   */
+  addYears: (ys: Iterable<number>) => void;
 };
 
 const ReportYearContext = createContext<ReportYearValue | null>(null);
@@ -53,11 +59,9 @@ function initialYear(): number {
   return readStoredYear() ?? new Date().getFullYear();
 }
 
-/** Danh sách năm luôn chứa năm đang chọn, xếp tăng dần. */
-function withYear(years: number[], year: number): number[] {
-  return years.includes(year)
-    ? years
-    : [...years, year].sort((a, b) => a - b);
+/** Danh sách năm luôn chứa năm đang chọn và các năm thêm vào, xếp tăng dần. */
+function withYear(years: number[], year: number, extra: number[] = []): number[] {
+  return [...new Set([...years, ...extra, year])].sort((a, b) => a - b);
 }
 
 export function ReportYearProvider({
@@ -69,15 +73,24 @@ export function ReportYearProvider({
   years?: number[];
 }) {
   const [year, setYearState] = useState<number>(initialYear);
+  const [extraYears, setExtraYears] = useState<number[]>([]);
 
   const setYear = useCallback((y: number) => {
     setYearState(y);
     writeStoredYear(y);
   }, []);
 
+  const addYears = useCallback((ys: Iterable<number>) => {
+    setExtraYears((prev) => {
+      const next = new Set(prev);
+      for (const y of ys) next.add(y);
+      return next.size === prev.length ? prev : [...next];
+    });
+  }, []);
+
   const value = useMemo<ReportYearValue>(
-    () => ({ year, setYear, years: withYear(years, year) }),
-    [year, setYear, years]
+    () => ({ year, setYear, years: withYear(years, year, extraYears), addYears }),
+    [year, setYear, years, extraYears, addYears]
   );
 
   return (
@@ -96,26 +109,50 @@ ReportYearProvider.displayName = "ReportYearProvider";
 export function useReportYear(): ReportYearValue {
   const ctx = useContext(ReportYearContext);
   const [fallbackYear, setFallbackYear] = useState<number>(initialYear);
+  const [fallbackExtra, setFallbackExtra] = useState<number[]>([]);
 
   const fallbackSet = useCallback((y: number) => {
     setFallbackYear(y);
     writeStoredYear(y);
   }, []);
 
+  const fallbackAdd = useCallback((ys: Iterable<number>) => {
+    setFallbackExtra((prev) => {
+      const next = new Set(prev);
+      for (const y of ys) next.add(y);
+      return next.size === prev.length ? prev : [...next];
+    });
+  }, []);
+
   const fallback = useMemo<ReportYearValue>(
     () => ({
       year: fallbackYear,
       setYear: fallbackSet,
-      years: withYear(DEFAULT_YEARS, fallbackYear),
+      years: withYear(DEFAULT_YEARS, fallbackYear, fallbackExtra),
+      addYears: fallbackAdd,
     }),
-    [fallbackYear, fallbackSet]
+    [fallbackYear, fallbackSet, fallbackExtra, fallbackAdd]
   );
 
   return ctx ?? fallback;
 }
 
-/** Ô "Năm 2026" có icon lịch, đặt ở cụm phải đầu trang. */
-export function YearSelect({ className }: { className?: string }) {
+/** Giá trị của mục thao tác cuối danh sách — không phải một năm. */
+const CREATE_VALUE = "__create__";
+
+/**
+ * Ô "Năm 2026" có icon lịch, đặt ở cụm phải đầu trang.
+ *
+ * `onCreateYear` (chỉ màn Lịch và kỳ báo cáo, người có quyền tạo lịch): thêm mục
+ * "Tạo lịch năm mới" ở cuối danh sách.
+ */
+export function YearSelect({
+  className,
+  onCreateYear,
+}: {
+  className?: string;
+  onCreateYear?: () => void;
+}) {
   const { year, setYear, years } = useReportYear();
   // Đổi năm thay cả khung làm việc mà không đổi đường dẫn, nên hộp hỏi "Bỏ thay đổi chưa
   // lưu?" của UnsavedChangesGuard không tự bắt được — màn đang có số chưa lưu (ma trận
@@ -126,6 +163,10 @@ export function YearSelect({ className }: { className?: string }) {
     <Select
       value={String(year)}
       onValueChange={(v) => {
+        if (v === CREATE_VALUE) {
+          if (onCreateYear) confirmDiscard(onCreateYear);
+          return;
+        }
         const n = Number(v);
         if (Number.isInteger(n) && n !== year) confirmDiscard(() => setYear(n));
       }}
@@ -145,6 +186,15 @@ export function YearSelect({ className }: { className?: string }) {
             Năm {y}
           </SelectItem>
         ))}
+        {onCreateYear ? (
+          <>
+            <SelectSeparator />
+            <SelectItem value={CREATE_VALUE}>
+              <CalendarPlus aria-hidden />
+              Tạo lịch năm mới
+            </SelectItem>
+          </>
+        ) : null}
       </SelectContent>
     </Select>
   );

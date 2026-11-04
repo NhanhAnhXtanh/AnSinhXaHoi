@@ -106,7 +106,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * /api/report_calendars`, `PATCH /api/report_periods/{id}` (hạn nộp từng kỳ).
  */
 export function ReportCalendar() {
-  const { year, setYear } = useReportYear();
+  const { year, setYear, addYears } = useReportYear();
   const [creating, setCreating] = useState(false);
   // Người chỉ có quyền xem (vd. cán bộ duyệt): không tạo / sửa / xoá lịch — máy chủ vẫn kiểm lại.
   const { data: canWriteData } = useCan({ resource: CALENDAR_RESOURCE, action: "edit" });
@@ -124,12 +124,28 @@ export function ReportCalendar() {
   const calendar = calendars.find((c) => c.year === year);
   const takenYears = useMemo(() => new Set(calendars.map((c) => c.year)), [calendars]);
 
+  // Ô năm đầu trang chỉ có sẵn 2024–2027: thêm các năm đã có lịch (vd. 2028 vừa tạo).
+  useEffect(() => {
+    addYears(takenYears);
+  }, [addYears, takenYears]);
+
+  /**
+   * Mục "Tạo lịch năm mới" của ô năm: nhảy sang năm liền sau năm có lịch muộn nhất
+   * (chưa có lịch nào thì năm nay) rồi mở khung tạo — ô Năm trong khung vẫn đổi được.
+   */
+  const startCreate = () => {
+    const latest = takenYears.size > 0 ? Math.max(...takenYears) : new Date().getFullYear() - 1;
+    setYear(latest + 1);
+    setCreating(true);
+  };
+  const onCreateYear = canWrite ? startCreate : undefined;
+
   if (query.isLoading || query.isError) {
     return (
       <AsxhPage
         title={`Lịch báo cáo năm ${year}`}
         description="Thiết lập các kỳ báo cáo cho cả năm — hệ thống tự sinh kỳ theo loại kỳ đã chọn."
-        actions={<YearSelect />}
+        actions={<YearSelect onCreateYear={onCreateYear} />}
         fill
       >
         <div className="bg-card border-border flex min-h-0 flex-1 flex-col rounded-lg border shadow-e1">
@@ -163,6 +179,7 @@ export function ReportCalendar() {
         takenYears={takenYears}
         canWrite={canWrite}
         canDelete={canDelete}
+        onCreateYear={onCreateYear}
       />
     );
   }
@@ -187,7 +204,7 @@ export function ReportCalendar() {
     <AsxhPage
       title={`Lịch báo cáo năm ${year}`}
       description="Năm này chưa có lịch. Tạo lịch để hệ thống sinh các kỳ báo cáo."
-      actions={<YearSelect />}
+      actions={<YearSelect onCreateYear={onCreateYear} />}
       fill
     >
       <div className="bg-card border-border flex min-h-0 flex-1 items-center justify-center rounded-lg border p-6 shadow-e1">
@@ -232,6 +249,7 @@ function CalendarWorkspace({
   onCreated,
   canWrite,
   canDelete,
+  onCreateYear,
 }: {
   mode: "create" | "view";
   year: number;
@@ -243,6 +261,8 @@ function CalendarWorkspace({
   /** Quyền tạo / sửa lịch (gồm hạn nộp từng kỳ). Không có thì cả khung chỉ xem. */
   canWrite: boolean;
   canDelete: boolean;
+  /** Mục "Tạo lịch năm mới" trong ô năm (chỉ khi đang xem lịch đã có). */
+  onCreateYear?: () => void;
 }) {
   const form = useForm<CalendarFormValues>({
     resolver: zodResolver(schema),
@@ -662,7 +682,7 @@ function CalendarWorkspace({
       }
       actions={
         <>
-          <YearSelect />
+          <YearSelect onCreateYear={mode === "view" ? onCreateYear : undefined} />
           <HeaderActions
             primary={
               canWrite
