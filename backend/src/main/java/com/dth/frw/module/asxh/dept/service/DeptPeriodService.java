@@ -25,8 +25,8 @@ import com.dth.frw.module.asxh.period.service.ReportPeriodService;
 import com.dth.frw.module.asxh.summary.query.SummaryRow;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries;
 import com.dth.frw.module.asxh.summary.repo.SummaryQueries.ReportRow;
+import com.dth.frw.module.asxh.summary.service.PeriodVersionResolver;
 import com.dth.frw.module.asxh.summary.service.SummaryAggregationService;
-import com.dth.frw.module.asxh.template.service.TemplateVersionService;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.exception.ResourceNotFoundException;
 import com.dth.frw.shared.security.CurrentUser;
@@ -78,7 +78,7 @@ public class DeptPeriodService {
     private final SummaryAggregationService aggregation;
     private final SummaryQueries queries;
     private final ReportPeriodService periodService;
-    private final TemplateVersionService templateVersionService;
+    private final PeriodVersionResolver versionResolver;
     private final EntityManager entityManager;
 
     public DeptPeriodService(DeptReportRepository reportRepository,
@@ -91,7 +91,7 @@ public class DeptPeriodService {
                              SummaryAggregationService aggregation,
                              SummaryQueries queries,
                              ReportPeriodService periodService,
-                             TemplateVersionService templateVersionService,
+                             PeriodVersionResolver versionResolver,
                              EntityManager entityManager) {
         this.reportRepository = reportRepository;
         this.sheetRepository = sheetRepository;
@@ -103,7 +103,7 @@ public class DeptPeriodService {
         this.aggregation = aggregation;
         this.queries = queries;
         this.periodService = periodService;
-        this.templateVersionService = templateVersionService;
+        this.versionResolver = versionResolver;
         this.entityManager = entityManager;
     }
 
@@ -232,12 +232,14 @@ public class DeptPeriodService {
         record Form(Template template, TemplateVersion version) {
         }
         List<Form> forms = new ArrayList<>();
+        // Cùng phiên bản với màn Tổng hợp kỳ: bản ghim trong phiếu của kỳ (xem PeriodVersionResolver).
+        List<Long> leafIds = aggregation.resolveLeafPeriodIds(period.getId());
         for (Template template : queries.assignedTemplates(period.getId())) {
             if (template.getKind() != TemplateKind.CHI_TIET) {
                 continue;
             }
-            Optional<TemplateVersion> version = templateVersionService.resolveOrEarliest(template.getId(),
-                    period.getFromDate());
+            Optional<TemplateVersion> version = versionResolver.resolve(period, leafIds, template.getId())
+                    .map(PeriodVersionResolver.Resolved::version);
             if (version.isEmpty()) {
                 log.warn("Bỏ qua biểu {} khi lưu số liệu kỳ {}: chưa có phiên bản đã ban hành.",
                         template.getShortName(), period.getName());
