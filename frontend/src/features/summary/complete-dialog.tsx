@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCheck, LoaderCircle, TriangleAlert } from "lucide-react";
+import { LoaderCircle, Save, TriangleAlert } from "lucide-react";
 
 import { LoadingState, formatNumber } from "@/shared/components/asxh";
 import { Button } from "@/shared/ui/button";
@@ -16,6 +16,17 @@ import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 
 import { deptSheetUrl, errorMessage, useApiArray, type PendingChange } from "./api";
+
+/**
+ * Phần đổi của một dòng: số lượng và / hoặc kinh phí — chỉ phần nào khác mới hiện (trước đây chỉ hiện
+ * kinh phí, đổi số lượng mà kinh phí giữ nguyên thì dòng trông như không đổi).
+ */
+function changedParts(c: PendingChange): { label: string; from: number | null; to: number | null }[] {
+  const parts: { label: string; from: number | null; to: number | null }[] = [];
+  if (c.currentQuantity !== c.quantity) parts.push({ label: "Số lượng", from: c.currentQuantity, to: c.quantity });
+  if (c.currentAmount !== c.amount) parts.push({ label: "Kinh phí", from: c.currentAmount, to: c.amount });
+  return parts;
+}
 
 /** Hiện tối đa bấy nhiêu dòng đổi trong hộp; còn lại ghi "và N dòng khác". */
 const PREVIEW_LIMIT = 8;
@@ -60,8 +71,8 @@ export function CompleteDialog({
         <DialogHeader>
           <DialogTitle>Lưu số liệu biểu {sheetLabel}?</DialogTitle>
           <DialogDescription>
-            Số liệu biểu {sheetLabel} của {periodName} sẽ được lưu thành phiên bản mới và biểu
-            được khoá lại. Muốn sửa tiếp thì bấm "Sửa lại".
+            Số liệu biểu {sheetLabel} của {periodName} sẽ được lưu thành phiên bản mới. Lưu xong
+            bạn vẫn sửa tiếp được.
           </DialogDescription>
         </DialogHeader>
 
@@ -80,23 +91,28 @@ export function CompleteDialog({
             Biểu không có số nào khác số liệu đã lưu, bấm Lưu sẽ không đổi gì.
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <p className="text-sm">
               Có <span className="font-semibold">{formatNumber(changes.length)}</span> dòng sẽ được
               lưu vào số liệu tổng hợp:
             </p>
-            <ul className="divide-y overflow-hidden rounded-lg border text-sm">
+            <ul className="w-full min-w-0 divide-y overflow-hidden rounded-lg border text-sm">
               {changes.slice(0, PREVIEW_LIMIT).map((c, i) => (
-                <li key={`${c.indicatorCode}-${c.unitName}-${i}`} className="flex items-center gap-3 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate" title={`${c.indicatorName} · ${c.unitName}`}>
+                <li
+                  key={`${c.indicatorCode}-${c.unitName}-${i}`}
+                  className="flex min-w-0 flex-col gap-0.5 px-3 py-2"
+                >
+                  <span className="truncate" title={`${c.indicatorName} · ${c.unitName}`}>
                     {c.indicatorName}
                     <span className="text-muted-foreground"> · {c.unitName}</span>
                   </span>
-                  <span className="text-muted-foreground shrink-0 tabular-nums line-through">
-                    {formatNumber(c.currentAmount ?? c.currentQuantity)}
-                  </span>
-                  <span className="shrink-0 font-medium tabular-nums">
-                    {formatNumber(c.amount ?? c.quantity)}
+                  <span className="text-muted-foreground flex flex-wrap gap-x-4 text-xs tabular-nums">
+                    {changedParts(c).map((part) => (
+                      <span key={part.label}>
+                        {part.label}: <span className="line-through">{formatNumber(part.from)}</span> →{" "}
+                        <span className="text-foreground font-medium">{formatNumber(part.to)}</span>
+                      </span>
+                    ))}
                   </span>
                 </li>
               ))}
@@ -132,7 +148,7 @@ export function CompleteDialog({
             disabled={busy || preview.isLoading || preview.error !== null}
             onClick={() => onConfirm(reason.trim())}
           >
-            {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : <CheckCheck aria-hidden />}
+            {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : <Save aria-hidden />}
             Lưu
           </Button>
         </DialogFooter>
