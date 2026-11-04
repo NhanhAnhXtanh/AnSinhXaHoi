@@ -43,6 +43,7 @@ export interface SpreadAdapter extends ScriptWorkbookAdapter {
   refresh(): void;
   onBeforeEdit(guard: (cell: CellEvent) => boolean | void): () => void;
   onBeforeCommit(guard: (cell: CellEvent, newValue: unknown) => boolean | void): () => void;
+  /** Guard cho mọi thao tác ghi cả vùng: dán, kéo điền (núm góc ô), kéo thả khối ô. */
   onBeforePaste(guard: (range: RangeEvent) => boolean | void): () => void;
   /** Chặn mọi thao tác sửa (gõ, dán, kéo thả, kéo điền) — màn chỉ xem. */
   blockAllEdits(): () => void;
@@ -90,12 +91,60 @@ function visibilityName(visibility: GC.Spread.Sheets.SheetTabVisible): SheetVisi
   return "visible";
 }
 
+/**
+ * Văn bản clipboard (Excel / bảng tính khác: cột cách bằng tab, dòng cách bằng xuống dòng; ô có
+ * xuống dòng hoặc tab được bọc nháy kép, nháy kép bên trong viết đôi) → lưới ô. Bỏ dòng trống cuối.
+ */
+export function parseClipboardText(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') {
+        cell += '"';
+        i += 1;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        cell += ch;
+      }
+    } else if (ch === '"' && cell === "") {
+      quoted = true;
+    } else if (ch === "\t") {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i += 1;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += ch;
+    }
+  }
+  if (cell !== "" || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
 function fileTypeOf(file: File): GC.Spread.Sheets.FileType | "json" {
   const name = file.name.toLowerCase();
   if (name.endsWith(".ssjson")) return GC.Spread.Sheets.FileType.ssjson;
   if (name.endsWith(".json")) return "json";
   return GC.Spread.Sheets.FileType.excel;
 }
+
+const PASTE_ALLOWED_COMMAND = "asxh.pasteAllowedCells";
+const REDO_SHIFT_COMMAND = "asxh.redoCtrlShiftZ";
+
+type PasteWrite = { sheetName: string; row: number; col: number; text?: string; value?: unknown };
+type PasteAllowedOptions = { cmd: string; sheetName: string; writes: PasteWrite[] };
 
 export function wrapSpreadWorkbook(
   workbook: GC.Spread.Sheets.Workbook,
@@ -113,6 +162,50 @@ export function wrapSpreadWorkbook(
   const marks = new Map<string, { sheetIndex: number; row: number; col: number; original: unknown }>();
   let unbindMarkWatch: (() => void) | null = null;
   const markKey = (sheetIndex: number, row: number, col: number) => `${sheetIndex}:${row}:${col}`;
+
+  // Làm lại: Ctrl+Shift+Z (thói quen của nhiều phần mềm) cùng với Ctrl+Y sẵn có; Ctrl+Z là hoàn tác.
+  // Lệnh riêng gắn phím: setShortcutKey("redo", …) sẽ THAY phím Ctrl+Y của lệnh redo gốc.
+  workbook.commandManager().register(
+    REDO_SHIFT_COMMAND,
+    {
+      canUndo: false,
+      execute(context: GC.Spread.Sheets.Workbook) {
+        context.undoManager().redo();
+        return true;
+      },
+    },
+    GC.Spread.Commands.Key.z,
+    true,
+    true,
+    false,
+    false
+  );
+  // Dán MỘT PHẦN (vùng dán lẫn ô khoá — xem onBeforePaste): một lệnh có hoàn tác, để Ctrl+Z trả mọi ô
+  // vừa ghi về giá trị cũ trong một bước và Ctrl+Shift+Z / Ctrl+Y làm lại được.
+  workbook.commandManager().register(PASTE_ALLOWED_COMMAND, {
+    canUndo: true,
+    execute(context: GC.Spread.Sheets.Workbook, opts: PasteAllowedOptions, isUndo: boolean) {
+      const Commands = GC.Spread.Sheets.Commands;
+      if (isUndo) {
+        Commands.undoTransaction(context, opts);
+        return true;
+      }
+      Commands.startTransaction(context, opts);
+      context.suspendPaint();
+      try {
+        for (const write of opts.writes) {
+          const sheet = context.getSheetFromName(write.sheetName);
+          if (!sheet) continue;
+          if (write.text !== undefined) sheet.setText(write.row, write.col, write.text);
+          else sheet.setValue(write.row, write.col, write.value ?? null);
+        }
+      } finally {
+        context.resumePaint();
+      }
+      Commands.endTransaction(context, opts);
+      return true;
+    },
+  });
 
   function muteChanges(fn: () => void): void {
     muted += 1;
@@ -382,6 +475,65 @@ export function wrapSpreadWorkbook(
     },
     onBeforePaste(guard) {
       assertNotDestroyed();
+      const cellAllowed = (sheetName: string, row: number, col: number) =>
+        guard({ sheetName, row, col, rowCount: 1, colCount: 1 }) !== false;
+      /**
+       * Vùng dán lẫn ô không được sửa: KHÔNG huỷ cả lần dán — chỉ ghi GIÁ TRỊ vào từng ô được phép,
+       * ô khoá giữ nguyên. Nguồn trong workbook đọc giá trị ô nguồn (giữ kiểu số); nguồn ngoài (Excel,
+       * văn bản) đọc văn bản tab / xuống dòng. Vùng đích lớn hơn nguồn thì lặp lại nguồn như Excel.
+       */
+      const pasteAllowedCells = (args: GC.Spread.Sheets.IClipboardPastingEventArgs) => {
+        const sheet = args.sheet;
+        const range = args.cellRange;
+        let rows: number;
+        let cols: number;
+        let read: (r: number, c: number) => { text?: string; value?: unknown };
+        if (args.fromSheet && args.fromRange && args.fromRange.row >= 0 && args.fromRange.col >= 0) {
+          const from = args.fromSheet;
+          const fr = args.fromRange;
+          rows = fr.rowCount;
+          cols = fr.colCount;
+          read = (r, c) => ({ value: from.getValue(fr.row + r, fr.col + c) });
+        } else {
+          const grid = parseClipboardText(args.pasteData?.text ?? "");
+          rows = grid.length;
+          cols = grid.reduce((max, line) => Math.max(max, line.length), 0);
+          read = (r, c) => ({ text: grid[r]?.[c] ?? "" });
+        }
+        if (rows === 0 || cols === 0) return;
+        const writes: PasteWrite[] = [];
+        const written = new Set<string>();
+        for (let r = 0; r < range.rowCount; r += 1) {
+          for (let c = 0; c < range.colCount; c += 1) {
+            const row = range.row + r;
+            const col = range.col + c;
+            if (!cellAllowed(args.sheetName, row, col)) continue;
+            writes.push({ sheetName: args.sheetName, row, col, ...read(r % rows, c % cols) });
+            written.add(row + ":" + col);
+          }
+        }
+        // Cắt (Ctrl+X) trong cùng workbook: chỉ xoá ô nguồn được phép sửa, ô khoá ở nguồn giữ nguyên.
+        if (args.isCutting && args.fromSheet && args.fromRange) {
+          const fr = args.fromRange;
+          const fromName = args.fromSheet.name();
+          for (let r = 0; r < fr.rowCount; r += 1) {
+            for (let c = 0; c < fr.colCount; c += 1) {
+              const row = fr.row + r;
+              const col = fr.col + c;
+              const sameCell = args.fromSheet === sheet && written.has(row + ":" + col);
+              if (!sameCell && cellAllowed(fromName, row, col)) {
+                writes.push({ sheetName: fromName, row, col, value: null });
+              }
+            }
+          }
+        }
+        if (writes.length === 0) return;
+        // Chạy sau sự kiện dán (đã huỷ) để lệnh vào ngăn hoàn tác như một thao tác riêng của người dùng.
+        setTimeout(() => {
+          if (destroyed) return;
+          workbook.commandManager().execute({ cmd: PASTE_ALLOWED_COMMAND, sheetName: sheet.name(), writes });
+        }, 0);
+      };
       const handler = (_: unknown, args: GC.Spread.Sheets.IClipboardPastingEventArgs) => {
         const range = args.cellRange;
         const verdict = guard({
@@ -391,10 +543,83 @@ export function wrapSpreadWorkbook(
           rowCount: range.rowCount,
           colCount: range.colCount,
         });
-        if (verdict === false) args.cancel = true;
+        if (verdict !== false) return; // cả vùng được phép: dán bình thường (giữ định dạng như cũ)
+        args.cancel = true;
+        pasteAllowedCells(args);
+      };
+      // Kéo điền (núm góc ô) và kéo thả khối ô: để bảng tính kéo như Excel (chuỗi số, công thức, định
+      // dạng) trên cả vùng, nhưng ô KHÔNG được sửa giữ nguyên — chụp lại trước khi kéo, trả về ngay sau
+      // khi kéo xong. Kéo thả kiểu di chuyển còn xoá vùng nguồn nên ô khoá ở nguồn cũng được chụp lại.
+      // Hoàn tác: Ctrl+Z trả cả vùng về trước khi kéo (ô khoá vẫn đúng giá trị cũ); làm lại chạy lại lệnh
+      // kéo nên sự kiện "kéo xong" chạy lại và ô khoá lại được trả về.
+      type Snapshot = { row: number; col: number; value: unknown; formula: string; style: GC.Spread.Sheets.Style | null };
+      let pending: { sheet: GC.Spread.Sheets.Worksheet; cells: Snapshot[] } | null = null;
+      const snapshotLocked = (
+        sheet: GC.Spread.Sheets.Worksheet,
+        areas: { row: number; col: number; rowCount: number; colCount: number }[]
+      ): Snapshot[] => {
+        const cells: Snapshot[] = [];
+        const seen = new Set<string>();
+        for (const area of areas) {
+          for (let r = 0; r < area.rowCount; r += 1) {
+            for (let c = 0; c < area.colCount; c += 1) {
+              const row = area.row + r;
+              const col = area.col + c;
+              const key = row + ":" + col;
+              if (seen.has(key) || cellAllowed(sheet.name(), row, col)) continue;
+              seen.add(key);
+              const style = sheet.getStyle(row, col);
+              cells.push({
+                row,
+                col,
+                value: sheet.getValue(row, col),
+                formula: sheet.getFormula(row, col) || "",
+                style: style ? style.clone() : null,
+              });
+            }
+          }
+        }
+        return cells;
+      };
+      const restoreLocked = () => {
+        const job = pending;
+        pending = null;
+        if (!job || job.cells.length === 0) return;
+        job.sheet.suspendPaint();
+        try {
+          for (const cell of job.cells) {
+            // null = ô không có style riêng (theo dòng / cột) — SpreadJS nhận null để gỡ style của ô.
+            job.sheet.setStyle(cell.row, cell.col, cell.style as GC.Spread.Sheets.Style);
+            if (cell.formula) job.sheet.setFormula(cell.row, cell.col, cell.formula);
+            else job.sheet.setValue(cell.row, cell.col, cell.value ?? null);
+          }
+        } finally {
+          job.sheet.resumePaint();
+        }
+      };
+      const fillHandler = (_: unknown, args: GC.Spread.Sheets.IDragFillBlockEventArgs) => {
+        const range = args.fillRange;
+        pending = { sheet: args.sheet, cells: snapshotLocked(args.sheet, [range]) };
+      };
+      const dropHandler = (_: unknown, args: GC.Spread.Sheets.IDragDropBlockEventArgs) => {
+        const areas = [{ row: args.toRow, col: args.toCol, rowCount: args.rowCount, colCount: args.colCount }];
+        if (!args.copy) {
+          areas.push({ row: args.fromRow, col: args.fromCol, rowCount: args.rowCount, colCount: args.colCount });
+        }
+        pending = { sheet: args.sheet, cells: snapshotLocked(args.sheet, areas) };
       };
       workbook.bind(GC.Spread.Sheets.Events.ClipboardPasting, handler);
-      return () => workbook.unbind(GC.Spread.Sheets.Events.ClipboardPasting, handler);
+      workbook.bind(GC.Spread.Sheets.Events.DragFillBlock, fillHandler);
+      workbook.bind(GC.Spread.Sheets.Events.DragFillBlockCompleted, restoreLocked);
+      workbook.bind(GC.Spread.Sheets.Events.DragDropBlock, dropHandler);
+      workbook.bind(GC.Spread.Sheets.Events.DragDropBlockCompleted, restoreLocked);
+      return () => {
+        workbook.unbind(GC.Spread.Sheets.Events.ClipboardPasting, handler);
+        workbook.unbind(GC.Spread.Sheets.Events.DragFillBlock, fillHandler);
+        workbook.unbind(GC.Spread.Sheets.Events.DragFillBlockCompleted, restoreLocked);
+        workbook.unbind(GC.Spread.Sheets.Events.DragDropBlock, dropHandler);
+        workbook.unbind(GC.Spread.Sheets.Events.DragDropBlockCompleted, restoreLocked);
+      };
     },
     blockAllEdits() {
       assertNotDestroyed();
