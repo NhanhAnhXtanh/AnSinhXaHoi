@@ -10,12 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { cn } from "@/shared/lib/utils";
 
 import type { TemplateVersion } from "../types";
 import { firstOfNextMonth, nextDay, parseVnDate, versionLabel } from "../model";
+import { DateInput } from "./date-input";
 
 /**
  * Hộp "Ban hành phiên bản N?" (UC-13): một ô Áp dụng từ ngày, điền sẵn ngày đã
@@ -99,17 +99,15 @@ export function PublishDialog({
           <Label htmlFor={inputId}>
             Áp dụng từ ngày <span className="text-destructive-text">*</span>
           </Label>
-          <Input
+          <DateInput
             id={inputId}
             value={text}
-            inputMode="numeric"
-            placeholder="ngày/tháng/năm"
-            autoComplete="off"
+            min={min}
             disabled={busy}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={hintId}
-            onChange={(e) => {
-              setText(e.target.value);
+            invalid={Boolean(error)}
+            describedBy={hintId}
+            onChange={(next) => {
+              setText(next);
               setError(null);
             }}
           />
