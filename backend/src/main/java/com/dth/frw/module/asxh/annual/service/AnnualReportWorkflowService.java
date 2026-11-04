@@ -216,9 +216,10 @@ public class AnnualReportWorkflowService {
     /**
      * Sở và UBND dùng chung quyền quyết định báo cáo năm (như bản Jmix), nên quyền không đủ để tách
      * người nộp khỏi người quyết định: người đã nộp phiếu không tự phê duyệt / trả lại phiếu đó.
+     * Quản trị (vai trò ADMIN) được miễn — vẫn quyết định được phiếu do chính mình nộp.
      */
     private static void requireNotSubmitter(AnnualReport report) {
-        if (AnnualReportService.isSubmittedByCurrentUser(report)) {
+        if (AnnualReportService.isBlockedAsSubmitter(report)) {
             throw new ConflictException("Bạn là người nộp báo cáo năm này nên không tự phê duyệt hoặc trả lại "
                     + "được. Lãnh đạo UBND sẽ quyết định.");
         }

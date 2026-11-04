@@ -187,8 +187,8 @@ public class AnnualReportService {
             return actions;
         }
         if (report.getStatus() == AnnualReportStatus.SUBMITTED) {
-            // Người nộp không tự quyết định phiếu của mình (AnnualReportWorkflowService).
-            if (!isSubmittedByCurrentUser(report)) {
+            // Người nộp không tự quyết định phiếu của mình, trừ quản trị (AnnualReportWorkflowService).
+            if (!isBlockedAsSubmitter(report)) {
                 actions.add("approve");
                 actions.add("return");
             }
@@ -198,10 +198,21 @@ public class AnnualReportService {
         return actions;
     }
 
+    /** Vai trò quản trị hệ thống — miễn quy tắc tách người nộp khỏi người quyết định. */
+    static final String ADMIN_AUTHORITY = "ROLE_ADMIN";
+
     /** Người đang đăng nhập chính là người đã nộp phiếu này. */
     public static boolean isSubmittedByCurrentUser(AnnualReport report) {
         String actor = CurrentUser.username().orElse(null);
         return actor != null && actor.equalsIgnoreCase(report.getSubmittedBy());
+    }
+
+    /**
+     * Người đang đăng nhập bị chặn tự phê duyệt / trả lại phiếu này: là người nộp và không phải
+     * quản trị. Quản trị (vai trò ADMIN) vẫn quyết định được cả phiếu do chính mình nộp.
+     */
+    public static boolean isBlockedAsSubmitter(AnnualReport report) {
+        return isSubmittedByCurrentUser(report) && !CurrentUser.has(ADMIN_AUTHORITY);
     }
 
     /** Phiếu còn hiệu lực của năm (đang chờ / đã duyệt); {@code null} = nộp được phiếu mới. */
