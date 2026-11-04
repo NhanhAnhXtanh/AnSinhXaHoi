@@ -357,6 +357,8 @@ function YearPanel({ year }: { year: number }) {
         meta={<span className="block truncate">{meta}</span>}
         actions={<HeaderActions primary={primary} items={items} />}
         tabs={sheets.map((s) => ({ key: String(s.templateId), label: s.shortName }))}
+        // Năm thường chỉ có biểu 01-TongHop — các trang 1a, 1b… nằm ở thanh trang của bảng.
+        hideSingleTab
         tab={sheet ? String(sheet.templateId) : ""}
         onTabChange={setSheetKey}
       >
