@@ -324,8 +324,9 @@ test.describe("Nhóm C — Tổng hợp, sổ Sở, báo cáo năm, Trang chủ"
     record(G, "POST complete (chưa có bảng sửa → chỉ đánh dấu hoàn tất)", done, OK);
     const afterDone = parse<{ ledgerVersion: number; reportYear: number; sheets: { completion: string }[] }>(await th.send("get", `/dept_reports/${id}`));
     check(G, "Trường lạ khi hoàn tất không có tác dụng (ledgerVersion/reportYear/completion)", [1, Y_SUM, "COMPLETED"], [afterDone.ledgerVersion, afterDone.reportYear, afterDone.sheets[0]?.completion]);
-    record(G, "POST complete lần hai (biểu đã hoàn tất)", await th.send("post", `/dept_reports/${id}/sheets/${S.tplId}/complete`, {}), [409]);
-    record(G, "PUT draft khi biểu đã hoàn tất", await th.send("put", `/dept_reports/${id}/sheets/${S.tplId}/draft`, { workbookJson: "{}", revision: rt.revision }), [409]);
+    // Không còn bước hoàn tất / sửa lại theo biểu: Lưu lần hai (không có bảng sửa dở) không đổi gì, lưu xong vẫn sửa tiếp.
+    record(G, "POST complete (Lưu) lần hai, không có gì sửa", await th.send("post", `/dept_reports/${id}/sheets/${S.tplId}/complete`, {}), OK);
+    record(G, "PUT draft sau khi đã Lưu (sửa tiếp được)", await th.send("put", `/dept_reports/${id}/sheets/${S.tplId}/draft`, { workbookJson: "{}", revision: rt.revision }), [200, 409]);
     record(G, "POST reopen (Sửa lại)", await th.send("post", `/dept_reports/${id}/sheets/${S.tplId}/reopen`), OK);
     const commit = await th.send("post", `/dept_reports/${id}/commit`, { reason: "E2E-C" });
     record(G, "POST commit khi biểu chưa hoàn tất & không có bảng sửa dở", commit, [200, 409], "200 hợp lệ nếu không tạo phiên bản mới");
