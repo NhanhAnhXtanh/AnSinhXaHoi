@@ -196,14 +196,8 @@ export function SubmitYearDialog({
         {warnings.length > 0 && (
           <div className="bg-warning-subtle text-warning-text flex gap-2.5 rounded-lg px-3.5 py-3 text-sm">
             <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <p className="font-medium">Chưa đủ số liệu cả năm — vẫn nộp được</p>
-              <ul className="flex flex-col gap-0.5">
-                {warnings.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            </div>
+            {/* Chỉ một câu tóm tắt — không liệt kê từng kỳ chưa lưu số liệu (người dùng chốt). */}
+            <p className="min-w-0 font-medium">Chưa đủ số liệu cả năm</p>
           </div>
         )}
 
