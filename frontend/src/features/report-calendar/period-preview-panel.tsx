@@ -43,6 +43,7 @@ export function PeriodPreviewPanel({
   error,
   onDeadlineChange,
   readOnly = false,
+  readOnlyReason = "Bạn chỉ có quyền xem lịch báo cáo.",
 }: {
   periods: PeriodRow[];
   kinds: PeriodKind[];
@@ -53,8 +54,10 @@ export function PeriodPreviewPanel({
   /** Câu báo lỗi khi không tải được; kèm nút thử lại nếu có. */
   error?: { message: string; action?: ReactNode } | null;
   onDeadlineChange: (slot: string, iso: string) => void;
-  /** Người chỉ có quyền xem: ô hạn nộp không sửa được. */
+  /** Người chỉ có quyền xem, hoặc lịch đã chốt: ô hạn nộp không sửa được. */
   readOnly?: boolean;
+  /** Vì sao chỉ xem — hiện khi rê vào ô hạn nộp. */
+  readOnlyReason?: string;
 }) {
   const [tab, setTab] = useState<TabValue>("all");
   const shownKinds = KIND_ORDER.filter((k) => kinds.includes(k));
@@ -138,7 +141,7 @@ export function PeriodPreviewPanel({
                           periodName={p.name}
                           disabled={readOnly || !p.editable}
                           disabledReason={
-                            readOnly ? "Bạn chỉ có quyền xem lịch báo cáo." : deadlineLockReason(p.status)
+                            readOnly ? readOnlyReason : deadlineLockReason(p.status)
                           }
                           onChange={(iso) => onDeadlineChange(p.slot, iso)}
                         />
@@ -154,7 +157,7 @@ export function PeriodPreviewPanel({
           </div>
 
           <footer className="text-muted-foreground shrink-0 border-t border-border px-6 py-3 text-sm">
-            {periods.length} kỳ · Bấm vào ô ngày để sửa hạn nộp của từng kỳ.
+            {periods.length} kỳ{readOnly ? "" : " · Bấm vào ô ngày để sửa hạn nộp của từng kỳ."}
           </footer>
         </>
       )}

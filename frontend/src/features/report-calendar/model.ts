@@ -66,6 +66,11 @@ export type ReportCalendarRecord = {
   /** Loại kỳ đã có kỳ được dùng (đã gán đơn vị trở đi) — không bỏ được (UC-21 2c). */
   lockedKinds: PeriodKind[];
   periodCount: number;
+  /**
+   * Chỉ có khi báo cáo năm đã nộp UBND (chờ duyệt) hoặc đã được UBND duyệt: lịch năm đó đã
+   * chốt, không sửa / xoá được nữa (UC-60). Câu này để hiện thẳng cho người dùng.
+   */
+  yearLockReason?: string;
   /** Chỉ có trên kết quả tạo / cập nhật. */
   createdPeriods?: number;
   skippedPeriods?: number;
