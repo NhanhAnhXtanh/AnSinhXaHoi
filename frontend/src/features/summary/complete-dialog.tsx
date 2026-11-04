@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LoaderCircle, Save, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronUp, LoaderCircle, Save, TriangleAlert } from "lucide-react";
 
 import { LoadingState, formatNumber } from "@/shared/components/asxh";
 import { Button } from "@/shared/ui/button";
@@ -28,9 +28,6 @@ function changedParts(c: PendingChange): { label: string; from: number | null; t
   return parts;
 }
 
-/** Hiện tối đa bấy nhiêu dòng đổi trong hộp; còn lại ghi "và N dòng khác". */
-const PREVIEW_LIMIT = 8;
-
 /**
  * "Lưu số liệu biểu …?" (Sở sửa → Lưu): đọc bảng đang sửa, cho biết có bao
  * nhiêu dòng khác số liệu hiện hành, ô lý do điều chỉnh không bắt buộc.
@@ -55,8 +52,13 @@ export function CompleteDialog({
   onConfirm: (reason: string) => void;
 }) {
   const [reason, setReason] = useState("");
+  // Danh sách dòng đổi mặc định thu gọn — chỉ một dòng tóm tắt, bấm "Xem chi tiết" mới liệt kê.
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
-    if (open) setReason("");
+    if (open) {
+      setReason("");
+      setExpanded(false);
+    }
   }, [open]);
 
   const preview = useApiArray<PendingChange>(
@@ -92,35 +94,45 @@ export function CompleteDialog({
           </p>
         ) : (
           <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-sm">
-              Có <span className="font-semibold">{formatNumber(changes.length)}</span> dòng sẽ được
-              lưu vào số liệu tổng hợp:
-            </p>
-            <ul className="w-full min-w-0 divide-y overflow-hidden rounded-lg border text-sm">
-              {changes.slice(0, PREVIEW_LIMIT).map((c, i) => (
-                <li
-                  key={`${c.indicatorCode}-${c.unitName}-${i}`}
-                  className="flex min-w-0 flex-col gap-0.5 px-3 py-2"
-                >
-                  <span className="truncate" title={`${c.indicatorName} · ${c.unitName}`}>
-                    {c.indicatorName}
-                    <span className="text-muted-foreground"> · {c.unitName}</span>
-                  </span>
-                  <span className="text-muted-foreground flex flex-wrap gap-x-4 text-xs tabular-nums">
-                    {changedParts(c).map((part) => (
-                      <span key={part.label}>
-                        {part.label}: <span className="line-through">{formatNumber(part.from)}</span> →{" "}
-                        <span className="text-foreground font-medium">{formatNumber(part.to)}</span>
-                      </span>
-                    ))}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {changes.length > PREVIEW_LIMIT && (
-              <p className="text-muted-foreground text-xs">
-                và {formatNumber(changes.length - PREVIEW_LIMIT)} dòng khác.
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <p>
+                Có <span className="font-semibold">{formatNumber(changes.length)}</span> dòng sẽ được
+                lưu vào số liệu tổng hợp.
               </p>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto shrink-0 px-0"
+                aria-expanded={expanded}
+                onClick={() => setExpanded((v) => !v)}
+              >
+                {expanded ? "Thu gọn" : "Xem chi tiết"}
+                {expanded ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+              </Button>
+            </div>
+            {expanded && (
+              <ul className="max-h-72 w-full min-w-0 divide-y overflow-y-auto rounded-lg border text-sm">
+                {changes.map((c, i) => (
+                  <li
+                    key={`${c.indicatorCode}-${c.unitName}-${i}`}
+                    className="flex min-w-0 flex-col gap-0.5 px-3 py-2"
+                  >
+                    <span className="truncate" title={`${c.indicatorName} · ${c.unitName}`}>
+                      {c.indicatorName}
+                      <span className="text-muted-foreground"> · {c.unitName}</span>
+                    </span>
+                    <span className="text-muted-foreground flex flex-wrap gap-x-4 text-xs tabular-nums">
+                      {changedParts(c).map((part) => (
+                        <span key={part.label}>
+                          {part.label}: <span className="line-through">{formatNumber(part.from)}</span> →{" "}
+                          <span className="text-foreground font-medium">{formatNumber(part.to)}</span>
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}
