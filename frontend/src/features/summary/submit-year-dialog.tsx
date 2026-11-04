@@ -255,6 +255,7 @@ export function SubmitYearDialog({
             <Label>File phiếu nộp (bản ký, đóng dấu)</Label>
             <FileUpload
               variant="button"
+              compact
               pickLabel="Tải file lên"
               disabled={busy}
               accept={ACCEPT}
