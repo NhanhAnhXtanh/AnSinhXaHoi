@@ -7,10 +7,20 @@ import { Calendar } from "@/shared/ui/calendar";
 import { Input } from "@/shared/ui/input";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 
-import { parseVnDate } from "../model";
-
 const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const WEEKDAY_NAMES = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+
+/** "dd/MM/yyyy" → yyyy-MM-dd; chữ không phải một ngày có thật → null. */
+function parseVnDate(text: string): string | null {
+  const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/.exec(text);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 /** yyyy-MM-dd → Date theo giờ máy (không lệch ngày như new Date("yyyy-MM-dd")). */
 function fromIso(iso: string): Date {
@@ -21,7 +31,7 @@ function fromIso(iso: string): Date {
 /**
  * Ô ngày dạng ngày/tháng/năm: gõ tay được, hoặc bấm biểu tượng lịch (hay bấm vào ô)
  * để mở bảng chọn ngày. Giá trị vẫn là chữ "dd/MM/yyyy" như ô cũ — nơi dùng tự
- * kiểm bằng parseVnDate. {@code min} (yyyy-MM-dd) làm mờ các ngày trước đó trên lịch.
+ * kiểm chữ đó (vd. parseVnDate của mẫu biểu, parseViDate của Tổng hợp). {@code min} (yyyy-MM-dd) làm mờ các ngày trước đó trên lịch.
  */
 export function DateInput({
   id,

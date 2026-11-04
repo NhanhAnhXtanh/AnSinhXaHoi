@@ -15,7 +15,7 @@ import { cn } from "@/shared/lib/utils";
 
 import type { TemplateVersion } from "../types";
 import { firstOfNextMonth, nextDay, parseVnDate, versionLabel } from "../model";
-import { DateInput } from "./date-input";
+import { DateInput } from "@/shared/components/date-input";
 
 /**
  * Hộp "Ban hành phiên bản N?" (UC-13): một ô Áp dụng từ ngày, điền sẵn ngày đã
