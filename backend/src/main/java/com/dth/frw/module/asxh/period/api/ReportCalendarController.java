@@ -73,7 +73,8 @@ public class ReportCalendarController {
                 .map(calendar -> ReportCalendarResponse.from(
                         calendar,
                         service.lockedKinds(calendar.getId()),
-                        counts.getOrDefault(calendar.getId(), 0L)))
+                        counts.getOrDefault(calendar.getId(), 0L),
+                        service.yearLockReason(calendar).orElse(null)))
                 .toList();
         return ListResponse.of(body, total);
     }
@@ -95,7 +96,8 @@ public class ReportCalendarController {
     @PreAuthorize("hasAuthority('" + ReportPeriodPermissions.CALENDARS_READ + "')")
     public ReportCalendarResponse get(@PathVariable Long id) {
         ReportCalendar calendar = service.get(id);
-        return ReportCalendarResponse.from(calendar, service.lockedKinds(id), service.periodCount(id));
+        return ReportCalendarResponse.from(calendar, service.lockedKinds(id), service.periodCount(id),
+                service.yearLockReason(calendar).orElse(null));
     }
 
     @GetMapping("/{id}/update_plan")
@@ -117,7 +119,8 @@ public class ReportCalendarController {
                 .created(URI.create("/api/report_calendars/" + id))
                 .body(ReportCalendarResponse.from(
                         result.calendar(), service.lockedKinds(id), service.periodCount(id),
-                        result.created(), result.skipped(), null, null));
+                        result.created(), result.skipped(), null, null,
+                        service.yearLockReason(result.calendar()).orElse(null)));
     }
 
     @RequestMapping(value = "/{id}", method = {RequestMethod.PATCH, RequestMethod.PUT})
@@ -126,14 +129,15 @@ public class ReportCalendarController {
         ReportCalendarService.CalendarResult result = service.update(id, request);
         return ReportCalendarResponse.from(
                 result.calendar(), service.lockedKinds(id), service.periodCount(id),
-                result.created(), result.skipped(), result.removed(), result.rescheduled());
+                result.created(), result.skipped(), result.removed(), result.rescheduled(),
+                service.yearLockReason(result.calendar()).orElse(null));
     }
 
     /** Trả lại lịch đã xoá — data provider đọc body của DELETE. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('" + ReportPeriodPermissions.CALENDARS_DELETE + "')")
     public ReportCalendarResponse delete(@PathVariable Long id) {
-        return ReportCalendarResponse.from(service.delete(id), List.of(), 0L);
+        return ReportCalendarResponse.from(service.delete(id), List.of(), 0L, null);
     }
 
     /** {@code kinds=thang,quy} hoặc {@code kinds=thang&kinds=quy}; Spring đã tách dấu phẩy. */

@@ -69,10 +69,13 @@ public class ReportPeriodService {
 
     private final ReportPeriodRepository repository;
     private final RowLevelSecurity rowLevel;
+    private final CalendarYearLock yearLock;
 
-    public ReportPeriodService(ReportPeriodRepository repository, RowLevelSecurity rowLevel) {
+    public ReportPeriodService(ReportPeriodRepository repository, RowLevelSecurity rowLevel,
+                               CalendarYearLock yearLock) {
         this.repository = repository;
         this.rowLevel = rowLevel;
+        this.yearLock = yearLock;
     }
 
     /** Kết quả sinh kỳ: "Đã tạo N kỳ; bỏ qua M kỳ đã tồn tại." */
@@ -152,6 +155,8 @@ public class ReportPeriodService {
     public ReportPeriod update(Long id, ReportPeriodPatchRequest request) {
         ReportPeriod period = repository.findOne(rowLevel.byId(ReportPeriod.class, Action.WRITE, id))
                 .orElseThrow(() -> new ResourceNotFoundException(RESOURCE, id));
+        // UC-60: lịch của năm đã nộp UBND / đã được duyệt không đổi hạn nộp từng kỳ được nữa.
+        yearLock.assertEditable(period.getYear());
 
         if (period.getStatus() != PeriodStatus.DRAFT && period.getStatus() != PeriodStatus.READY) {
             throw new ConflictException("Kỳ " + period.getName() + " đang ở trạng thái \""
