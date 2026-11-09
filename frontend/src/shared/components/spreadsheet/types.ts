@@ -73,6 +73,8 @@ export type SpreadWorkbookProps = {
    * Script vẫn đọc được mọi ô như bình thường. Mặc định false.
    */
   offscreen?: boolean;
+  /** Chữ dưới vòng quay khi đang mở. Mặc định "Đang mở bảng tính…". */
+  loadingLabel?: string;
 };
 
 export type SpreadDesignerProps = {
@@ -80,6 +82,8 @@ export type SpreadDesignerProps = {
   onDirtyChange?: (dirty: boolean) => void;
   onReady?: (api: SpreadWorkbookApi) => void;
   className?: string;
+  /** Chữ dưới vòng quay khi đang mở. Mặc định "Đang mở bảng tính…". */
+  loadingLabel?: string;
   /** (Mở rộng ngoài hợp đồng) Cho thêm/xoá/đổi tên/kéo tab sheet. Mặc định true. */
   sheetStructureEditable?: boolean;
 };

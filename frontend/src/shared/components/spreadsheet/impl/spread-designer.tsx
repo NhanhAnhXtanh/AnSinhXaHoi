@@ -308,7 +308,7 @@ export default function SpreadDesignerImpl(props: SpreadDesignerProps) {
       </div>
       {loading && (
         <div className="bg-card absolute inset-0 z-10 flex">
-          <LoadingState label="Đang mở bảng tính…" />
+          <LoadingState label={props.loadingLabel ?? "Đang mở bảng tính…"} />
         </div>
       )}
     </div>

@@ -361,7 +361,7 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
       <div ref={hostRef} className="absolute inset-0" />
       {status === "loading" && (
         <div className="bg-card absolute inset-0 z-10 flex">
-          <LoadingState label="Đang mở bảng tính…" />
+          <LoadingState label={props.loadingLabel ?? "Đang mở bảng tính…"} />
         </div>
       )}
       {status === "error" && (
