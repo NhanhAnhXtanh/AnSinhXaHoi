@@ -1,0 +1,96 @@
+// Nguon: DB asxh_template_scripts — bieu tong hop nam 01-TONGHOP (BM-000009), script "1q"
+// Hook: afterInject. Them 2026-11-09 (changeset 181): truoc day tab 1q khong co khoi nao do so.
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1q (1q-sdttg-95xp)  —  hook afterInject  (CẢ NĂM DƯƠNG LỊCH)
+//  Chính sách đối với người có uy tín trong đồng bào DTTS. Số cả năm from=Y-01-01 to=Y-12-31.
+//  A. Chế độ cung cấp thông tin (dòng 12–18, mỗi dòng một báo / hoạt động, cộng mọi đơn vị):
+//       O = số đối tượng, Q = kinh phí (theo sổ cái). P (mức) của tab giữ nguyên.
+//  B. Hỗ trợ vật chất, động viên tinh thần — cộng theo KHỐI:
+//       dòng 20 "Cơ quan tỉnh" = đơn vị loại TINH / SO; dòng 23 "Cơ quan xã" = mọi loại khác.
+//       Số đối tượng: C (Tết), F (ốm đau), I (gia đình khó khăn), L (qua đời). Kinh phí E, H, K, N là
+//       công thức của tab (số đối tượng × mức của tab) — script KHÔNG ghi đè.
+//  Dòng tổng 10, 11, 19 và tab 01 dòng 90 tự tính.
+// ============================================================================
+
+const SHEET = '1q-sdttg-95xp';
+const CK = 'indi' + 'catorCode';
+// A: mã → dòng Excel (1-based); O = số đối tượng, Q = kinh phí.
+const TT_ROW = {
+  '1Q.TT.BAO_DAN_TOC': 12,
+  '1Q.TT.BAO_DONG_NAI': 13,
+  '1Q.TT.BAO_BINH_PHUOC': 14,
+  '1Q.TT.BAN_TIN_DTTS': 15,
+  '1Q.TT.HOP_MAT': 16,
+  '1Q.TT.TAP_HUAN': 17,
+  '1Q.TT.HOC_TAP': 18,
+};
+const O_COL = 14, Q_COL = 16;
+// B: mã → cột số đối tượng (0-based).
+const VC_COL = {
+  '1Q.TET.SO_DOI_TUONG': 2,       // C
+  '1Q.OM_DAU.SO_DOI_TUONG': 5,    // F
+  '1Q.KHO_KHAN.SO_DOI_TUONG': 8,  // I
+  '1Q.QUA_DOI.SO_DOI_TUONG': 11,  // L
+};
+const ROW_TINH = 20, ROW_XA = 23;
+const KHOI_TINH = ['TINH', 'SO'];
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+function add(map, key, q, kp) {
+  const cur = map[key] || (map[key] = { q: null, kp: null });
+  if (q != null) cur.q = (cur.q || 0) + q;
+  if (kp != null) cur.kp = (cur.kp || 0) + kp;
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? ('&scopeKind=' + ctx.shared.scopeKind) : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    async function apiGet(path) { try { return (await ctx.api.get(path)) || []; } catch (e) { ctx.ui.message('Lỗi 1q: ' + e.message); return []; } }
+
+    const rows = await apiGet('/rest/qt/summary/data?from=' + a + '-01-01&to=' + a + '-12-31&groupByOrg=true' + scope + src);
+
+    // Loại đơn vị (TINH/SO → khối tỉnh): đơn vị được giao biểu 1q trong năm, thiếu thì tra danh mục.
+    const typeOf = {};
+    for (const u of await apiGet('/rest/qt/summary/period-organizations?from=' + a + '-01-01&to=' + a
+      + '-12-31&reportType=1q')) if (u && u.code) typeOf[u.code] = u.orgType || '';
+    const missing = rows.some((r) => VC_COL[r[CK]] != null && r.organizationCode
+      && r.organizationCode !== 'TONG_HOP' && typeOf[r.organizationCode] == null);
+    if (missing) {
+      for (const u of await apiGet('/rest/qt/master/organization-units')) {
+        if (u && u.code && typeOf[u.code] == null) typeOf[u.code] = u.orgType || '';
+      }
+    }
+
+    const tt = {}, tinh = {}, xa = {};
+    for (const r of rows) {
+      const code = r[CK];
+      const q = num(r.quantity), kp = num(r.amount);
+      if (q == null && kp == null) continue;
+      if (TT_ROW[code] != null) { add(tt, code, q, kp); continue; }
+      if (VC_COL[code] == null) continue;
+      // TONG_HOP (Sở điều chỉnh chung) tính vào khối tỉnh.
+      const isTinh = r.organizationCode === 'TONG_HOP' || KHOI_TINH.indexOf(typeOf[r.organizationCode]) >= 0;
+      add(isTinh ? tinh : xa, code, q, kp);
+    }
+
+    let filled = 0;
+    for (const code in tt) {
+      put(ctx, TT_ROW[code] - 1, O_COL, tt[code].q);
+      put(ctx, TT_ROW[code] - 1, Q_COL, tt[code].kp);
+      filled += 1;
+    }
+    for (const [row, m] of [[ROW_TINH, tinh], [ROW_XA, xa]]) {
+      for (const code in m) { put(ctx, row - 1, VC_COL[code], m[code].q); filled += 1; }
+    }
+    ctx.ui.message('Đã đổ ' + filled + ' ô vào 1q (năm ' + a + '). Kinh phí hỗ trợ vật chất, các dòng tổng và tab 01 tự tính.');
+  },
+});
