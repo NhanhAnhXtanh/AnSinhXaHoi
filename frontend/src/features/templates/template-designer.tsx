@@ -15,7 +15,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useCan, useWarnAboutChange } from "@refinedev/core";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import {
@@ -57,9 +57,11 @@ import {
   formLabel,
   formOfVersion,
   isEditable,
+  openingLabel,
   parseWorkbook,
   toVersion,
   versionLabel,
+  type DesignerNavState,
 } from "./model";
 import { ScriptEditorPanel, type ScriptPanelMode } from "./components/script-editor-panel";
 import { useVersionCommands } from "./components/use-version-commands";
@@ -89,12 +91,15 @@ export function TemplateDesigner() {
   // Người chỉ có quyền xem (vd. cán bộ duyệt) mở thiết kế ở chế độ chỉ xem — không Lưu / Ban hành.
   // Chờ câu trả lời quyền rồi mới dựng: đổi giữa Designer và bảng chỉ xem là dựng lại cả bảng tính.
   const { data: canWriteData, isLoading: canLoading } = useCan({ resource: "template_versions", action: "edit" });
+  // Tên biểu do màn trước gửi kèm (mở thẳng bằng địa chỉ thì chưa có): vòng quay lúc tải
+  // dữ liệu và vòng quay lúc dựng bảng tính ghi cùng một câu.
+  const passedName = (useLocation().state as DesignerNavState | null)?.formName;
 
   if (isLoading || canLoading) {
     return (
       <AsxhPage title={TITLE} backTo="/templates" fill>
         <div className="bg-card flex min-h-0 flex-1 rounded-lg border shadow-e1">
-          <LoadingState label="Đang mở thiết kế…" hint="Biểu lớn có thể mất vài giây." />
+          <LoadingState label={openingLabel(passedName)} hint="Biểu lớn có thể mất vài giây." />
         </div>
       </AsxhPage>
     );
@@ -316,7 +321,10 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
   const commands = useVersionCommands({
     actions,
     chainOf: () => chain,
-    onCloned: (v) => navigate(`/templates/designer/${v.id}`),
+    onCloned: (v) =>
+      navigate(`/templates/designer/${v.id}`, {
+        state: { formName: form.name } satisfies DesignerNavState,
+      }),
     onDeleted: () => navigate(backTo),
     onPublished: () => setMode("design"),
     isFormLocked: () => form.locked,
@@ -424,6 +432,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       <SpreadWorkbook
         workbook={saved}
         readOnly
+        loadingLabel={openingLabel(form.name)}
         className="min-h-0 flex-1"
         onReady={(api) => {
           spreadRef.current = api;
@@ -452,6 +461,7 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
     sheetArea = (
       <SpreadDesigner
         workbook={seed}
+        loadingLabel={openingLabel(form.name)}
         className="min-h-0 flex-1"
         onReady={(api) => {
           spreadRef.current = api;

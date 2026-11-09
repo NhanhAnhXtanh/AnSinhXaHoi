@@ -12,7 +12,7 @@ import type { SpreadDesignerProps, SpreadWorkbookProps } from "./types";
 const SpreadWorkbookImpl = lazy(() => import("./impl/spread-workbook"));
 const SpreadDesignerImpl = lazy(() => import("./impl/spread-designer"));
 
-function SpreadFallback({ className }: { className?: string }) {
+function SpreadFallback({ className, label }: { className?: string; label?: string }) {
   return (
     <div
       className={cn(
@@ -20,7 +20,7 @@ function SpreadFallback({ className }: { className?: string }) {
         className
       )}
     >
-      <LoadingState label="Đang mở bảng tính…" />
+      <LoadingState label={label ?? "Đang mở bảng tính…"} />
     </div>
   );
 }
@@ -31,7 +31,7 @@ function SpreadFallback({ className }: { className?: string }) {
  */
 export function SpreadWorkbook(props: SpreadWorkbookProps) {
   return (
-    <Suspense fallback={<SpreadFallback className={props.className} />}>
+    <Suspense fallback={<SpreadFallback className={props.className} label={props.loadingLabel} />}>
       <SpreadWorkbookImpl {...props} />
     </Suspense>
   );
@@ -41,7 +41,12 @@ export function SpreadWorkbook(props: SpreadWorkbookProps) {
 export function SpreadDesigner(props: SpreadDesignerProps) {
   return (
     <Suspense
-      fallback={<SpreadFallback className={cn("min-h-[480px]", props.className)} />}
+      fallback={
+        <SpreadFallback
+          className={cn("min-h-[480px]", props.className)}
+          label={props.loadingLabel}
+        />
+      }
     >
       <SpreadDesignerImpl {...props} />
     </Suspense>

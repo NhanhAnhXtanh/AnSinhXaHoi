@@ -22,7 +22,13 @@ import {
 
 import { useSetContent, useTemplateActions, useTemplateSets } from "./api";
 import type { TemplateForm, TemplateSet, TemplateVersion } from "./types";
-import { buildChangeLog, currentVersion, formLabel, versionsOf } from "./model";
+import {
+  buildChangeLog,
+  currentVersion,
+  formLabel,
+  versionsOf,
+  type DesignerNavState,
+} from "./model";
 import { CreateFormDialog } from "./components/create-form-dialog";
 import { FormsPanel, type FormRow } from "./components/forms-panel";
 import { SetDialog } from "./components/set-dialog";
@@ -133,10 +139,18 @@ export function TemplateSets() {
     return `/templates/designer/${versionId}${rules ? "?rules=1" : ""}`;
   }
 
+  /** Mở Thiết kế mẫu, gửi kèm tên biểu để vòng quay lúc mở ghi đúng tên ngay từ đầu. */
+  function openDesigner(version: TemplateVersion, rules = false) {
+    const formName = content.forms.find((f) => f.id === version.formId)?.name;
+    navigate(designerPath(version.id, rules), {
+      state: { formName } satisfies DesignerNavState,
+    });
+  }
+
   const commands = useVersionCommands({
     actions,
     chainOf: (v) => versionsOf(content.versions, v.formId),
-    onOpenDesigner: (version, rules) => navigate(designerPath(version.id, rules)),
+    onOpenDesigner: openDesigner,
     onCloned: (version) => select({ version: version.id }),
     onDeleted: () => select({ version: null }),
     onPublished: (version) => select({ version: version.id }),
@@ -207,7 +221,9 @@ export function TemplateSets() {
         onOpenChange={(open) => !open && setCreateFormIn(null)}
         onCreated={({ form, firstVersionId }, openDesigner) => {
           if (openDesigner && firstVersionId) {
-            navigate(designerPath(firstVersionId));
+            navigate(designerPath(firstVersionId), {
+              state: { formName: form.name } satisfies DesignerNavState,
+            });
             return;
           }
           const p = new URLSearchParams(params);
@@ -355,7 +371,7 @@ export function TemplateSets() {
       onSelect={(id) => select({ version: id })}
       itemsFor={commands.itemsFor}
       canWrite={commands.canWrite}
-      onOpenDesigner={(v: TemplateVersion) => navigate(designerPath(v.id))}
+      onOpenDesigner={(v: TemplateVersion) => openDesigner(v)}
       onPublish={commands.requestPublish}
       onClone={commands.clone}
       className={className}
@@ -393,7 +409,7 @@ export function TemplateSets() {
       onCreateForm={canFormWrite ? () => setCreateFormIn(selectedSet) : undefined}
       canWriteVersion={commands.canWrite}
       canDeleteForm={canFormDelete}
-      onOpenDesigner={(v) => navigate(designerPath(v.id))}
+      onOpenDesigner={(v) => openDesigner(v)}
       onPublish={commands.requestPublish}
       onClone={commands.clone}
       onDeleteForm={(form) => {

@@ -103,3 +103,13 @@ databaseChangeLog:
       file: db/changelog/changes/176-period-setup-ignore-locked-forms.sql
   - include:
       file: db/changelog/changes/177-so-cai-so-1c-1s.sql
+  - include:
+      file: db/changelog/changes/178-fix-1k-1m-1q-templates.sql
+  - include:
+      file: db/changelog/changes/179-1a-lock-muc-tonghop-1l.sql
+  - include:
+      file: db/changelog/changes/180-1j-so-cai-so-tonghop.sql
+  - include:
+      file: db/changelog/changes/181-tonghop-1q.sql
+  - include:
+      file: db/changelog/changes/182-tonghop-01-tien-dien-1o.sql

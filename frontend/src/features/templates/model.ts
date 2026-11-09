@@ -46,6 +46,20 @@ export function formLabel(form: Pick<TemplateForm, "name">): string {
   return `Biểu ${form.name}`;
 }
 
+/**
+ * Trạng thái điều hướng gửi kèm khi mở Thiết kế mẫu: tên biểu biết trước, để
+ * vòng quay đầu tiên (đang tải phiên bản) đã ghi đúng tên biểu.
+ */
+export type DesignerNavState = { formName?: string };
+
+/**
+ * Chữ dưới vòng quay khi mở Thiết kế mẫu — một câu dùng chung từ lúc tải dữ liệu
+ * tới lúc bảng tính dựng xong, để người dùng thấy một lần mở chứ không phải nhiều lần.
+ */
+export function openingLabel(formName: string | undefined): string {
+  return formName ? `Đang mở biểu ${formName}…` : "Đang mở biểu…";
+}
+
 export function versionLabel(v: Pick<TemplateVersion, "number">): string {
   return `Phiên bản ${v.number}`;
 }

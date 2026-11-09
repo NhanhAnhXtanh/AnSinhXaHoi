@@ -1,0 +1,92 @@
+// Nguon: DB asxh_template_scripts — bieu tong hop nam 01-TONGHOP (BM-000009), script "1l"
+// Hook: afterInject. Them 2026-11-09 (changeset 179): truoc day tab 1l khong co khoi nao do so.
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1l (1l-bhxh-syt-snn-sgd-sdt)  —  hook afterInject  (CỘNG GỘP · CẢ NĂM)
+//  NSNN đóng và hỗ trợ mức đóng BHYT. Tab có MỘT cặp cột cho cả năm: C = số đối tượng, D = kinh phí.
+//  ĐỔ: from=Y-01-01 to=Y-12-31 (năm dương lịch), cộng mọi đơn vị (không groupByOrg). Máy chủ tự gộp
+//  số đối tượng qua các kỳ theo bản chất chỉ tiêu (MeasureKind); kinh phí cộng dồn.
+//  Mã chỉ tiêu → dòng Excel (1-based) của tab. Dòng nhóm (11, 13, 28, 29) và tổng (10) giữ công thức.
+//  - 1L.NGUOI_CO_CONG và 1L.CUU_CHIEN_BINH_TNXP cùng vào dòng 16 "Người có công với cách mạng,
+//    cựu chiến binh" (tab chỉ có một dòng cho hai mã này) → CỘNG.
+//  - 1L.DAN_QUAN (Dân quân thường trực) chưa có dòng trong tab → không đổ, báo số đơn vị bị bỏ.
+//  - Dòng 21, 23, 26, 27 của tab không có mã ở biểu nhập 1l → để trống.
+//  - Ô có công thức (vd. D37 kinh phí y tế thôn bản) giữ công thức, không ghi đè.
+// ============================================================================
+
+const SHEET = '1l-bhxh-syt-snn-sgd-sdt';
+const CK = 'indi' + 'catorCode';
+const Q_COL = 2;   // C: số đối tượng
+const KP_COL = 3;  // D: kinh phí
+
+const ROW = {
+  '1L.HO_NGHEO_DTTS': 12,
+  '1L.TRE_EM_6T.MENH_GIA': 14,
+  '1L.TRE_EM_6T.TRUY_LINH': 15,
+  '1L.NGUOI_CO_CONG': 16,
+  '1L.CUU_CHIEN_BINH_TNXP': 16,
+  '1L.BTXH': 17,
+  '1L.HIEN_TANG': 18,
+  '1L.NGUOI_75_TUOI': 19,
+  '1L.XA_ATK': 20,
+  '1L.HUU_TRI_XH': 22,
+  '1L.DAI_BIEU_QH_HDND': 24,
+  '1L.CAN_BO_XA_NGHI': 25,
+  '1L.CAN_NGHEO_100': 30,
+  '1L.CAN_NGHEO_70': 31,
+  '1L.HSSV_50': 32,
+  '1L.HO_NONG_LAM_NGU': 33,
+  '1L.DTTS_DIA_BAN': 34,
+  '1L.DTTS_XA': 35,
+  '1L.LUC_LUONG_ANTT': 36,
+  '1L.Y_TE_THON_BAN': 37,
+  '1L.KHONG_CHUYEN_TRACH': 38,
+  '1L.NAN_NHAN': 39,
+  '1L.NQ_RIENG': 40,
+};
+const NO_ROW = { '1L.DAN_QUAN': 'Dân quân thường trực' };
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? ('&scopeKind=' + ctx.shared.scopeKind) : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    const path = '/rest/qt/summary/data?from=' + a + '-01-01&to=' + a + '-12-31' + scope + src;
+    let rows;
+    try { rows = await ctx.api.get(path); }
+    catch (e) { ctx.ui.message('Lỗi lấy số 1l năm ' + a + ': ' + e.message); return; }
+
+    // Gom theo DÒNG (hai mã cùng một dòng thì cộng).
+    const byRow = {};
+    const skipped = {};
+    for (const r of (rows || [])) {
+      const code = r[CK];
+      const row = ROW[code];
+      if (row == null) {
+        if (NO_ROW[code] && (num(r.quantity) || num(r.amount))) skipped[code] = true;
+        continue;
+      }
+      const q = num(r.quantity), kp = num(r.amount);
+      const cur = byRow[row] || (byRow[row] = { q: null, kp: null });
+      if (q != null) cur.q = (cur.q || 0) + q;
+      if (kp != null) cur.kp = (cur.kp || 0) + kp;
+    }
+    let filled = 0;
+    for (const row in byRow) {
+      put(ctx, Number(row) - 1, Q_COL, byRow[row].q);
+      put(ctx, Number(row) - 1, KP_COL, byRow[row].kp);
+      filled += 1;
+    }
+    const miss = Object.keys(skipped).map((c) => NO_ROW[c]);
+    ctx.ui.message('Đã đổ ' + filled + ' dòng vào 1l (năm ' + a + '). Cột tổng + tab 01 tự tính.'
+      + (miss.length ? ' Chưa có dòng trong tab cho: ' + miss.join(', ') + '.' : ''));
+  },
+});

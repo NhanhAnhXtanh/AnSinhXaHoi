@@ -1,0 +1,73 @@
+// Nguon: DB asxh_template_scripts — bieu tong hop nam 01-TONGHOP (BM-000009), script "1j"
+// Hook: afterInject. Them 2026-11-09 (changeset 180): truoc day tab 1j khong co khoi nao do so (chi co so lieu mau).
+
+// ============================================================================
+//  SCRIPT TỔNG HỢP · BIỂU 1j (1j-dhdn-cdbp)  —  hook afterInject  (THEO LOẠI ĐỐI TƯỢNG · CẢ NĂM)
+//  Hỗ trợ học phí, sinh hoạt phí sinh viên sư phạm (NĐ 116/2020). Tab có hai nhóm:
+//    I  (dòng 11) đặt hàng / giao nhiệm vụ  → dòng số liệu 12
+//    II (dòng 13) nhu cầu xã hội             → dòng số liệu 14
+//  Mỗi dòng số liệu = CỘNG mọi đơn vị (năm dương lịch from=Y-01-01 to=Y-12-31); cột B ghi tên các đơn vị
+//  có số. C = số sinh viên, D = mức thu học phí, G = hỗ trợ học phí = ROUND(C × D),
+//  H = hỗ trợ sinh hoạt phí = kinh phí sổ cái − G, F = G + H (công thức của tab).
+//  ‼ Sổ cái 1j lưu MỘT kinh phí (= học phí + sinh hoạt phí) cho mỗi mã; tách lại bằng mức học phí của
+//    biểu nhập 1j (D8 = 17, D9 = 14 triệu đồng). Đổi mức ở biểu nhập thì sửa MUC_HOC_PHI ở đây.
+//  Tab 01 dòng 47 (học phí) lấy C10, G10; dòng 48 (sinh hoạt phí) lấy C10, H10.
+// ============================================================================
+
+const SHEET = '1j-dhdn-cdbp';
+const CK = 'indi' + 'catorCode';
+const LOAI = [
+  { code: '1J.DATHANG.SO_DOI_TUONG', row: 12, mucHocPhi: 17 },
+  { code: '1J.XAHOI.SO_DOI_TUONG', row: 14, mucHocPhi: 14 },
+];
+const B = 1, C = 2, D = 3, G = 6, H = 7;
+
+function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+function put(ctx, r, c, v) {
+  if (v == null) return;
+  try { const f = ctx.cell.getFormula(SHEET, r, c); if (f && String(f).trim() !== '') return; ctx.cell.set(SHEET, r, c, v); }
+  catch (e) { /* bỏ qua */ }
+}
+function setText(ctx, r, c, v) { try { ctx.cell.set(SHEET, r, c, v); } catch (e) { /* bỏ qua */ } }
+
+return defineScript({
+  async afterInject(ctx) {
+    const a = (ctx.shared && ctx.shared.a != null) ? Number(ctx.shared.a)
+      : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
+    const scope = (ctx.shared && ctx.shared.scopeKind) ? ('&scopeKind=' + ctx.shared.scopeKind) : '';
+    const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    async function apiGet(path) { try { return (await ctx.api.get(path)) || []; } catch (e) { ctx.ui.message('Lỗi 1j: ' + e.message); return []; } }
+
+    const rows = await apiGet('/rest/qt/summary/data?from=' + a + '-01-01&to=' + a + '-12-31&groupByOrg=true' + scope + src);
+    const sum = LOAI.map(() => ({ q: null, kp: null, orgs: [] }));
+    for (const r of rows) {
+      const k = LOAI.findIndex((l) => l.code === r[CK]);
+      if (k < 0) continue;
+      const q = num(r.quantity), kp = num(r.amount);
+      if (q == null && kp == null) continue;
+      const s = sum[k];
+      if (q != null) s.q = (s.q || 0) + q;
+      if (kp != null) s.kp = (s.kp || 0) + kp;
+      // TONG_HOP = dòng Sở điều chỉnh chung: cộng số, không ghi tên.
+      if (r.organizationCode && r.organizationCode !== 'TONG_HOP' && s.orgs.indexOf(r.organizationCode) < 0) s.orgs.push(r.organizationCode);
+    }
+    let names = {};
+    if (sum.some((s) => s.orgs.length > 0)) {
+      for (const u of await apiGet('/rest/qt/master/organization-units')) names[u.code] = u.name || u.code;
+    }
+    let filled = 0;
+    LOAI.forEach(function (l, k) {
+      const s = sum[k];
+      const r0 = l.row - 1;
+      if (s.q == null && s.kp == null) return;
+      setText(ctx, r0, B, s.orgs.map((c) => names[c] || c).join('; '));
+      put(ctx, r0, C, s.q);
+      put(ctx, r0, D, l.mucHocPhi);
+      const hocPhi = s.q == null ? null : Math.round(s.q * l.mucHocPhi);
+      put(ctx, r0, G, hocPhi);
+      if (s.kp != null) put(ctx, r0, H, s.kp - (hocPhi || 0));
+      filled += 1;
+    });
+    ctx.ui.message('Đã đổ 1j (năm ' + a + '): ' + filled + ' loại đối tượng. Tổng + tab 01 tự tính.');
+  },
+});

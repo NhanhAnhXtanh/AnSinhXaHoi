@@ -1,32 +1,36 @@
 // Nguon: DB asxh-react-dn — bieu 1j, phien ban PUBLISHED moi nhat, khoi 4 "Tong hop theo ky — hook: afterInject".
 // Dong bo tu DB ngay 2026-10-29 (DB lam chuan).
+// SUA 2026-11-09 (changeset 180): v3 — moi don vi HAI dong (dat hang, nhu cau xa hoi) de So cai So tach duoc theo ma.
 
-// ==== 1j - Script 4/4 (v2) - AFTERINJECT: TONG HOP THEO KY (tab "Tong hop theo bieu (ky)") ====
-// O tab nay moi dong la MOT DON VI. Script do so cua KY dang chon (ctx.shared.periodId):
-//   - dong 7 = TONG CONG (cong moi don vi),
-//   - moi don vi duoc GIAO BIEU NAY trong ky them mot dong ben duoi, ten don vi ghi o cot B.
+// ==== 1j - Script 4/5 (v3) - AFTERINJECT: TONG HOP THEO KY (tab "Tong hop theo bieu (ky)") ====
+// Script do so cua KY dang chon (ctx.shared.periodId) vao chinh bieu 1j:
+//   - dong 8 (0-based 7) = TONG loai DAT HANG / GIAO NHIEM VU (cong moi don vi),
+//   - dong 9 (0-based 8) = TONG loai NHU CAU XA HOI,
+//   - moi don vi duoc GIAO BIEU NAY trong ky them HAI dong ben duoi: dong dau = dat hang, dong sau =
+//     nhu cau xa hoi; ten don vi o cot B (ca hai dong), loai doi tuong ghi o cot I.
 //     Don vi khong duoc giao bieu nay thi KHONG co dong (loc theo ma bieu ctx.shared.sheetCode).
-// Don vi duoc giao ma chua nop -> van co dong, so de trong (nhin ra ai con thieu).
-// O cong thuc (kinh phi = so luong x muc x thang) KHONG ghi de - bieu tu tinh.
+// Don vi duoc giao ma chua nop -> van co hai dong, so de trong (nhin ra ai con thieu).
+// Kinh phi (F = G + H, G = so SV x muc hoc phi, H = so SV x sinh hoat phi x so thang) la cong thuc cua
+// bieu, KHONG ghi de; script ghi so SV (C) va muc (D), so thang (E) cho tung dong.
 // Man NHAP LIEU khong co ctx.shared.periodId nen script tu bo qua.
 //
-// ‼ THAY DOI SO VOI v1:
-//  1) Bieu nay co HAI ma chi tieu (dat hang + nhu cau xa hoi). O tab tong hop moi don vi
-//     van CHI MOT DONG, nen so cua hai ma duoc CONG GOP lai - tab nay tra loi "don vi X
-//     nop bao nhieu", con chi tiet theo tung loai doi tuong xem o chinh bieu 1j.
-//  2) Template ban v2 co dong 8 (doi tuong nhu cau xa hoi). Khi clone dong cho tung don vi,
-//     dong 8 goc bi day xuong duoi cung va tro thanh dong thua -> script don sach no.
+// ‼ THAY DOI SO VOI v2 (changeset 180, 09/11/2026): v2 CONG GOP hai ma chi tieu vao MOT dong don vi nen
+//   So cai So khong tach lai duoc theo tung ma. v3 de MOI DON VI HAI DONG (mot dong mot ma) — kich ban
+//   "So cai So" doc lai tung dong theo cap.
 
 const SHEET = '1j';
-const ROW0 = 7;               // dong du lieu goc (0-based) = dong TONG CONG
-const EXTRA_TEMPLATE_ROW = 8; // dong "nhu cau xa hoi" cua template, khong dung o tab tong hop
-const ORG_COL = 1;            // cot B: "Chi tieu / Don vi"
-const BINDINGS = [
-  { code: '1J.DATHANG.SO_DOI_TUONG', qty: 2, amt: 5 },
-  { code: '1J.XAHOI.SO_DOI_TUONG', qty: 2, amt: 5 },
+const ROW_DH = 7;            // dong mau dat hang (= dong TONG dat hang)
+const ROW_XH = 8;            // dong mau nhu cau xa hoi (= dong TONG nhu cau xa hoi)
+const FIRST_UNIT_ROW = 9;    // dong dau tien cua don vi
+const ORG_COL = 1;           // cot B: ten don vi
+const QTY_COL = 2;           // C: so doi tuong
+const MUC_COL = 3;           // D: muc thu hoc phi
+const THANG_COL = 4;         // E: so thang ho tro
+const NOTE_COL = 8;          // I: ghi chu → ghi loai doi tuong
+const LOAI = [
+  { code: '1J.DATHANG.SO_DOI_TUONG', row: ROW_DH, label: 'Đặt hàng, giao nhiệm vụ' },
+  { code: '1J.XAHOI.SO_DOI_TUONG', row: ROW_XH, label: 'Nhu cầu xã hội' },
 ];
-const MUC_COL = 3;    // [FIX] D: Muc (hang co dinh, doc tu dong Tong cong)
-const THANG_COL = 4;  // [FIX] E: Thoi gian (hang co dinh)
 const CK = 'indi' + 'catorCode';
 
 function num(v) {
@@ -67,15 +71,15 @@ return defineScript({
       const code = r.organizationCode || '';
       (byOrg[code] || (byOrg[code] = {}))[r[CK]] = r;
     }
-    // Thu tu: don vi duoc giao truoc (theo ma), roi don vi CO SO CUA BIEU NAY (ma trong BINDINGS) ma
-    // khong nam trong danh sach giao (du lieu cu) - ten nhom sau tra danh muc. So bieu khac KHONG tinh.
+    // Thu tu: don vi duoc giao truoc (theo ma), roi don vi CO SO CUA BIEU NAY ma khong nam trong danh sach
+    // giao (du lieu cu) - ten nhom sau tra danh muc. So bieu khac KHONG tinh.
     const codes = [];
     for (const u of units) if (codes.indexOf(u.code) < 0) codes.push(u.code);
     const nameOf = {};
     for (const u of units) nameOf[u.code] = u.name || u.code;
     const extra = [];
     for (const c in byOrg) {
-      if (c && c !== 'TONG_HOP' && codes.indexOf(c) < 0 && BINDINGS.some((b) => byOrg[c][b.code])) extra.push(c);
+      if (c && c !== 'TONG_HOP' && codes.indexOf(c) < 0 && LOAI.some((l) => byOrg[c][l.code])) extra.push(c);
     }
     if (extra.length > 0) {
       for (const u of await get('/rest/qt/master/organization-units')) if (!nameOf[u.code]) nameOf[u.code] = u.name || u.code;
@@ -83,48 +87,33 @@ return defineScript({
     }
     if (codes.length === 0) { ctx.ui.message('1j: ky nay chua giao bieu cho don vi nao.'); return; }
 
-    // Chen du dong: dong ROW0 giu lam TONG CONG, moi don vi mot dong ben duoi
-    if (codes.length > 0) ctx.rows.clone(SHEET, ROW0, codes.length);
+    // Muc va so thang cua tung loai lay tu dong mau TRUOC khi nhan dong (clone khong chep so).
+    const muc = LOAI.map((l) => num(ctx.cell.get(SHEET, l.row, MUC_COL)));
+    const thang = LOAI.map((l) => num(ctx.cell.get(SHEET, l.row, THANG_COL)));
 
-    const total = { q: null, a: null };
-    const MUC_HO_TRO = num(ctx.cell.get(SHEET, ROW0, MUC_COL)); // [FIX]
-    const THOI_GIAN  = num(ctx.cell.get(SHEET, ROW0, THANG_COL)); // [FIX]
+    // Hai dong moi don vi, chen ngay duoi dong mau nhu cau xa hoi.
+    ctx.rows.clone(SHEET, ROW_XH, codes.length * LOAI.length);
+
+    const total = LOAI.map(() => null);
     codes.forEach(function (code, i) {
-      const r0 = ROW0 + 1 + i;
-      setText(ctx, r0, ORG_COL, nameOf[code] || code);
-      setText(ctx, r0, 0, String(i + 1));
-      put(ctx, r0, MUC_COL, MUC_HO_TRO);    // [FIX] do o co dinh cho tung don vi
-      put(ctx, r0, THANG_COL, THOI_GIAN);
       const data = byOrg[code] || {};
-      // Cong gop hai ma chi tieu cua don vi nay
-      let q = null;
-      let a = null;
-      for (const b of BINDINGS) {
-        const row = data[b.code];
-        if (!row) continue;
-        const rq = num(row.quantity);
-        const ra = num(row.amount);
-        if (rq != null) q = (q || 0) + rq;
-        if (ra != null) a = (a || 0) + ra;
-      }
-      put(ctx, r0, BINDINGS[0].qty, q);
-      put(ctx, r0, BINDINGS[0].amt, a);
-      if (q != null) total.q = (total.q || 0) + q;
-      if (a != null) total.a = (total.a || 0) + a;
+      LOAI.forEach(function (l, k) {
+        const r0 = FIRST_UNIT_ROW + i * LOAI.length + k;
+        setText(ctx, r0, 0, k === 0 ? String(i + 1) : '');
+        setText(ctx, r0, ORG_COL, nameOf[code] || code);
+        setText(ctx, r0, NOTE_COL, l.label);
+        put(ctx, r0, MUC_COL, muc[k]);
+        put(ctx, r0, THANG_COL, thang[k]);
+        const row = data[l.code];
+        const q = row ? num(row.quantity) : null;
+        put(ctx, r0, QTY_COL, q);
+        if (q != null) total[k] = (total[k] || 0) + q;
+      });
     });
 
-    // Dong TONG CONG
-    setText(ctx, ROW0, ORG_COL, 'Tong cong');
-    setText(ctx, ROW0, 0, '');
-    put(ctx, ROW0, BINDINGS[0].qty, total.q);
-    put(ctx, ROW0, BINDINGS[0].amt, total.a);
+    // Dong TONG tung loai (giu ten loai o cot B, muc/so thang cua mau)
+    LOAI.forEach(function (l, k) { put(ctx, l.row, QTY_COL, total[k]); });
 
-    // Don dong template thua bi clone day xuong duoi cung
-    const thua = EXTRA_TEMPLATE_ROW + codes.length;
-    setText(ctx, thua, 0, '');
-    setText(ctx, thua, ORG_COL, '');
-    [2, 3, 4, 8].forEach(function (c) { setText(ctx, thua, c, ''); });
-
-    ctx.ui.message('Da do 1j: ' + codes.length + ' don vi + dong tong cong (theo ky dang chon).');
+    ctx.ui.message('Da do 1j: ' + codes.length + ' don vi x 2 loai doi tuong + 2 dong tong (theo ky dang chon).');
   },
 });
