@@ -1,5 +1,6 @@
 // Nguon: DB qt_template_script — bieu tong hop nam (YEAR_SUMMARY), script "1o"
 // Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
+// SUA 2026-11-09 (changeset 183): dien muc tien dien + so thang theo nam a vao dong 9.
 
 // ============================================================================
 //  SCRIPT TỔNG HỢP · BIỂU 1o (1o-snnmt-95xp)  —  hook afterInject  (THEO ĐƠN VỊ động · 1 KỲ NĂM)
@@ -23,6 +24,35 @@ const COL = {                              // mã chỉ tiêu -> cột 0-based (
 const DATA_ROW = 9;                        // dòng mẫu (1-based) — điểm clone
 const B = 1;
 
+// ---- Mức hỗ trợ tiền điện theo NĂM của kỳ (changeset 183) ----
+// Mức (triệu đồng/hộ/tháng) = 30 kWh × giá điện bậc 1 × (1 + VAT), theo ghi chú văn bản trong biểu:
+//   QĐ 2699/QĐ-BTC (giá 1.893 đ) cho 4 tháng đầu 2025; QĐ 1279/QĐ-BTC (giá 1.984 đ) từ tháng 5/2025;
+//   VAT 8% tới 31/12/2026 (NĐ 174/2025/NĐ-CP), 10% từ 2027. Mỗi năm tối đa hai mức: kinh phí = hộ × (H × I + J × K).
+//   Giá điện đổi thì thêm một dòng vào BIEU_GIA ở CẢ BA kịch bản 1o (khoá ô, tổng hợp theo kỳ, tổng hợp năm).
+const mucHoTro = (gia, vat) => Math.round(30 * gia * (1 + vat) * 10) / 1e7; // triệu đồng/hộ/tháng, 7 số lẻ
+const BIEU_GIA = [
+  { tuNam: 0, muc: [[mucHoTro(1893, 0.08), 4, '61.333'], [mucHoTro(1984, 0.08), 8, '64.282']] },
+  { tuNam: 2026, muc: [[mucHoTro(1984, 0.08), 12, '64.282']] },
+  { tuNam: 2027, muc: [[mucHoTro(1984, 0.10), 12, '65.472']] },
+];
+const GIA_ROW = 8;        // dòng chứa H (mức 1), I (số tháng 1), J (mức 2), K (số tháng 2) — 0-based
+const GIA_HEADER_ROW = 4; // dòng tiêu đề "Mức hỗ trợ (… đồng)" — 0-based
+function datBieuGia(ctx, nam) {
+  let g = BIEU_GIA[0];
+  for (const x of BIEU_GIA) if (nam >= x.tuNam) g = x;
+  [[7, 8], [9, 10]].forEach(function (cot, k) {
+    const m = g.muc[k];
+    ctx.cell.set(SHEET, GIA_ROW, cot[0], m ? m[0] : 0);
+    ctx.cell.set(SHEET, GIA_ROW, cot[1], m ? m[1] : 0);
+    ctx.cell.set(SHEET, GIA_HEADER_ROW, cot[0],
+      m ? 'Mức hỗ trợ (' + m[2] + ' đồng)' : 'Mức hỗ trợ (không áp dụng năm ' + nam + ')');
+  });
+}
+function namCuaKy(ctx) {   // màn nhập và màn tổng hợp đặt sẵn ctx.shared.year = năm của kỳ
+  const y = Number(ctx.shared && ctx.shared.year);
+  return Number.isFinite(y) && y > 0 ? y : NaN;
+}
+
 function num(v) { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
 function put(ctx, r, c, v) {
   if (v == null) return;
@@ -37,6 +67,7 @@ return defineScript({
       : ((ctx.shared && ctx.shared.year) ? Number(ctx.shared.year) : 2025);
     const b = (ctx.shared && ctx.shared.b != null) ? Number(ctx.shared.b) : (a + 1);
     const src = (ctx.shared && ctx.shared.sourceSheet) ? ('&sourceSheetCode=' + encodeURIComponent(ctx.shared.sourceSheet)) : '';
+    datBieuGia(ctx, a);   // mức + số tháng của năm a ở dòng 9 (mọi dòng đơn vị dùng $H$9…$K$9)
     async function apiGet(path) { try { return (await ctx.api.get(path)) || []; } catch (e) { ctx.ui.message('Lỗi 1o: ' + e.message); return []; } }
 
     const units = await apiGet('/rest/qt/master/organization-units');

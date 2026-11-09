@@ -1,6 +1,7 @@
 // Nguon: DB qt_template_script — bieu 1o, phien ban PB-000029, script "Script 1"
 // Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
 // SUA 2026-11-04 (ghi DB qua changeset 177): 3 guard bo qua mode 'summary-edit' — o so cai So do script "So cai So" quyet.
+// SUA 2026-11-09 (changeset 183): onLoad dien muc tien dien + so thang theo nam cua ky (phieu DRAFT/RETURNED).
 
 // ==== 1o · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
 // displayOrder = 1, enabled = true, gắn biểu reportType = "1o".
@@ -16,6 +17,35 @@
 const SHEET = '1o';
 const DATA_ROW = 7;
 const INPUT_COLS = [3, 5, 6, 14]; // D số hộ nghèo, F/G hộ chính sách, O ghi chú
+
+// ---- Mức hỗ trợ tiền điện theo NĂM của kỳ (changeset 183) ----
+// Mức (triệu đồng/hộ/tháng) = 30 kWh × giá điện bậc 1 × (1 + VAT), theo ghi chú văn bản trong biểu:
+//   QĐ 2699/QĐ-BTC (giá 1.893 đ) cho 4 tháng đầu 2025; QĐ 1279/QĐ-BTC (giá 1.984 đ) từ tháng 5/2025;
+//   VAT 8% tới 31/12/2026 (NĐ 174/2025/NĐ-CP), 10% từ 2027. Mỗi năm tối đa hai mức: kinh phí = hộ × (H × I + J × K).
+//   Giá điện đổi thì thêm một dòng vào BIEU_GIA ở CẢ BA kịch bản 1o (khoá ô, tổng hợp theo kỳ, tổng hợp năm).
+const mucHoTro = (gia, vat) => Math.round(30 * gia * (1 + vat) * 10) / 1e7; // triệu đồng/hộ/tháng, 7 số lẻ
+const BIEU_GIA = [
+  { tuNam: 0, muc: [[mucHoTro(1893, 0.08), 4, '61.333'], [mucHoTro(1984, 0.08), 8, '64.282']] },
+  { tuNam: 2026, muc: [[mucHoTro(1984, 0.08), 12, '64.282']] },
+  { tuNam: 2027, muc: [[mucHoTro(1984, 0.10), 12, '65.472']] },
+];
+const GIA_ROW = 7;        // dòng chứa H (mức 1), I (số tháng 1), J (mức 2), K (số tháng 2) — 0-based
+const GIA_HEADER_ROW = 4; // dòng tiêu đề "Mức hỗ trợ (… đồng)" — 0-based
+function datBieuGia(ctx, nam) {
+  let g = BIEU_GIA[0];
+  for (const x of BIEU_GIA) if (nam >= x.tuNam) g = x;
+  [[7, 8], [9, 10]].forEach(function (cot, k) {
+    const m = g.muc[k];
+    ctx.cell.set(SHEET, GIA_ROW, cot[0], m ? m[0] : 0);
+    ctx.cell.set(SHEET, GIA_ROW, cot[1], m ? m[1] : 0);
+    ctx.cell.set(SHEET, GIA_HEADER_ROW, cot[0],
+      m ? 'Mức hỗ trợ (' + m[2] + ' đồng)' : 'Mức hỗ trợ (không áp dụng năm ' + nam + ')');
+  });
+}
+function namCuaKy(ctx) {   // màn nhập và màn tổng hợp đặt sẵn ctx.shared.year = năm của kỳ
+  const y = Number(ctx.shared && ctx.shared.year);
+  return Number.isFinite(y) && y > 0 ? y : NaN;
+}
 
 function isEditable(row, col) {
   if (row === 2 && col === 1) return true;
@@ -47,6 +77,12 @@ return defineScript({
     if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
     // + ô "Chỉ tiêu / Đơn vị" của dòng nhập (cùng tên đơn vị).
     if (_org) ctx.cell.set(SHEET, DATA_ROW, 1, _org);
+    // Mức + số tháng theo năm của kỳ — chỉ khi phiếu còn sửa được; phiếu đã nộp / đã duyệt giữ số đã lưu.
+    const st = ctx.report && ctx.report.status ? String(ctx.report.status) : '';
+    // Phiếu lưu từ trước 183 giữ công thức cũ M8 = D8 × J8 × K8 (không có H8): để nguyên, không thì kinh phí về 0.
+    const congThucMoi = String(ctx.cell.getFormula(SHEET, DATA_ROW, 12) || '').indexOf('$H$8') >= 0;
+    const nam = namCuaKy(ctx);
+    if ((st === 'DRAFT' || st === 'RETURNED') && congThucMoi && Number.isFinite(nam)) datBieuGia(ctx, nam);
   },
   // Guard của màn NHẬP: ở sổ cái Sở ('summary-edit') không ý kiến — script 5-so-cai-so quyết ô Sở sửa.
   beforeEdit(ctx, cell) {
