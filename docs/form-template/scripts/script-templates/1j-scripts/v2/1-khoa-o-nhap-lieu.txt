@@ -1,3 +1,6 @@
+
+// SUA 2026-11-09 (changeset 180): 3 guard bo qua mode 'summary-edit' — o so cai So do kich ban "So cai So" quyet.
+
 // ==== 1j · Script 1/4 (v2): KHÓA/MỞ Ô NHẬP LIỆU ====
 // displayOrder = 1, enabled = true, gắn biểu reportType = "1j".
 // Nguồn: form-template/1j.xlsx (sheet '1j', A1:I17). Tọa độ 0-based.
@@ -48,13 +51,17 @@ return defineScript({
     const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
     if (_org) ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
   },
+  // Guard của màn NHẬP: ở sổ cái Sở ('summary-edit') không ý kiến — kịch bản "Sổ cái Sở" quyết ô Sở sửa.
   beforeEdit(ctx, cell) {
+    if (ctx.mode === 'summary-edit') return;
     return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
   },
   beforeCommit(ctx, cell) {
+    if (ctx.mode === 'summary-edit') return;
     return cell.sheetName === SHEET && isEditable(cell.row, cell.col);
   },
   beforePaste(ctx, range) {
+    if (ctx.mode === 'summary-edit') return;
     return containsOnlyEditableCells(range);
   },
 });

@@ -1,0 +1,88 @@
+// Nguon: DB asxh_template_scripts — bieu 1j, script "Sổ cái Sở" (displayOrder 4)
+// Hook: beforeEdit,beforeCommit,beforePaste,getSummaryData. Them 2026-11-09 (changeset 180).
+
+// Hàm cho SỔ CÁI SỞ — biểu 1j. Nằm CHUNG bộ script của biểu (displayOrder = 4).
+// Hook: beforeEdit, beforeCommit, beforePaste (chỉ có hiệu lực ở mode 'summary-edit'), getSummaryData
+// (máy chủ chạy mỗi lần Sở bấm Lưu sổ).
+//
+// Bảng tổng hợp kỳ của 1j (kịch bản "Tong hop theo ky" v3): mỗi đơn vị HAI dòng liền nhau từ dòng 10
+// (0-based 9) — dòng đầu = đặt hàng / giao nhiệm vụ, dòng sau = nhu cầu xã hội; tên đơn vị ở cột B
+// của cả hai dòng. Hai dòng 8, 9 là dòng TỔNG từng loại (không sửa).
+// - Guard: Sở chỉ sửa cột C (số sinh viên) ở dòng đơn vị; kinh phí F = G + H là công thức tự tính.
+// - getSummaryData: đọc lại cột C (số SV) + cột F (kinh phí đã tính) của từng dòng, theo cặp.
+
+const SHEET = '1j';
+const FIRST_UNIT_ROW = 9;
+const NAME_COL = 1;
+const QTY_COL = 2;
+const AMOUNT_COL = 5;
+const MAX_UNITS = 2000;
+const LOAI = [
+  { code: '1J.DATHANG.SO_DOI_TUONG', name: 'SV sư phạm đào tạo theo đặt hàng/giao nhiệm vụ › Số đối tượng' },
+  { code: '1J.XAHOI.SO_DOI_TUONG', name: 'SV sư phạm đào tạo theo nhu cầu xã hội › Số đối tượng' },
+];
+
+function num(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function unitName(ctx, row) {
+  const value = ctx.cell.get(SHEET, row, NAME_COL);
+  return value == null ? '' : String(value).trim();
+}
+
+function editable(ctx, sheetName, row, col) {
+  return sheetName === SHEET && row >= FIRST_UNIT_ROW && col === QTY_COL && unitName(ctx, row) !== '';
+}
+
+return defineScript({
+  // Ngoài sổ cái Sở (màn nhập, tổng hợp) không ý kiến — guard của màn nhập ở kịch bản khoá ô.
+  beforeEdit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforeCommit(ctx, cell) {
+    if (ctx.mode !== 'summary-edit') return;
+    return editable(ctx, cell.sheetName, cell.row, cell.col);
+  },
+  beforePaste(ctx, range) {
+    if (ctx.mode !== 'summary-edit') return;
+    for (let row = range.row; row < range.row + range.rowCount; row += 1) {
+      for (let col = range.col; col < range.col + range.colCount; col += 1) {
+        if (!editable(ctx, range.sheetName, row, col)) return false;
+      }
+    }
+    return true;
+  },
+  getSummaryData(ctx) {
+    const codeByName = (ctx.shared && ctx.shared.orgCodeByName) || {};
+    const rows = [];
+    for (let i = 0; i < MAX_UNITS; i += 1) {
+      const first = FIRST_UNIT_ROW + i * LOAI.length;
+      const name = unitName(ctx, first);
+      if (name === '') break;
+      const code = codeByName[name];
+      if (!code) {
+        ctx.issues.add({ severity: 'ERROR', code: 'UNKNOWN_UNIT',
+          message: 'Biểu 1j: không xác định được mã của đơn vị "' + name + '" (dòng ' + (first + 1) + ').' });
+        continue;
+      }
+      for (let k = 0; k < LOAI.length; k += 1) {
+        const row = first + k;
+        if (unitName(ctx, row) !== name) {
+          ctx.issues.add({ severity: 'ERROR', code: 'ROW_PAIR',
+            message: 'Biểu 1j: dòng ' + (row + 1) + ' phải cùng đơn vị "' + name + '" với dòng ' + (first + 1) + '.' });
+          continue;
+        }
+        const quantity = num(ctx.cell.get(SHEET, row, QTY_COL));
+        const amount = num(ctx.cell.get(SHEET, row, AMOUNT_COL));
+        if (quantity == null && amount == null) continue;
+        rows.push({ organizationCode: code, indicatorCode: LOAI[k].code, indicatorName: LOAI[k].name,
+          quantity: quantity, amount: amount, orderNo: i });
+      }
+    }
+    return rows;
+  },
+});
