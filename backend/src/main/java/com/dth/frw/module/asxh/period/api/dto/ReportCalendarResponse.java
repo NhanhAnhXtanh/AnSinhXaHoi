@@ -14,6 +14,8 @@ import java.util.List;
  * {@code createdPeriods}/{@code skippedPeriods} chỉ có trên kết quả tạo/cập nhật,
  * để hiện "Đã tạo N kỳ; bỏ qua M kỳ đã tồn tại."; {@code removedPeriods}/
  * {@code rescheduledPeriods} chỉ có trên kết quả cập nhật.
+ * {@code yearLockReason} chỉ có khi báo cáo năm đã nộp UBND / đã được duyệt: lịch năm đó
+ * đã chốt, giao diện chỉ cho xem (UC-60).
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ReportCalendarResponse(
@@ -28,17 +30,18 @@ public record ReportCalendarResponse(
         Integer skippedPeriods,
         Integer removedPeriods,
         Integer rescheduledPeriods,
+        String yearLockReason,
         Instant createdAt,
         Instant updatedAt) {
 
     public static ReportCalendarResponse from(ReportCalendar calendar, List<PeriodKind> lockedKinds,
-                                              long periodCount) {
-        return from(calendar, lockedKinds, periodCount, null, null, null, null);
+                                              long periodCount, String yearLockReason) {
+        return from(calendar, lockedKinds, periodCount, null, null, null, null, yearLockReason);
     }
 
     public static ReportCalendarResponse from(ReportCalendar calendar, List<PeriodKind> lockedKinds,
                                               long periodCount, Integer created, Integer skipped,
-                                              Integer removed, Integer rescheduled) {
+                                              Integer removed, Integer rescheduled, String yearLockReason) {
         return new ReportCalendarResponse(
                 calendar.getId(),
                 calendar.getYear(),
@@ -51,6 +54,7 @@ public record ReportCalendarResponse(
                 skipped,
                 removed,
                 rescheduled,
+                yearLockReason,
                 calendar.getCreatedAt(),
                 calendar.getUpdatedAt());
     }

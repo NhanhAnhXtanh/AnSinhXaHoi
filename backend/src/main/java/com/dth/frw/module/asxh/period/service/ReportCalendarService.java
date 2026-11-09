@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -51,13 +52,21 @@ public class ReportCalendarService {
     private final ReportCalendarRepository repository;
     private final ReportPeriodService periodService;
     private final RowLevelSecurity rowLevel;
+    private final CalendarYearLock yearLock;
 
     public ReportCalendarService(ReportCalendarRepository repository,
                                  ReportPeriodService periodService,
-                                 RowLevelSecurity rowLevel) {
+                                 RowLevelSecurity rowLevel,
+                                 CalendarYearLock yearLock) {
         this.repository = repository;
         this.periodService = periodService;
         this.rowLevel = rowLevel;
+        this.yearLock = yearLock;
+    }
+
+    /** Vì sao lịch năm này không sửa được (năm đã nộp / đã được UBND duyệt); rỗng = sửa được. */
+    public Optional<String> yearLockReason(ReportCalendar calendar) {
+        return yearLock.reason(calendar.getYear());
     }
 
     /** Kết quả tạo/cập nhật lịch, kèm số kỳ để hiện thông báo. */
@@ -200,6 +209,8 @@ public class ReportCalendarService {
         if (request.year() != null && !request.year().equals(calendar.getYear())) {
             throw new ConflictException("Lịch năm đã tạo không thể đổi năm.");
         }
+        // UC-60: báo cáo năm đã nộp UBND / đã được duyệt thì lịch năm đó đã chốt.
+        yearLock.assertEditable(calendar.getYear());
 
         UpdatePlan plan = plan(calendar, request.kinds(), request.deadlineDays());
         if (plan.isEmpty()) {
@@ -239,6 +250,7 @@ public class ReportCalendarService {
     public ReportCalendar delete(Long id) {
         ReportCalendar calendar = repository.findOne(rowLevel.byId(ReportCalendar.class, Action.DELETE, id))
                 .orElseThrow(() -> new ResourceNotFoundException(RESOURCE, id));
+        yearLock.assertEditable(calendar.getYear());
         boolean anyUsed = periodService.listByCalendar(calendar.getId()).stream()
                 .anyMatch(ReportPeriodService::isUsed);
         if (anyUsed) {

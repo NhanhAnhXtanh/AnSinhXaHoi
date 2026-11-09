@@ -221,13 +221,21 @@ class AnnualReportWorkflowTest {
         assertThrows(ConflictException.class, () -> workflow.reopen(report.getId(), "Sai số"));
     }
 
-    /** Đăng nhập giả bằng token có claim tên đăng nhập — đúng thứ CurrentUser.username() đọc. */
-    private static void signInAs(String username) {
+    /**
+     * Đăng nhập giả bằng token có claim tên đăng nhập — đúng thứ CurrentUser.username() đọc — kèm
+     * các quyền / vai trò (vd. "ROLE_ADMIN") mà CurrentUser.has() đọc.
+     */
+    private static void signInAs(String username, String... authorities) {
         org.springframework.security.oauth2.jwt.Jwt jwt = org.springframework.security.oauth2.jwt.Jwt
                 .withTokenValue("t").header("alg", "none").subject("1")
                 .claim(com.dth.frw.shared.security.JwtService.CLAIM_USERNAME, username).build();
+        List<org.springframework.security.core.GrantedAuthority> granted = java.util.Arrays.stream(authorities)
+                .<org.springframework.security.core.GrantedAuthority>map(
+                        org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                .toList();
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
-                new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt));
+                new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(
+                        jwt, granted));
     }
 
     @Test
@@ -245,6 +253,29 @@ class AnnualReportWorkflowTest {
 
             signInAs("ubnd.duyet");
             assertEquals(AnnualReportStatus.APPROVED, workflow.approve(submitted.getId()).getStatus());
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    @DisplayName("Quản trị (ADMIN) tự nộp vẫn phê duyệt / trả lại được; tài khoản khác vẫn bị chặn")
+    void adminMayDecideOwnReport() {
+        try {
+            signInAs("admin", "ROLE_ADMIN");
+            readyToSubmit(5);
+            AnnualReport submitted = workflow.submit(YEAR, "12/TTr-STC", DOC_DATE, List.of());
+
+            assertFalse(AnnualReportService.isBlockedAsSubmitter(submitted), "Quản trị không bị chặn");
+            assertEquals(AnnualReportStatus.RETURNED,
+                    workflow.returnReport(submitted.getId(), "Thiếu số liệu quý IV").getStatus());
+
+            AnnualReport resubmitted = workflow.submit(YEAR, "13/TTr-STC", DOC_DATE, List.of());
+            assertEquals(AnnualReportStatus.APPROVED, workflow.approve(resubmitted.getId()).getStatus());
+
+            // Cùng tên đăng nhập nhưng không có vai trò ADMIN thì vẫn là người nộp bị chặn.
+            signInAs("admin");
+            assertTrue(AnnualReportService.isBlockedAsSubmitter(resubmitted));
         } finally {
             org.springframework.security.core.context.SecurityContextHolder.clearContext();
         }

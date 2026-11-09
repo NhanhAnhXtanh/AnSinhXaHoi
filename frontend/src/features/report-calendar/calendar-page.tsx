@@ -14,7 +14,7 @@ import {
   useWarnAboutChange,
   type HttpError,
 } from "@refinedev/core";
-import { CalendarPlus, CalendarX, RefreshCw, Trash, TriangleAlert } from "lucide-react";
+import { CalendarPlus, CalendarX, Lock, RefreshCw, Trash, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { API_URL } from "@/shared/api/constants";
@@ -424,6 +424,9 @@ function CalendarWorkspace({
 
   const locked = useMemo(() => new Set(calendar?.lockedKinds ?? []), [calendar]);
   const hasAssigned = (calendar?.lockedKinds.length ?? 0) > 0;
+  // UC-60: báo cáo năm đã nộp UBND / đã được duyệt thì lịch năm đó đã chốt — cả khung chỉ xem.
+  const yearLock = mode === "view" ? (calendar?.yearLockReason ?? null) : null;
+  const editable = canWrite && yearLock === null;
 
   /** Tên kỳ theo mã — hộp xác nhận nói "Tháng 1/2026", không nói "T1". */
   function periodNames(codes: string[]): string {
@@ -680,7 +683,7 @@ function CalendarWorkspace({
           <YearSelect onCreateYear={mode === "view" ? onCreateYear : undefined} />
           <HeaderActions
             primary={
-              canWrite
+              editable
                 ? {
                     label: mode === "view" ? "Lưu lịch" : "Tạo lịch",
                     onClick: submit,
@@ -696,10 +699,10 @@ function CalendarWorkspace({
                       label: "Xoá lịch năm",
                       icon: Trash,
                       destructive: true,
-                      disabled: hasAssigned || busy,
-                      reason: hasAssigned
-                        ? "Đã có kỳ được gán cho đơn vị nên không xoá được."
-                        : undefined,
+                      disabled: yearLock !== null || hasAssigned || busy,
+                      reason:
+                        yearLock ??
+                        (hasAssigned ? "Đã có kỳ được gán cho đơn vị nên không xoá được." : undefined),
                       onSelect: () => setConfirmDelete(true),
                     },
                   ]
@@ -710,6 +713,15 @@ function CalendarWorkspace({
       }
       fill
     >
+      {yearLock && (
+        <div
+          role="status"
+          className="bg-warning-subtle text-warning-text flex shrink-0 items-start gap-2.5 rounded-lg px-3.5 py-3 text-sm"
+        >
+          <Lock aria-hidden className="mt-0.5 size-4 shrink-0" />
+          <p className="min-w-0 font-medium">{yearLock}</p>
+        </div>
+      )}
       <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:overflow-visible xl:grid-cols-[35rem_minmax(0,1fr)]">
         <CalendarInfoPanel
           form={form}
@@ -718,7 +730,7 @@ function CalendarWorkspace({
           yearOptions={yearOptions}
           onYearChange={(y) => onYearChange?.(y)}
           locked={locked}
-          readOnly={!canWrite}
+          readOnly={!editable}
         />
         <PeriodPreviewPanel
           periods={rows}
@@ -726,7 +738,8 @@ function CalendarWorkspace({
           daysValid={days !== null}
           loading={panelLoading}
           error={panelError}
-          readOnly={!canWrite}
+          readOnly={!editable}
+          readOnlyReason={yearLock ?? undefined}
           onDeadlineChange={(slot, iso) =>
             form.setValue(
               "overrides",
