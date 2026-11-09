@@ -8,7 +8,8 @@ PUBLISHED mới nhất của từng biểu), kèm file Excel gốc của các bi
   `1-khoa-o-nhap-lieu` (onLoad/beforeEdit…), `2-validate-khi-nop`, `3-getinputdata-khi-duyet`,
   `4-tonghop-theo-ky` (afterInject), `5-so-cai-so` (sổ cái Sở, chỉ 1a/1b).
   Biểu **1j** chạy bản trong `1j-scripts/v2/` (bản v1 ở thư mục cha chỉ để tham khảo).
-- `scripts/script-summariez/` — 15 khối afterInject của biểu tổng hợp `01-TONGHOP`, mỗi file một khối.
+- `scripts/script-summariez/` — các khối afterInject của biểu tổng hợp `01-TONGHOP`, mỗi file một khối
+  (16 khối từ changeset 179 ngày 09/11/2026: thêm `1l`).
 - `scan-donvi.txt`, `scan-tonghop.txt` — bảng quét cấu trúc ô của các biểu.
 
 Trong DB, mỗi phiên bản có NHIỀU kịch bản (như `qt_template_script` của bản Jmix): mỗi file ở trên là

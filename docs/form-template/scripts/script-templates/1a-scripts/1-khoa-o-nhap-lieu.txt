@@ -1,13 +1,16 @@
 // Nguon: DB qt_template_script — bieu 1a, phien ban PB-000005, script "Lock cell"
 // Hook: onLoad,beforeEdit,beforeCommit,beforePaste. Dong bo tu ban DA KIEM THU ngay 2026-08-22.
 // SUA 2026-10-01 (da ghi DB): 3 guard bo qua mode 'summary-edit' — o so cai So do script "So cai So" quyet.
+// SUA 2026-11-09 (changeset 179): khoa muc C33:C37 theo bieu mau; ghi chu cot E chi o dong la.
 
 // ==== 1a · Script 1/3: KHÓA/MỞ Ô NHẬP LIỆU ====
 // displayOrder = 1, enabled = true, gắn biểu reportType = "1a".
 // Nguồn cấu trúc: form-template/1a_DATA.xlsx (sheet '1a', dims A1:I49). Tọa độ 0-based.
 //
 // FORM CHUẨN MỚI: cột D (Kinh phí) là Ô CÔNG THỨC =ROUND(SoDoiTuong × mức, 0) — KHÔNG
-// mở khoá. Đơn vị chỉ nhập cột C (Số đối tượng) + ghi chú (E) + tham số tính toán (C33:C37).
+// mở khoá. Đơn vị chỉ nhập cột C (Số đối tượng) + ghi chú (E) ở các DÒNG LÁ.
+// Mức tính toán C33:C37 theo biểu mẫu Sở giao → KHOÁ: kinh phí cột D luôn tính theo mức của biểu
+// rồi vào sổ cái khi duyệt (đơn vị không sửa mức, giống các biểu 1b–1s).
 //
 // Import workbook thường mở khoá hết ô → khoá TẤT CẢ rồi mở lại đúng ô nhập (như 1g).
 
@@ -16,27 +19,23 @@ const SHEET = '1a';
 // Cột C (Số đối tượng) — chỉ các DÒNG LÁ (0-based). Các dòng tiểu tổng C8,C9,C11,C12,
 // C22,C23,C27 là công thức → giữ khoá.
 const C_LEAF_ROWS = [9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 23, 24, 25, 27, 28];
-// Tham số tính toán C33:C37 (nhãn "đơn vị có thể chỉnh giá trị ở cột C").
-const PARAM_ROWS = [32, 33, 34, 35, 36];
-// Ghi chú cột E: E8:E29 (0-based 7..28).
-const NOTE_ROW_FROM = 7;
-const NOTE_ROW_TO = 28;
+// Ghi chú cột E: chỉ ở dòng lá (cùng dòng với C_LEAF_ROWS) — ghi chú dòng nhóm không vào sổ cái.
 
 function isEditable(row, col) {
   if (row === 0 && (col === 0 || col === 1)) return true;       // A1:B1 đơn vị (ô gộp)
   if (row === 2 && col === 1) return true;                      // B3 tháng/năm
   if (col === 2 && C_LEAF_ROWS.indexOf(row) >= 0) return true;  // C: số đối tượng (dòng lá)
-  if (col === 2 && PARAM_ROWS.indexOf(row) >= 0) return true;   // C33:C37 tham số
-  return col === 4 && row >= NOTE_ROW_FROM && row <= NOTE_ROW_TO; // E: ghi chú
+  return col === 4 && C_LEAF_ROWS.indexOf(row) >= 0;            // E: ghi chú (dòng lá)
 }
 
 function unlockEditableCells(ctx) {
   ctx.cell.lock(SHEET, 0, 0, false);
   ctx.cell.lock(SHEET, 0, 1, false);
   ctx.cell.lock(SHEET, 2, 1, false);
-  C_LEAF_ROWS.forEach((row) => ctx.cell.lock(SHEET, row, 2, false));
-  PARAM_ROWS.forEach((row) => ctx.cell.lock(SHEET, row, 2, false));
-  for (let row = NOTE_ROW_FROM; row <= NOTE_ROW_TO; row += 1) ctx.cell.lock(SHEET, row, 4, false);
+  C_LEAF_ROWS.forEach((row) => {
+    ctx.cell.lock(SHEET, row, 2, false);
+    ctx.cell.lock(SHEET, row, 4, false);
+  });
 }
 
 function containsOnlyEditableCells(range) {
