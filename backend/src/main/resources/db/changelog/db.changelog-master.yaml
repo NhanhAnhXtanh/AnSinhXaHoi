@@ -111,3 +111,5 @@ databaseChangeLog:
       file: db/changelog/changes/180-1j-so-cai-so-tonghop.sql
   - include:
       file: db/changelog/changes/181-tonghop-1q.sql
+  - include:
+      file: db/changelog/changes/182-tonghop-01-tien-dien-1o.sql
