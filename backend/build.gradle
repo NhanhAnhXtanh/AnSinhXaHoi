@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.1.1'
+    id 'org.springframework.boot' version '4.1.2'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -47,8 +47,8 @@ dependencies {
     // đơn vị nộp và khi Sở duyệt phiếu — xem module/asxh/script/ServerScriptRunner. Bản
     // community (js-community), dòng 25.x dựng cho JDK 25; trên JDK thường (không phải GraalVM)
     // nó chạy chế độ thông dịch, đủ cho script đọc vài trăm ô.
-    implementation 'org.graalvm.polyglot:polyglot:25.3.4.1'
-    implementation 'org.graalvm.polyglot:js-community:25.3.4.1'
+    implementation 'org.graalvm.polyglot:polyglot:25.4.4.1.1'
+    implementation 'org.graalvm.polyglot:js-community:25.4.4.1.1'
     testImplementation 'org.springframework.boot:spring-boot-starter-liquibase-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.security:spring-security-test'
