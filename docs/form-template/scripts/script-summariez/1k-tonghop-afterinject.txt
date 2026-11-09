@@ -2,12 +2,16 @@
 // Hook: afterInject. Dong bo tu ban DA KIEM THU ngay 2026-08-22 (nam duong lich).
 // SUA 2026-09-29: chi lay don vi DUOC GIAO bieu trong nam (period-organizations?from&to&reportType)
 //   thay cho /rest/qt/master/organization-units (toan bo danh muc don vi).
+// SUA 2026-11-09 (changeset 178): do them tuyen dung mot lan (1K.TUYEN_DUNG.*) vao cot Q, R;
+//   truoc day bo qua vi tuong tab tong hop khong co cot.
 
 // ============================================================================
 //  SCRIPT TỔNG HỢP · BIỂU 1k (1k-sgd-xp)  —  hook afterInject  (NHÓM B: khối tỉnh/xã · 2 KỲ · 3 chỉ tiêu)
 //  Phổ cập giáo dục mầm non 3–5 tuổi. 3 chỉ tiêu (mỗi cái có Số đối tượng + Kinh phí):
 //    PHO_CAP (1K.PHO_CAP.DOI_TUONG) · AN_TRUA (1K.AN_TRUA.DOI_TUONG) · CP (1K.CP_HOC_TAP.DOI_TUONG).
-//  (TUYEN_DUNG không có cột trong sheet tổng hợp → BỎ.)
+//  TUYEN_DUNG (1K.TUYEN_DUNG.DOI_TUONG / .KINH_PHI) → cột Q (đối tượng) + R (kinh phí): một nhóm cột
+//  cho cả năm, CỘNG Kỳ II + Kỳ I (tuyển dụng một lần — người tuyển mỗi kỳ là người khác). Cột S
+//  (tổng kinh phí = F + M + R) và tiểu tổng Q/R/S giữ công thức template.
 //  ‼ CỬA SỔ NỬA-NĂM-TRỌN + a/b: Khối "Kỳ II" (cột C–I) ← HK2 = năm b (T1–6) ; Khối "Kỳ I" (cột J–P)
 //    ← HK1 = năm a (T7–12). a = ctx.shared.a (HK1 nửa cuối) ; b = ctx.shared.b (HK2 nửa đầu).
 //  ĐỔ per đơn vị: 3 Số ĐT (qty) + 3 Kinh phí thành phần (amount) MỖI kỳ. Cột KP tổng F/M (=SUM 3 thành
@@ -23,6 +27,9 @@ const MA = {
   AN_TRUA: '1K.AN_TRUA.DOI_TUONG',
   CP: '1K.CP_HOC_TAP.DOI_TUONG',
 };
+// Tuyển dụng một lần: một nhóm cột cho cả năm (không chia kỳ) — Q = số đối tượng, R = kinh phí.
+const TD = { Q: '1K.TUYEN_DUNG.DOI_TUONG', R: '1K.TUYEN_DUNG.KINH_PHI' };
+const TD_Q_COL = 16, TD_R_COL = 17;
 // Cột 0-based. Kỳ II (HK2 năm b): qty C/D/E, amt G/H/I (F=KP tổng công thức).
 const II = { q: { PHO_CAP: 2, AN_TRUA: 3, CP: 4 }, a: { PHO_CAP: 6, AN_TRUA: 7, CP: 8 } };
 // Kỳ I (HK1 năm a): qty J/K/L, amt N/O/P (M=KP tổng công thức).
@@ -69,6 +76,7 @@ return defineScript({
     // Gom per đơn vị: byOrg[code][MÃ] = {q, a} (groupByOrg). MeasureKind tự giải quantity; amount = KP.
     async function periodByOrg(from, to) {
       const codeByMa = {}; for (const k in MA) codeByMa[MA[k]] = k;
+      for (const k in TD) codeByMa[TD[k]] = 'TD_' + k;
       const m = {};
       for (const r of await apiGet('/rest/qt/summary/data?from=' + from + '&to=' + to + '&groupByOrg=true' + src)) {
         const key = codeByMa[r[CK]]; if (!key) continue;
@@ -97,7 +105,7 @@ return defineScript({
     const xaRow = XA_ROW + shift;
     if (xa.length > 1) ctx.rows.clone(SHEET, xaRow, xa.length - 1);
 
-    // Đổ 1 đơn vị: 3 Số ĐT + 3 KP thành phần mỗi kỳ; KP tổng F/M công thức tự tính.
+    // Đổ 1 đơn vị: 3 Số ĐT + 3 KP thành phần mỗi kỳ; KP tổng F/M công thức tự tính; tuyển dụng → Q, R.
     function writeUnit(r0, u) {
       setText(ctx, r0, B, nameOf[u.code] || u.code);
       const e2 = hk2[u.code], e1 = hk1[u.code];
@@ -105,6 +113,10 @@ return defineScript({
         if (e2 && e2[k]) { put(ctx, r0, II.q[k], e2[k].q); put(ctx, r0, II.a[k], e2[k].a); }
         if (e1 && e1[k]) { put(ctx, r0, I.q[k], e1[k].q); put(ctx, r0, I.a[k], e1[k].a); }
       }
+      // Tuyển dụng một lần: CỘNG Kỳ II + Kỳ I vào cột Q (đối tượng), R (kinh phí).
+      const q2 = e2 && e2.TD_Q, q1 = e1 && e1.TD_Q, a2 = e2 && e2.TD_R, a1 = e1 && e1.TD_R;
+      if (q2 || q1) put(ctx, r0, TD_Q_COL, (q2 ? q2.q : 0) + (q1 ? q1.q : 0));
+      if (a2 || a1) put(ctx, r0, TD_R_COL, (a2 ? a2.a : 0) + (a1 ? a1.a : 0));
     }
     for (let i = 0; i < so.length; i += 1) writeUnit(SO_ROW + i, so[i]);
     for (let j = 0; j < xa.length; j += 1) writeUnit(xaRow + j, xa[j]);
