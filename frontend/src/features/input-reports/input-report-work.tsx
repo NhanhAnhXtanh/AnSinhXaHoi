@@ -401,8 +401,8 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
       const submitLabel = report.status === "RETURNED" ? "Nộp lại phiếu" : "Nộp phiếu";
       toast.success(
         left.length === 0
-          ? `Đã đánh dấu biểu ${code} là nhập xong. Mọi biểu đã xong — bạn bấm ${submitLabel} để gửi Sở.`
-          : `Đã đánh dấu biểu ${code} là nhập xong. Biểu chuyển sang chỉ xem; bấm "Sửa lại" nếu cần nhập tiếp.`
+          ? `Biểu ${code} đã nhập xong (chỉ xem). Mọi biểu đã xong, bạn bấm ${submitLabel} để gửi Sở.`
+          : `Biểu ${code} đã nhập xong (chỉ xem).`
       );
     } finally {
       setBusy((b) => (b === "complete" ? null : b));

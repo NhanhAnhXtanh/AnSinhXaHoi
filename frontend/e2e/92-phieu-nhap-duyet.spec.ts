@@ -698,7 +698,7 @@ test.describe("Nhóm B — phiếu nhập, duyệt phiếu, đính kèm, sổ c�
     await page.getByRole("button", { name: "Lưu dữ liệu" }).click();
     await expectToast(page, "Đã lưu số liệu biểu 1a.");
     await page.getByRole("button", { name: "Kiểm tra & hoàn tất" }).click();
-    await expectToast(page, /Đã đánh dấu biểu 1a là nhập xong/);
+    await expectToast(page, /Biểu 1a đã nhập xong/);
     const submitBtn = page.getByRole("button", { name: "Nộp phiếu", exact: true });
     const disabledWhilePending = await submitBtn.isDisabled().catch(() => false);
     check(G, "Nút Nộp phiếu mờ khi còn biểu 1b chưa xong", "disabled", disabledWhilePending ? "disabled" : "enabled", disabledWhilePending);

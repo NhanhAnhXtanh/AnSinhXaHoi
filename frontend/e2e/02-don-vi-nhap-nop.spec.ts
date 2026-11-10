@@ -61,7 +61,7 @@ test.describe("Luồng (b): đơn vị nhập liệu và nộp phiếu", () => {
     await expectToast(page, "Đã lưu số liệu biểu 1a.");
 
     await page.getByRole("button", { name: "Kiểm tra & hoàn tất" }).click();
-    await expectToast(page, /Đã đánh dấu biểu 1a là nhập xong/);
+    await expectToast(page, /Biểu 1a đã nhập xong/);
 
     await page.getByRole("button", { name: "Nộp phiếu", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Nộp phiếu lên Sở Tài chính" });
