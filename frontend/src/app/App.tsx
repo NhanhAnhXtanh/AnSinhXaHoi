@@ -55,6 +55,8 @@ function useAppNotificationProvider(): NotificationProvider {
  *
  * Để ở cấp module: Refine dựng QueryClient một lần theo object này.
  */
+const APP_NAME = "Quyết toán ASXH";
+
 const NO_RETRY_STATUSES = new Set([400, 401, 403, 404, 409, 410, 422]);
 const reactQueryClientConfig = {
   defaultOptions: {
@@ -104,7 +106,7 @@ function App() {
               // Drives the sidebar brand block and the document title.
               title: {
                 icon: <Landmark />,
-                text: "Quyết toán ASXH",
+                text: APP_NAME,
               },
             }}
           >
@@ -117,7 +119,16 @@ function App() {
             <Toaster />
             {/* Ô tìm kiếm Ctrl K nằm ở `layout/header.tsx` (`CommandPalette`). */}
             <AuthoritiesSync />
-            <DocumentTitleHandler />
+            <DocumentTitleHandler
+              // Mặc định của Refine ghi "… | Refine" (và tên tiếng Anh của resource). Tiêu đề thẻ:
+              // "{tên màn} | Quyết toán ASXH", tên màn lấy từ nhãn tiếng Việt của resource.
+              handler={({ resource, action }) => {
+                const label = resource?.meta?.label;
+                if (typeof label !== "string" || label === "") return APP_NAME;
+                const prefix = action === "create" ? "Thêm " : action === "edit" ? "Sửa " : "";
+                return `${prefix}${prefix ? label.toLowerCase() : label} | ${APP_NAME}`;
+              }}
+            />
           </Refine>
           <DevtoolsPanel />
         </DevtoolsProvider>
