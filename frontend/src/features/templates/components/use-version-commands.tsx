@@ -33,6 +33,22 @@ import {
 import { PublishDialog } from "./publish-dialog";
 
 /**
+ * Câu của hộp xoá. Máy chủ cho xoá cả phiên bản đã ban hành miễn là bản mới nhất và CHƯA phiếu
+ * hay tổng hợp nào dùng (UC-16, gỡ bản ban hành nhầm) — với bản đó phải nói rõ là đang xoá một bản
+ * đã ban hành và bản liền trước sẽ được dùng lại, để người dùng không tưởng đang xoá bản nháp.
+ */
+function deleteDescription(version: TemplateVersion | null): string {
+  const base = "Toàn bộ biểu mẫu đã thiết kế trong phiên bản này sẽ bị xoá và không khôi phục được.";
+  if (!version || version.status === "draft" || version.status === "testing") return base;
+  const from = version.effectiveFrom ? ` (áp dụng từ ${formatDate(version.effectiveFrom)})` : "";
+  return (
+    `Đây là phiên bản ĐÃ BAN HÀNH${from}. Chỉ xoá được vì chưa có phiếu hay số liệu tổng hợp nào dùng; ` +
+    `sau khi xoá, phiên bản đã ban hành liền trước được dùng lại. ${base} ` +
+    "Nếu chỉ muốn ngừng dùng phiên bản này, hãy thu hồi hoặc khoá biểu thay vì xoá."
+  );
+}
+
+/**
  * Các việc trên một phiên bản (menu ⋯ của thẻ phiên bản, nút chân panel, đầu
  * trang Thiết kế mẫu) cùng các hộp xác nhận của chúng — dùng chung cho hai màn
  * để chữ, điều kiện và lý do mờ chỉ viết một lần. Điều kiện ở đây chỉ để làm
@@ -229,7 +245,7 @@ export function useVersionCommands({
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Xoá ${lastDelete ? versionLabel(lastDelete).toLowerCase() : "phiên bản"}?`}
-        description="Toàn bộ biểu mẫu đã thiết kế trong phiên bản này sẽ bị xoá và không khôi phục được."
+        description={deleteDescription(lastDelete)}
         confirmLabel="Xoá phiên bản"
         destructive
         onConfirm={() => {
