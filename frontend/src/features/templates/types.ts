@@ -27,6 +27,8 @@ export type ApiTemplateSet = {
   templateCount: number;
   inUse: boolean;
   createdAt: string;
+  /** Tên đăng nhập người tạo; null với bản ghi có từ trước khi lưu thông tin này. */
+  createdBy: string | null;
   updatedAt: string | null;
 };
 
@@ -54,6 +56,7 @@ export type ApiTemplate = {
   lockedAt: string | null;
   lockedBy: string | null;
   createdAt: string;
+  createdBy: string | null;
   updatedAt: string | null;
 };
 
@@ -80,6 +83,7 @@ export type ApiTemplateVersion = {
   /** Chỉ có ở getOne và các thao tác; danh sách để null. */
   workbookJson: string | null;
   createdAt: string;
+  createdBy: string | null;
   updatedAt: string | null;
 };
 
@@ -133,6 +137,7 @@ export type TemplateSet = {
   name: string;
   description?: string;
   createdAt: string;
+  createdBy: string | null;
   updatedAt: string;
   templateCount: number;
   inUse: boolean;
@@ -149,6 +154,7 @@ export type TemplateForm = {
   kind: FormKind;
   sortOrder: number;
   createdAt: string;
+  createdBy: string | null;
   /** Phiên bản mới nhất (mọi trạng thái) — để màn thiết kế chuyển tab biểu. */
   latestVersionId: string | null;
   /** Cả biểu đang khoá để sửa: không ban hành / thu hồi, đợt mới không dùng được biểu. */
@@ -173,6 +179,7 @@ export type TemplateVersion = {
   revokedAt: string | null;
   revokedBy: string | null;
   createdAt: string;
+  createdBy: string | null;
 };
 
 export type ChangeLogEntry = {

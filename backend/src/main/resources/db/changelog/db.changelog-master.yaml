@@ -117,3 +117,5 @@ databaseChangeLog:
       file: db/changelog/changes/183-1o-muc-tien-dien-theo-nam.sql
   - include:
       file: db/changelog/changes/184-viet-hoa-vai-tro-he-thong.sql
+  - include:
+      file: db/changelog/changes/185-ghi-nguoi-tao-bo-mau.sql

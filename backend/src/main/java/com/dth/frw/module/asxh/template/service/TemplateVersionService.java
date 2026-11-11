@@ -179,6 +179,7 @@ public class TemplateVersionService {
                     "Biểu này đã có phiên bản — hãy dùng \"Tạo phiên bản kế tiếp\" để có phiên bản mới.");
         }
         TemplateVersion version = new TemplateVersion(template, repository.maxVersionNo(template.getId()) + 1, null);
+        version.setCreatedBy(CurrentUser.username().orElse(null));
         version.setEffectiveFrom(request.effectiveFrom() != null
                 ? request.effectiveFrom()
                 : TemplateDates.firstDayOfNextMonth());
@@ -356,6 +357,7 @@ public class TemplateVersionService {
 
         int nextNo = chain.stream().mapToInt(TemplateVersion::getVersionNo).max().orElse(0) + 1;
         TemplateVersion copy = new TemplateVersion(template, nextNo, source);
+        copy.setCreatedBy(CurrentUser.username().orElse(null));
         copy.setWorkbookJson(source.getWorkbookJson());
         copy.setEffectiveFrom(null);
         TemplateVersion saved = repository.save(copy);

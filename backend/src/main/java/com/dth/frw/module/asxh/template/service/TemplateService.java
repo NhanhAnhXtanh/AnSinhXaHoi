@@ -184,15 +184,19 @@ public class TemplateService {
                 : repository.maxSortOrder(set.getId()) + 1;
         String code = "BM-%06d".formatted(repository.nextCodeNumber());
 
-        Template template = repository.save(new Template(
+        Template created = new Template(
                 set,
                 code,
                 shortName,
                 request.name().trim(),
                 request.kind() == null ? TemplateKind.CHI_TIET : request.kind(),
-                sortOrder));
+                sortOrder);
+        String actor = CurrentUser.username().orElse(null);
+        created.setCreatedBy(actor);
+        Template template = repository.save(created);
 
         TemplateVersion first = new TemplateVersion(template, 1, null);
+        first.setCreatedBy(actor);
         first.setEffectiveFrom(request.effectiveFrom() != null
                 ? request.effectiveFrom()
                 : TemplateDates.firstDayOfNextMonth());

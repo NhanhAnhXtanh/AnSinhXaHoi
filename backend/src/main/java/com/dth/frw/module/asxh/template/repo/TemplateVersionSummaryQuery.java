@@ -72,6 +72,7 @@ public class TemplateVersionSummaryQuery {
                 root.get("revokedAt"),
                 root.get("revokedBy"),
                 root.get("createdAt"),
+                root.get("createdBy"),
                 root.get("updatedAt"));
 
         Predicate where = spec == null ? null : spec.toPredicate(root, query, cb);
@@ -112,7 +113,8 @@ public class TemplateVersionSummaryQuery {
                     tuple.get(9, Instant.class),
                     tuple.get(10, String.class),
                     tuple.get(11, Instant.class),
-                    tuple.get(12, Instant.class)));
+                    tuple.get(12, String.class),
+                    tuple.get(13, Instant.class)));
         }
         return rows;
     }

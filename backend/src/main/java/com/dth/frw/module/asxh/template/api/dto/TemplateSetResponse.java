@@ -16,6 +16,7 @@ public record TemplateSetResponse(
         long templateCount,
         boolean inUse,
         Instant createdAt,
+        String createdBy,
         Instant updatedAt) {
 
     public static TemplateSetResponse from(TemplateSet set, long templateCount, boolean inUse) {
@@ -26,6 +27,7 @@ public record TemplateSetResponse(
                 templateCount,
                 inUse,
                 set.getCreatedAt(),
+                set.getCreatedBy(),
                 set.getUpdatedAt());
     }
 }

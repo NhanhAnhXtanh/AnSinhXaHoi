@@ -9,6 +9,7 @@ import com.dth.frw.module.asxh.template.repo.TemplateSetRepository;
 import com.dth.frw.module.asxh.template.repo.TemplateSetSpecifications;
 import com.dth.frw.shared.exception.ConflictException;
 import com.dth.frw.shared.web.ListParams;
+import com.dth.frw.shared.security.CurrentUser;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -84,7 +85,9 @@ public class TemplateSetService {
     public TemplateSet create(TemplateSetRequest request) {
         String name = request.name().trim();
         requireNameAvailable(name, null);
-        return repository.save(new TemplateSet(name, trimToNull(request.description())));
+        TemplateSet set = new TemplateSet(name, trimToNull(request.description()));
+        set.setCreatedBy(CurrentUser.username().orElse(null));
+        return repository.save(set);
     }
 
     @Transactional

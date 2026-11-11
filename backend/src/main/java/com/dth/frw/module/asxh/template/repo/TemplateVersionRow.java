@@ -27,5 +27,6 @@ public record TemplateVersionRow(
         Instant revokedAt,
         String revokedBy,
         Instant createdAt,
+        String createdBy,
         Instant updatedAt) {
 }
