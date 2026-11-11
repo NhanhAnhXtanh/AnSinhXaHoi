@@ -26,6 +26,7 @@ import {
   buildChangeLog,
   currentVersion,
   formLabel,
+  formLabelInline,
   versionsOf,
   type DesignerNavState,
 } from "./model";
@@ -165,8 +166,8 @@ export function TemplateSets() {
     }
     toast.success(
       locked
-        ? `Đã khoá ${formLabel(form).toLowerCase()}. Các đợt báo cáo mới không dùng được biểu này cho tới khi mở khoá.`
-        : `Đã mở khoá ${formLabel(form).toLowerCase()}.`
+        ? `Đã khoá ${formLabelInline(form)}. Các đợt báo cáo mới không dùng được biểu này cho tới khi mở khoá.`
+        : `Đã mở khoá ${formLabelInline(form)}.`
     );
   }
 
@@ -261,7 +262,7 @@ export function TemplateSets() {
       <ConfirmDialog
         open={deletingForm !== null}
         onOpenChange={(open) => !open && setDeletingForm(null)}
-        title={`Xoá ${lastDeletingForm ? formLabel(lastDeletingForm).toLowerCase() : "biểu"}?`}
+        title={`Xoá ${lastDeletingForm ? formLabelInline(lastDeletingForm) : "biểu"}?`}
         description="Biểu và các phiên bản nháp của biểu sẽ bị xoá, không khôi phục được."
         confirmLabel="Xoá biểu"
         destructive
@@ -274,7 +275,7 @@ export function TemplateSets() {
               toast.error(result.error);
               return;
             }
-            toast.success(`Đã xoá ${formLabel(target).toLowerCase()}.`);
+            toast.success(`Đã xoá ${formLabelInline(target)}.`);
             select({ form: null });
           });
         }}
@@ -283,7 +284,7 @@ export function TemplateSets() {
       <ConfirmDialog
         open={lockingForm !== null}
         onOpenChange={(open) => !open && setLockingForm(null)}
-        title={`Khoá ${lastLockingForm ? formLabel(lastLockingForm).toLowerCase() : "biểu"}?`}
+        title={`Khoá ${lastLockingForm ? formLabelInline(lastLockingForm) : "biểu"}?`}
         description="Khoá cả biểu để sửa: các đợt báo cáo mới không dùng được bất kỳ phiên bản nào của biểu, và không ban hành hay thu hồi được phiên bản nào. Bạn vẫn xem và sửa được bản nháp. Phiếu đã lập theo biểu vẫn nhập và duyệt bình thường. Sửa xong thì mở khoá rồi ban hành."
         confirmLabel="Khoá biểu"
         onConfirm={() => {

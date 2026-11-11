@@ -55,6 +55,7 @@ import {
   byteLength,
   canClone,
   formLabel,
+  formLabelInline,
   formOfVersion,
   isEditable,
   openingLabel,
@@ -260,7 +261,8 @@ function DesignerWorkspace({ data, canWrite }: { data: ApiTemplateVersion; canWr
       setScriptsDirty(false);
     }
     toast.success(
-      `Đã lưu thiết kế và kịch bản của ${formLabel(form).toLowerCase()}, ${versionLabel(version).toLowerCase()}.`
+      // Chỉ phần "Biểu" viết thường: tên biểu ("KT2", "1a") giữ nguyên chữ hoa.
+      `Đã lưu thiết kế và kịch bản của ${formLabelInline(form)}, ${versionLabel(version).toLowerCase()}.`
     );
   }, [
     actions,

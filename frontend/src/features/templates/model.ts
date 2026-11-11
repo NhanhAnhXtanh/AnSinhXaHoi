@@ -47,6 +47,14 @@ export function formLabel(form: Pick<TemplateForm, "name">): string {
 }
 
 /**
+ * Giữa câu: "biểu KT2" — chữ "Biểu" viết thường nhưng TÊN biểu giữ nguyên chữ hoa (`formLabel(...)
+ * .toLowerCase()` làm "kt2", "1A" thành "1a" trong thông báo).
+ */
+export function formLabelInline(form: Pick<TemplateForm, "name">): string {
+  return `biểu ${form.name}`;
+}
+
+/**
  * Trạng thái điều hướng gửi kèm khi mở Thiết kế mẫu: tên biểu biết trước, để
  * vòng quay đầu tiên (đang tải phiên bản) đã ghi đúng tên biểu.
  */
@@ -305,13 +313,13 @@ export function buildChangeLog(
       id: `form-${form.id}`,
       at: form.createdAt,
       actor: null,
-      content: `Tạo ${formLabel(form).toLowerCase()}`,
+      content: `Tạo ${formLabelInline(form)}`,
     });
   }
   for (const v of versions) {
     const form = byId.get(v.formId);
     if (!form) continue;
-    const of = `${versionLabel(v).toLowerCase()} của ${formLabel(form).toLowerCase()}`;
+    const of = `${versionLabel(v).toLowerCase()} của ${formLabelInline(form)}`;
     if (v.number > 1) {
       entries.push({ id: `v-${v.id}-c`, at: v.createdAt, actor: null, content: `Tạo ${of}` });
     }
