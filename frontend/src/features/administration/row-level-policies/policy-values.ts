@@ -1,5 +1,6 @@
 import type { PolicyFormValues } from "./policy-form";
-import { EMPTY_SCOPE } from "@/domains/row-level-policy/types";
+import { EMPTY_SCOPE, NULLARY_OPERATORS, type ScopeNode } from "@/domains/row-level-policy/types";
+import { fieldLabel } from "./labels";
 
 /**
  * Annotated rather than inferred, so `scope` widens to a `ScopeNode` instead of
@@ -53,4 +54,43 @@ export function normalize(values: PolicyFormValues): PolicyFormValues {
     // that reappears if somebody switches back.
     checkScope: values.action === "write" ? (values.checkScope ?? null) : null,
   };
+}
+
+/** Giá trị `{ lit }` còn trống: chuỗi rỗng / toàn dấu cách, null, danh sách rỗng hoặc có ô trống. */
+function literalIsBlank(lit: unknown): boolean {
+  if (lit === undefined || lit === null) return true;
+  if (typeof lit === "string") return lit.trim() === "";
+  if (Array.isArray(lit)) return lit.length === 0 || lit.some(literalIsBlank);
+  return false;
+}
+
+/**
+ * Điều kiện ĐẦU TIÊN (theo thứ tự cây) còn thiếu giá trị so sánh, hoặc `null` nếu đã đủ. Phép
+ * "chưa có / đã có giá trị" không cần giá trị; giá trị lấy từ tài khoản đăng nhập (`ctx`) thì đủ.
+ * Kiểm ở form để báo "Hãy nhập giá trị cho điều kiện …" ngay, thay vì nhận câu kỹ thuật của máy chủ
+ * khi lưu (`scope.all[0].value: "" is not a valid Long for unit.id`).
+ */
+export function firstIncompleteCondition(node: ScopeNode | null | undefined): string | null {
+  if (!node) return null;
+  if ("all" in node) return firstOf(node.all);
+  if ("any" in node) return firstOf(node.any);
+  if ("not" in node) return firstIncompleteCondition(node.not);
+  if (NULLARY_OPERATORS.has(node.op)) return null;
+  const value = node.value;
+  const blank = value === undefined || ("lit" in value && literalIsBlank(value.lit)) || ("ctx" in value && !value.ctx);
+  return blank ? fieldLabel(node.field) : null;
+}
+
+function firstOf(nodes: ScopeNode[]): string | null {
+  for (const child of nodes) {
+    const found = firstIncompleteCondition(child);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/** Câu báo cho ô điều kiện: `true` khi đủ giá trị, ngược lại câu tiếng Việt chỉ ra điều kiện nào thiếu. */
+export function scopeCompleteMessage(node: ScopeNode | null | undefined): true | string {
+  const missing = firstIncompleteCondition(node);
+  return missing === null ? true : `Hãy nhập giá trị cho điều kiện "${missing}".`;
 }
