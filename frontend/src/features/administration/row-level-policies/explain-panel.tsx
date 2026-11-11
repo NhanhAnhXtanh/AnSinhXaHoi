@@ -25,7 +25,7 @@ import {
 import { Separator } from "@/shared/ui/separator";
 import { ACTIONS, type ExplainResponse } from "@/domains/row-level-policy/types";
 import { roleName } from "@/shared/lib/role-names";
-import { readCompiledVi } from "./labels";
+import { becauseVi, readCompiledVi } from "./labels";
 import { actionLabel, resourceLabel } from "../labels";
 
 const EVALUATED_LABELS: Record<string, string> = {
@@ -193,9 +193,9 @@ export function ExplainPanel({
                 {EVALUATED_LABELS[simulation.evaluatedAs] ?? simulation.evaluatedAs}
               </span>
               {simulation.failedAt && (
-                <span className="font-mono text-xs">{simulation.failedAt}</span>
+                <span className="text-xs">Điều kiện không đạt: {readCompiledVi(simulation.failedAt)}</span>
               )}
-              {simulation.because && <span>{simulation.because}</span>}
+              {simulation.because && <span>{becauseVi(simulation.because)}</span>}
               {simulation.evaluatedAs === "UNKNOWN" && (
                 <span className="text-xs">
                   “Không xác định” nghĩa là từ chối, không phải “có thể”. Điều

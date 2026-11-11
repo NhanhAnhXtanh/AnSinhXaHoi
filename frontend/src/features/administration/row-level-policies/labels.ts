@@ -158,3 +158,24 @@ export function readCompiledVi(text: string | null | undefined): string {
     .replace(/\beverything\b/g, "mọi dòng")
     .replace(/\bnothing\b/g, "không dòng nào");
 }
+
+/**
+ * Câu "vì sao" máy chủ trả cho kết quả kiểm tra một dòng (tiếng Anh) thành câu cho cán bộ đọc. Câu lạ thì
+ * giữ nguyên chữ nhận được, không để trống.
+ */
+export function becauseVi(text: string | null | undefined): string {
+  if (!text) return "";
+  if (text === "no scope grants this account access to this row") {
+    return "Không phạm vi nào cho phép tài khoản này thấy dòng này.";
+  }
+  if (text === "the policies could not be evaluated against this row") {
+    return "Chưa đánh giá được các phạm vi với dòng này.";
+  }
+  const empty = /^(.+) is null, so the condition is UNKNOWN/.exec(text);
+  if (empty) {
+    return `${fieldLabel(empty[1])} đang để trống nên điều kiện không xác định — và không xác định thì dòng bị từ chối.`;
+  }
+  const unmet = /^(.+) does not satisfy the condition$/.exec(text);
+  if (unmet) return `${fieldLabel(unmet[1])} không thỏa điều kiện của phạm vi.`;
+  return text;
+}
