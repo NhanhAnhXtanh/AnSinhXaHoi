@@ -134,7 +134,11 @@ export function InputReportWork() {
 }
 
 /** Bảng tính đang hiện: biểu nào, nạp từ JSON nào, có đóng dấu khoá ô của khung mẫu không. */
-type Pane = { sheetId: number; workbook: WorkbookJson | null; stampLocks: boolean };
+/**
+ * `corrupt`: biểu CÓ số liệu đã lưu nhưng không đọc được. Không được lặng lẽ mở khung mẫu trống —
+ * người dùng tưởng mất số, bấm Lưu là ghi đè số cũ; màn báo lỗi và khoá các nút ghi.
+ */
+type Pane = { sheetId: number; workbook: WorkbookJson | null; stampLocks: boolean; corrupt?: boolean };
 
 type Busy = "save" | "complete" | "no-data" | "reopen" | "validate" | "submit" | null;
 
@@ -231,11 +235,17 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   if (content && content.id === sheetId && pane?.sheetId !== sheetId) {
     const draft = drafts.current.get(sheetId) ?? saved.current.get(sheetId);
     const data = draft ?? parseWorkbook(content.dataJson);
-    setPane({
-      sheetId,
-      workbook: data ?? parseWorkbook(content.templateWorkbookJson),
-      stampLocks: data === null,
-    });
+    const corrupt = data === null && (content.dataJson ?? "").trim() !== "";
+    if (corrupt) {
+      console.error(`Số liệu đã lưu của biểu (sheet ${sheetId}) không đọc được.`);
+      setPane({ sheetId, workbook: null, stampLocks: false, corrupt: true });
+    } else {
+      setPane({
+        sheetId,
+        workbook: data ?? parseWorkbook(content.templateWorkbookJson),
+        stampLocks: data === null,
+      });
+    }
   }
 
   // ------------------------------------------------------------ trạng thái màn
@@ -248,7 +258,8 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const remaining = sheets.filter((s) => !isSheetDone(s.completion));
   const isDirty = sheetId !== undefined && dirty.has(sheetId);
   const scriptText = content?.id === sheetId ? (content?.scriptText ?? "") : "";
-  const paneReady = pane !== null && pane.sheetId === sheetId;
+  const paneReady = pane !== null && pane.sheetId === sheetId && !pane.corrupt;
+  const paneCorrupt = pane !== null && pane.sheetId === sheetId && pane.corrupt === true;
 
   const scriptContext = useMemo(
     () => ({
@@ -700,6 +711,20 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
           icon={SearchX}
           title="Phiếu chưa có biểu nào"
           description="Sở Tài chính chưa giao biểu nào cho đơn vị trong phiếu này."
+        />
+      );
+    }
+    if (paneCorrupt) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Không mở được bảng tính"
+          description={`Số liệu đã lưu của biểu ${code} bị lỗi nên chưa mở được; biểu không mở khung trống để tránh ghi đè số cũ. Vui lòng tải lại trang. Nếu vẫn không được, hãy báo cho quản trị hệ thống.`}
+          action={
+            <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+              Tải lại trang
+            </Button>
+          }
         />
       );
     }
