@@ -535,6 +535,14 @@ export function wrapSpreadWorkbook(
         }, 0);
       };
       const handler = (_: unknown, args: GC.Spread.Sheets.IClipboardPastingEventArgs) => {
+        // Cắt (Ctrl+X) rồi dán trong cùng workbook: SpreadJS DI CHUYỂN ô — công thức đang trỏ vào ô
+        // nguồn bị dời theo, công thức trỏ vào ô đích thành #REF! và được lưu luôn, phiếu không hoàn tất
+        // được nữa. Luôn làm như "chép giá trị rồi xoá ô nguồn được phép sửa", không đụng công thức.
+        if (args.isCutting && args.fromSheet && args.fromRange) {
+          args.cancel = true;
+          pasteAllowedCells(args);
+          return;
+        }
         const range = args.cellRange;
         const verdict = guard({
           sheetName: args.sheetName,
@@ -602,11 +610,44 @@ export function wrapSpreadWorkbook(
         pending = { sheet: args.sheet, cells: snapshotLocked(args.sheet, [range]) };
       };
       const dropHandler = (_: unknown, args: GC.Spread.Sheets.IDragDropBlockEventArgs) => {
-        const areas = [{ row: args.toRow, col: args.toCol, rowCount: args.rowCount, colCount: args.colCount }];
         if (!args.copy) {
-          areas.push({ row: args.fromRow, col: args.fromCol, rowCount: args.rowCount, colCount: args.colCount });
+          // Kéo thả kiểu DI CHUYỂN dời công thức trỏ vào khối (như cắt–dán, ra #REF!): huỷ, chuyển
+          // giá trị sang ô đích được phép sửa rồi xoá ô nguồn được phép sửa.
+          args.cancel = true;
+          moveAllowedValues(args);
+          return;
         }
+        const areas = [{ row: args.toRow, col: args.toCol, rowCount: args.rowCount, colCount: args.colCount }];
         pending = { sheet: args.sheet, cells: snapshotLocked(args.sheet, areas) };
+      };
+      const moveAllowedValues = (args: GC.Spread.Sheets.IDragDropBlockEventArgs) => {
+        const sheet = args.sheet;
+        const sheetName = sheet.name();
+        const writes: PasteWrite[] = [];
+        const written = new Set<string>();
+        for (let r = 0; r < args.rowCount; r += 1) {
+          for (let c = 0; c < args.colCount; c += 1) {
+            const row = args.toRow + r;
+            const col = args.toCol + c;
+            if (!cellAllowed(sheetName, row, col)) continue;
+            writes.push({ sheetName, row, col, value: sheet.getValue(args.fromRow + r, args.fromCol + c) });
+            written.add(row + ":" + col);
+          }
+        }
+        for (let r = 0; r < args.rowCount; r += 1) {
+          for (let c = 0; c < args.colCount; c += 1) {
+            const row = args.fromRow + r;
+            const col = args.fromCol + c;
+            if (!written.has(row + ":" + col) && cellAllowed(sheetName, row, col)) {
+              writes.push({ sheetName, row, col, value: null });
+            }
+          }
+        }
+        if (writes.length === 0) return;
+        setTimeout(() => {
+          if (destroyed) return;
+          workbook.commandManager().execute({ cmd: PASTE_ALLOWED_COMMAND, sheetName, writes });
+        }, 0);
       };
       workbook.bind(GC.Spread.Sheets.Events.ClipboardPasting, handler);
       workbook.bind(GC.Spread.Sheets.Events.DragFillBlock, fillHandler);
