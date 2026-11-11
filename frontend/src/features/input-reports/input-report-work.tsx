@@ -214,6 +214,9 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const [dirty, setDirty] = useState<ReadonlySet<number>>(new Set());
   const [pane, setPane] = useState<Pane | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
+  // Phần tự động của biểu bị dừng vì chạy quá lâu (khung "Không tải được đầy đủ biểu mẫu"): các nút
+  // Lưu / Kiểm tra & hoàn tất mờ — trước đây vẫn bấm được và không có phản hồi nào.
+  const [timedOutSheet, setTimedOutSheet] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -260,6 +263,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const isDirty = sheetId !== undefined && dirty.has(sheetId);
   const scriptText = content?.id === sheetId ? (content?.scriptText ?? "") : "";
   const paneReady = pane !== null && pane.sheetId === sheetId && !pane.corrupt;
+  const scriptTimedOut = timedOutSheet !== null && timedOutSheet === sheetId;
   const paneCorrupt = pane !== null && pane.sheetId === sheetId && pane.corrupt === true;
 
   const scriptContext = useMemo(
@@ -633,9 +637,13 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
     secondary = [{ label: `Sửa lại biểu ${code}`, icon: Pencil, onClick: () => void reopen() }];
   }
 
-  if (!paneReady || busy !== null) {
-    // Đang mở biểu / đang gửi: các nút hiện nhưng mờ (Figma 310:56441).
-    primary = primary && { ...primary, disabled: true, reason: undefined };
+  if (!paneReady || busy !== null || scriptTimedOut) {
+    // Đang mở biểu / đang gửi / phần tự động của biểu chưa chạy xong: các nút hiện nhưng mờ (Figma 310:56441).
+    primary = primary && {
+      ...primary,
+      disabled: true,
+      reason: scriptTimedOut ? "Biểu chưa tải đầy đủ — bấm Tải lại ở khung bảng tính." : undefined,
+    };
     secondary = secondary.map((a) => ({ ...a, disabled: true }));
     items = items.map((i) => ({ ...i, disabled: true }));
   }
@@ -743,6 +751,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
           stampInputLocks={pane.stampLocks}
           scriptText={scriptText}
           scriptContext={scriptContext}
+          onScriptResult={(result) => setTimedOutSheet(result.timedOut === true ? paneSheetId : null)}
           onDirtyChange={(d) => {
             if (!d) return;
             editSeq.current += 1;

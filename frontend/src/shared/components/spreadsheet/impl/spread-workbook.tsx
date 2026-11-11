@@ -238,6 +238,7 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
           ok: !issues.some((issue) => issue.severity === "ERROR") && !engine.didTimeOut,
           messages,
           apiErrors,
+          timedOut: engine.didTimeOut,
         });
         // Biểu chưa chạy xong phần tự động thì không cho dùng (ô khoá / số tự điền có thể thiếu).
         // Bảng ngầm (kiểm tra trước khi nộp) vẫn đi tiếp: bước kiểm tra tự báo lỗi của nó.

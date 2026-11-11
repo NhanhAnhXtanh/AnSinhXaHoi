@@ -43,6 +43,8 @@ export type ScriptRunResult = {
    * "HTTP {mã}". Có phần tử nghĩa là bảng có thể thiếu số; màn hình nên báo cho người dùng.
    */
   apiErrors?: string[];
+  /** Phần tự động của biểu bị dừng vì chạy quá lâu: bảng chưa đủ số, không nên Lưu / Hoàn tất. */
+  timedOut?: boolean;
 };
 
 export type SpreadWorkbookProps = {
