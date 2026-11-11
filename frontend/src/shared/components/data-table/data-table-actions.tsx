@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { BaseRecord, HttpError } from "@refinedev/core";
+import type { BaseRecord, CrudOperators, HttpError } from "@refinedev/core";
 import { useExport, useResourceParams } from "@refinedev/core";
 import type { UseTableReturnType } from "@refinedev/react-table";
 import type { Column } from "@tanstack/react-table";
@@ -90,6 +90,20 @@ export function DataTableRefresh<TData extends BaseRecord>({
 /* --------------------------------------------------------------------------
    Column visibility
    -------------------------------------------------------------------------- */
+
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- tham số kiểu bắt buộc khớp khai báo gốc
+  interface ColumnMeta<TData, TValue> {
+    /**
+     * Giá trị của ô khi xuất CSV, cho cột không có accessor (cột `display`) hoặc cột mà ô hiện khác
+     * giá trị lưu (nhãn trạng thái, tên vai trò, ngày giờ Việt Nam). Không khai thì xuất giá trị
+     * thô của accessor.
+     */
+    exportValue?: (row: TData) => unknown;
+    /** Phép so sánh của ô lọc cột (`data-table-filter.tsx` ghi vào đây khi người dùng đổi). */
+    filterOperator?: CrudOperators;
+  }
+}
 
 /** The header text, when it is a plain string — otherwise the column's id. */
 function columnLabel<TData>(column: Column<TData, unknown>) {
@@ -244,6 +258,52 @@ export function DataTableExport<TData extends BaseRecord>({
   const { filters, sorters } = table.refineCore;
   const [open, setOpen] = useState(false);
 
+  /** Các cột đang hiện mà đọc ra được một giá trị: có accessor, hoặc khai `meta.exportValue`. */
+  const exportColumns = () =>
+    table.reactTable
+      .getVisibleLeafColumns()
+      .filter(
+        (column) =>
+          column.id !== "actions" &&
+          (column.accessorFn || column.columnDef.meta?.exportValue)
+      );
+
+  const exportPage = () => {
+    const columns = exportColumns();
+
+    const head = columns.map((column) => columnLabel(column));
+    const body = table.reactTable
+      .getRowModel()
+      .rows.map((row) =>
+        columns.map((column) => {
+          const custom = column.columnDef.meta?.exportValue;
+          return toField(custom ? custom(row.original) : row.getValue(column.id));
+        })
+      );
+
+    download(`${name}-page.csv`, toCsv([head, ...body]));
+  };
+
+  /**
+   * Một dòng lấy từ máy chủ → các cột đang hiện, tiêu đề là nhãn cột, giá trị theo `exportValue`
+   * (nhãn trạng thái, tên vai trò, ngày giờ Việt Nam) — cùng bộ cột và cách ghi với "Trang đang
+   * xem". Không đọc được cột nào thì để nguyên các trường của dòng (như trước).
+   */
+  const exportRecord = (record: TData): Record<string, unknown> => {
+    const columns = exportColumns();
+    if (columns.length === 0) {
+      const fields: Record<string, unknown> = { ...record };
+      delete fields._can;
+      return fields;
+    }
+    const out: Record<string, unknown> = {};
+    columns.forEach((column, index) => {
+      const custom = column.columnDef.meta?.exportValue;
+      out[columnLabel(column)] = toField(custom ? custom(record) : column.accessorFn?.(record, index));
+    });
+    return out;
+  };
+
   const { triggerExport, isLoading } = useExport<TData>({
     resource: resource?.name,
     filters,
@@ -251,30 +311,11 @@ export function DataTableExport<TData extends BaseRecord>({
     // `download` and `useBom` both default to true, which is what writes the
     // file and what makes Excel read it back as UTF-8.
     filename: name,
-    // `_can` is the row-level flag object the API stamps on each row so the
-    // UI knows which buttons to offer. It is plumbing, and in a spreadsheet it
-    // is a column of `[object Object]`.
-    mapData: (record) => {
-      const fields: Record<string, unknown> = { ...record };
-      delete fields._can;
-      return fields;
-    },
+    // Cột đang hiện, nhãn tiếng Việt, giá trị đã định dạng (`exportRecord`). Cũng nhờ đó mà
+    // `_can` — cờ quyền theo dòng, chỉ để giao diện biết nút nào được hiện — không lọt vào tệp
+    // thành một cột `[object Object]`.
+    mapData: exportRecord,
   });
-
-  const exportPage = () => {
-    const columns = table.reactTable
-      .getVisibleLeafColumns()
-      .filter((column) => column.id !== "actions" && column.accessorFn);
-
-    const head = columns.map((column) => columnLabel(column));
-    const body = table.reactTable
-      .getRowModel()
-      .rows.map((row) =>
-        columns.map((column) => toField(row.getValue(column.id)))
-      );
-
-    download(`${name}-page.csv`, toCsv([head, ...body]));
-  };
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -289,7 +330,7 @@ export function DataTableExport<TData extends BaseRecord>({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Tải về tệp mở bằng Excel</DropdownMenuLabel>
+        <DropdownMenuLabel>Tải về tệp CSV (mở bằng Excel)</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={exportPage}>
           <span className="flex flex-col">
