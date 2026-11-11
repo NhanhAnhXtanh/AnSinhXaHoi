@@ -3,6 +3,7 @@ package com.dth.frw.module.asxh.unit.repo;
 import com.dth.frw.domain.asxh.unit.ReportBlock;
 import com.dth.frw.domain.asxh.unit.ReportUnit;
 import com.dth.frw.domain.asxh.unit.ReportUnitType;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,10 +45,10 @@ public final class ReportUnitSpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("budgetCode")), pattern),
-                    cb.like(cb.lower(root.get("name")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("budgetCode")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("name")), pattern));
         }));
 
         List<Long> ids = params.ids();

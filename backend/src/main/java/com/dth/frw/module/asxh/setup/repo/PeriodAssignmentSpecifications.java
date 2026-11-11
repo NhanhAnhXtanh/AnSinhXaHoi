@@ -1,6 +1,7 @@
 package com.dth.frw.module.asxh.setup.repo;
 
 import com.dth.frw.domain.asxh.report.PeriodAssignment;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,11 +35,11 @@ public final class PeriodAssignmentSpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("unit").get("name")), pattern),
-                    cb.like(cb.lower(root.get("unit").get("budgetCode")), pattern),
-                    cb.like(cb.lower(root.get("template").get("shortName")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("unit").get("name")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("unit").get("budgetCode")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("template").get("shortName")), pattern));
         }));
 
         List<Long> ids = params.ids();

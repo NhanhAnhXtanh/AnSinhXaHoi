@@ -4,6 +4,7 @@ import com.dth.frw.domain.asxh.template.Template;
 import com.dth.frw.domain.asxh.template.TemplateKind;
 import com.dth.frw.domain.asxh.template.TemplateStatus;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -52,11 +53,11 @@ public final class TemplateSpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("shortName")), pattern),
-                    cb.like(cb.lower(root.get("name")), pattern),
-                    cb.like(cb.lower(root.get("templateSet").get("name")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("shortName")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("name")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("templateSet").get("name")), pattern));
         }));
 
         List<Long> ids = params.ids();

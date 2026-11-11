@@ -3,6 +3,7 @@ package com.dth.frw.module.asxh.setup.repo;
 import com.dth.frw.domain.asxh.report.Publication;
 import com.dth.frw.domain.asxh.report.PublicationKind;
 import com.dth.frw.domain.asxh.report.PublicationStatus;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,10 +39,10 @@ public final class PublicationSpecifications {
 
         // Ô tìm của màn Lịch sử mở đợt: "Tìm theo kỳ báo cáo hoặc người mở…".
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("period").get("name")), pattern),
-                    cb.like(cb.lower(cb.coalesce(root.<String>get("createdBy"), "")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("period").get("name")), pattern),
+                    cb.like(TextFold.fold(cb, cb.coalesce(root.<String>get("createdBy"), "")), pattern));
         }));
 
         List<Long> ids = params.ids();
