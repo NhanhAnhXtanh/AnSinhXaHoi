@@ -410,7 +410,7 @@ export function PublicationHistoryList() {
                               key: "setup",
                               label: "Mở kỳ ở Thiết lập & điều hành",
                               icon: ExternalLink,
-                              onSelect: () => navigate("/period-setup"),
+                              onSelect: () => navigate(`/period-setup?ky=${p.period.id}`),
                             },
                           ]}
                         />
