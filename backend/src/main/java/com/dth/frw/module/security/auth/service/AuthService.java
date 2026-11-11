@@ -54,6 +54,10 @@ public class AuthService {
     private static final String INVALID_CREDENTIALS = "Tên đăng nhập hoặc mật khẩu không đúng.";
     private static final String ACCOUNT_INACTIVE =
             "Tài khoản này đã ngừng hoạt động. Bạn liên hệ quản trị viên để được mở lại.";
+    // Chỉ nói khi mật khẩu ĐÚNG: người nhập đúng mật khẩu đã biết tài khoản có tồn tại, nên báo khoá
+    // không để lộ thêm gì cho kẻ dò; còn người dùng thật thì biết để liên hệ quản trị viên.
+    private static final String ACCOUNT_LOCKED_AT_LOGIN =
+            "Tài khoản của bạn đã bị khoá. Bạn liên hệ quản trị viên để được mở lại.";
     private static final String SESSION_EXPIRED = "Phiên đăng nhập đã hết hạn. Bạn đăng nhập lại để tiếp tục.";
 
     private final UserService userService;
@@ -94,16 +98,17 @@ public class AuthService {
     /**
      * Verifies credentials and opens a session.
      *
-     * @throws BadCredentialsException on a wrong username, a wrong password or
-     *                                 an account that is not active — the same
-     *                                 exception and the same message for all
-     *                                 three, so that a failed attempt reveals
+     * @throws BadCredentialsException on a wrong username or a wrong password
+     *                                 — the same exception and the same message
+     *                                 for both, so that a failed attempt reveals
      *                                 nothing about which accounts exist.
-     *                                 The one exception is the temporary
-     *                                 lock after repeated wrong passwords
-     *                                 ({@link LoginAttemptService}), which
-     *                                 says so and for how long: the person
-     *                                 locked out has to know to wait
+     *                                 Two exceptions, both said out loud because
+     *                                 the person affected has to know what to
+     *                                 do: the temporary lock after repeated wrong
+     *                                 passwords ({@link LoginAttemptService}),
+     *                                 which says for how long; and an account an
+     *                                 administrator has locked, reported only
+     *                                 when the password was right
      */
     @Transactional
     public TokenResponse login(LoginRequest request) {
@@ -127,8 +132,10 @@ public class AuthService {
 
         User user = found
                 .filter(candidate -> passwordMatches)
-                .filter(User::canSignIn)
                 .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS));
+        if (!user.canSignIn()) {
+            throw new BadCredentialsException(ACCOUNT_LOCKED_AT_LOGIN);
+        }
 
         user.clearLoginFailures();
         userService.recordLogin(user, now);
