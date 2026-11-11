@@ -166,8 +166,12 @@ export type DeptReportDetail = {
   sourceStale: boolean;
   yearLock: string | null;
   canEdit: boolean;
+  /** Lần lưu ĐẦU của kỳ. */
   createdAt: string;
   createdBy: string | null;
+  /** Giờ và người lưu phiên bản HIỆN HÀNH (null khi chưa có lịch sử). */
+  savedAt?: string | null;
+  savedBy?: string | null;
   sheets: DeptSheetInfo[];
 };
 
