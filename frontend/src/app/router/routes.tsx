@@ -123,8 +123,24 @@ export function AppRoutes() {
           }
         >
           <Route index element={<UserList />} />
-          <Route path="create" element={<UserCreate />} />
-          <Route path="edit/:id" element={<UserEdit />} />
+          {/* Quyền xem danh sách chưa đủ: gõ tay đường dẫn thêm / sửa cũng phải có quyền ghi
+              (trước đây form mở ra, nhập xong bấm lưu mới bị máy chủ từ chối). */}
+          <Route
+            path="create"
+            element={
+              <CanAccess resource="users" action="create" fallback={<Forbidden />}>
+                <UserCreate />
+              </CanAccess>
+            }
+          />
+          <Route
+            path="edit/:id"
+            element={
+              <CanAccess resource="users" action="edit" fallback={<Forbidden />}>
+                <UserEdit />
+              </CanAccess>
+            }
+          />
           <Route path="show/:id" element={<UserShow />} />
         </Route>
         <Route
@@ -140,8 +156,24 @@ export function AppRoutes() {
           }
         >
           <Route index element={<RoleList />} />
-          <Route path="create" element={<RoleCreate />} />
-          <Route path="edit/:id" element={<RoleEdit />} />
+          {/* Quyền xem danh sách chưa đủ: gõ tay đường dẫn thêm / sửa cũng phải có quyền ghi
+              (trước đây form mở ra, nhập xong bấm lưu mới bị máy chủ từ chối). */}
+          <Route
+            path="create"
+            element={
+              <CanAccess resource="roles" action="create" fallback={<Forbidden />}>
+                <RoleCreate />
+              </CanAccess>
+            }
+          />
+          <Route
+            path="edit/:id"
+            element={
+              <CanAccess resource="roles" action="edit" fallback={<Forbidden />}>
+                <RoleEdit />
+              </CanAccess>
+            }
+          />
           <Route path="show/:id" element={<RoleShow />} />
         </Route>
         <Route
@@ -157,8 +189,24 @@ export function AppRoutes() {
           }
         >
           <Route index element={<RowLevelPolicyList />} />
-          <Route path="create" element={<RowLevelPolicyCreate />} />
-          <Route path="edit/:id" element={<RowLevelPolicyEdit />} />
+          {/* Quyền xem danh sách chưa đủ: gõ tay đường dẫn thêm / sửa cũng phải có quyền ghi
+              (trước đây form mở ra, nhập xong bấm lưu mới bị máy chủ từ chối). */}
+          <Route
+            path="create"
+            element={
+              <CanAccess resource="row_level_policies" action="create" fallback={<Forbidden />}>
+                <RowLevelPolicyCreate />
+              </CanAccess>
+            }
+          />
+          <Route
+            path="edit/:id"
+            element={
+              <CanAccess resource="row_level_policies" action="edit" fallback={<Forbidden />}>
+                <RowLevelPolicyEdit />
+              </CanAccess>
+            }
+          />
           <Route path="show/:id" element={<RowLevelPolicyShow />} />
         </Route>
         {/*
