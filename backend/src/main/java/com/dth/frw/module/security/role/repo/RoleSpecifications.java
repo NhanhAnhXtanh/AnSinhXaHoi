@@ -1,6 +1,7 @@
 package com.dth.frw.module.security.role.repo;
 
 import com.dth.frw.domain.security.role.Role;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,9 +30,9 @@ public final class RoleSpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> cb.or(
-                cb.like(cb.lower(root.get("code")), ListParams.likePattern(term)),
-                cb.like(cb.lower(root.get("name")), ListParams.likePattern(term)),
-                cb.like(cb.lower(cb.coalesce(root.get("description"), "")), ListParams.likePattern(term)))));
+                cb.like(TextFold.fold(cb, root.get("code")), TextFold.likePattern(term)),
+                cb.like(TextFold.fold(cb, root.get("name")), TextFold.likePattern(term)),
+                cb.like(TextFold.fold(cb, cb.coalesce(root.get("description"), "")), TextFold.likePattern(term)))));
 
         List<Long> ids = params.ids();
         if (!ids.isEmpty()) {

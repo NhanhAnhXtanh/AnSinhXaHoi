@@ -192,10 +192,13 @@ export function ExplainPanel({
                 {simulation.allowed ? "Được phép" : "Bị từ chối"} — kết quả{" "}
                 {EVALUATED_LABELS[simulation.evaluatedAs] ?? simulation.evaluatedAs}
               </span>
-              {simulation.failedAt && (
-                <span className="text-xs">Điều kiện không đạt: {readCompiledVi(simulation.failedAt)}</span>
+              {simulation.because ? (
+                <span>{becauseVi(simulation.because)}</span>
+              ) : (
+                simulation.failedAt && (
+                  <span className="text-xs">Điều kiện không đạt: {readCompiledVi(simulation.failedAt)}</span>
+                )
               )}
-              {simulation.because && <span>{becauseVi(simulation.because)}</span>}
               {simulation.evaluatedAs === "UNKNOWN" && (
                 <span className="text-xs">
                   “Không xác định” nghĩa là từ chối, không phải “có thể”. Điều

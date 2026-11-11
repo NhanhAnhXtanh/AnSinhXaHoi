@@ -2,6 +2,7 @@ package com.dth.frw.module.security.user.repo;
 
 import com.dth.frw.domain.security.user.User;
 import com.dth.frw.domain.security.user.UserStatus;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import jakarta.persistence.criteria.JoinType;
 import java.util.ArrayList;
@@ -51,9 +52,9 @@ public final class UserSpecifications {
         // The quick filter is one term matched across the three text columns,
         // because the provider has no way to express an OR across fields.
         params.search().ifPresent(term -> specs.add((root, query, cb) -> cb.or(
-                cb.like(cb.lower(root.get("username")), ListParams.likePattern(term)),
-                cb.like(cb.lower(root.get("email")), ListParams.likePattern(term)),
-                cb.like(cb.lower(root.get("fullName")), ListParams.likePattern(term)))));
+                cb.like(TextFold.fold(cb, root.get("username")), TextFold.likePattern(term)),
+                cb.like(TextFold.fold(cb, root.get("email")), TextFold.likePattern(term)),
+                cb.like(TextFold.fold(cb, root.get("fullName")), TextFold.likePattern(term)))));
 
         List<Long> ids = params.ids();
         if (!ids.isEmpty()) {

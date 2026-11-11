@@ -1,6 +1,7 @@
 package com.dth.frw.module.security.permission.repo;
 
 import com.dth.frw.domain.security.permission.Permission;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +38,8 @@ public final class PermissionSpecifications {
         // The quick filter matches the code and the name, which is what the
         // role form's permission picker searches on.
         params.search().ifPresent(term -> specs.add((root, query, cb) -> cb.or(
-                cb.like(cb.lower(root.get("code")), ListParams.likePattern(term)),
-                cb.like(cb.lower(root.get("name")), ListParams.likePattern(term)))));
+                cb.like(TextFold.fold(cb, root.get("code")), TextFold.likePattern(term)),
+                cb.like(TextFold.fold(cb, root.get("name")), TextFold.likePattern(term)))));
 
         List<Long> ids = params.ids();
         if (!ids.isEmpty()) {
