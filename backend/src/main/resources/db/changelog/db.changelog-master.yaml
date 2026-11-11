@@ -115,3 +115,5 @@ databaseChangeLog:
       file: db/changelog/changes/182-tonghop-01-tien-dien-1o.sql
   - include:
       file: db/changelog/changes/183-1o-muc-tien-dien-theo-nam.sql
+  - include:
+      file: db/changelog/changes/184-viet-hoa-vai-tro-he-thong.sql
