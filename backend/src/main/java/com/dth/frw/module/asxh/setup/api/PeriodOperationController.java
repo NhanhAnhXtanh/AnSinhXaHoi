@@ -3,6 +3,7 @@ package com.dth.frw.module.asxh.setup.api;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.report.Publication;
 import com.dth.frw.domain.asxh.report.PublicationKind;
+import com.dth.frw.module.asxh.notification.service.AsxhNotifier;
 import com.dth.frw.module.asxh.setup.api.dto.ExtendPeriodRequest;
 import com.dth.frw.module.asxh.setup.api.dto.PeriodActionResponse;
 import com.dth.frw.module.asxh.setup.api.dto.PeriodSetupResponse;
@@ -47,10 +48,14 @@ public class PeriodOperationController {
 
     private final PeriodLifecycleService lifecycleService;
     private final PublicationService publicationService;
+    // Báo cho tài khoản các đơn vị SAU khi đợt đã mở xong (không nằm trong giao dịch mở đợt).
+    private final AsxhNotifier notifier;
 
-    public PeriodOperationController(PeriodLifecycleService lifecycleService, PublicationService publicationService) {
+    public PeriodOperationController(PeriodLifecycleService lifecycleService, PublicationService publicationService,
+                                     AsxhNotifier notifier) {
         this.lifecycleService = lifecycleService;
         this.publicationService = publicationService;
+        this.notifier = notifier;
     }
 
     /**
@@ -74,6 +79,7 @@ public class PeriodOperationController {
     @PreAuthorize("hasAuthority('" + SetupPermissions.PUBLICATIONS_WRITE + "')")
     public PeriodActionResponse publish(@PathVariable Long id) {
         Publication publication = publicationService.publish(id);
+        notifier.publicationOpened(publication);
         ReportPeriod period = publication.getPeriod();
         String message = publication.getKind() == PublicationKind.LAN_DAU
                 ? "%s: đã mở, tạo %d phiếu.".formatted(period.getName(), publication.getReportCount())

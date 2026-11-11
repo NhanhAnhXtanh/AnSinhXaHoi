@@ -60,6 +60,21 @@ public class PublicationItemService {
         return items(publicationId, CurrentUser.has(LedgerPermissions.LEDGER_ENTRIES_READ));
     }
 
+    /**
+     * Mã các đơn vị có biểu trong đợt — để báo cho tài khoản của họ khi mở đợt. Không qua phạm vi
+     * của người gọi: người mở đợt là Sở, và danh sách này chỉ để gửi thông báo, không hiện ra.
+     */
+    public Set<Long> unitIds(Long publicationId) {
+        Publication publication = publications.get(publicationId);
+        Long periodId = publication.getPeriod().getId();
+        Set<Long> unitIds = new LinkedHashSet<>();
+        for (PublicationItemAssembler.Assigned a : PublicationItemAssembler.assign(
+                publicationId, queries.publications(periodId), queries.reports(periodId), queries.sheets(periodId))) {
+            unitIds.add(a.first().unitId());
+        }
+        return unitIds;
+    }
+
     PublicationItemsResponse items(Long publicationId, boolean includeLedger) {
         Publication publication = publications.get(publicationId);
         Long periodId = publication.getPeriod().getId();

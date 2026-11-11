@@ -41,6 +41,16 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     /** Tài khoản gắn với một đơn vị báo cáo ASXH — kiểm "một đơn vị — một tài khoản" (BR-69.2). */
     List<User> findByReportUnitId(Long reportUnitId);
 
+    /** Id các tài khoản ĐANG HOẠT ĐỘNG của một đơn vị — người nhận thông báo của đơn vị. */
+    @Query("select u.id from User u where u.reportUnit.id = :unitId "
+            + "and u.status = com.dth.frw.domain.security.user.UserStatus.ACTIVE order by u.id")
+    List<Long> findActiveIdsByReportUnitId(@Param("unitId") Long unitId);
+
+    /** Id các tài khoản ĐANG HOẠT ĐỘNG giữ một vai trò (theo mã) — người nhận thông báo của Sở / UBND. */
+    @Query("select distinct u.id from User u join u.roles r where r.code = :roleCode "
+            + "and u.status = com.dth.frw.domain.security.user.UserStatus.ACTIVE order by u.id")
+    List<Long> findActiveIdsByRoleCode(@Param("roleCode") String roleCode);
+
     /**
      * Id các tài khoản ĐANG HOẠT ĐỘNG gắn với đơn vị và toàn bộ cây đơn vị con của nó — để
      * ngừng hoạt động theo khi đơn vị ngừng hoạt động (BR-02.1).
