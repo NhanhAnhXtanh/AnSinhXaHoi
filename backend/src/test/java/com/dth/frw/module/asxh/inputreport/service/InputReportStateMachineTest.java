@@ -113,6 +113,15 @@ class InputReportStateMachineTest {
                 new InputReportService.IssueRequest(unit, second, secondVersion)));
         assertEquals(1, result.reportCount());
         assertEquals(2, result.sheetCount());
+        assertEquals(1, result.unitCount());
+
+        // Phát lại đúng các cặp đã có (đợt bổ sung không thêm gì): không đơn vị nào được tính.
+        InputReportService.IssueResult again = reports.issue(publication, List.of(
+                new InputReportService.IssueRequest(unit, first, firstVersion),
+                new InputReportService.IssueRequest(unit, second, secondVersion)));
+        assertEquals(0, again.unitCount());
+        assertEquals(0, again.sheetCount());
+        assertEquals(2, again.existingCount());
 
         report = reports.list(listParams("unit.id", String.valueOf(unit.getId()))).getContent().getFirst();
         reportSheets = sheetRepository.findByReportId(report.getId());

@@ -297,18 +297,21 @@ public class InputReportService {
             openByUnit.putIfAbsent(report.getUnit().getId(), report);
         }
 
+        // Đơn vị có biểu MỚI trong đợt này. Đợt bổ sung gửi lại cả cặp đã phát (để đếm "đã có"),
+        // nên chỉ đếm đơn vị khi thật sự phát thêm biểu — không thì đợt bổ sung một biểu cho một
+        // đơn vị vẫn ghi "5 đơn vị" (cả kỳ).
         Set<Long> touchedUnits = new LinkedHashSet<>();
         int createdReports = 0;
         int createdSheets = 0;
         int existing = 0;
         for (IssueRequest request : requests) {
             Long unitId = request.unit().getId();
-            touchedUnits.add(unitId);
             String key = pairKey(unitId, request.template().getId());
             if (!issued.add(key)) {
                 existing++;
                 continue;
             }
+            touchedUnits.add(unitId);
             InputReport report = openByUnit.get(unitId);
             if (report == null) {
                 report = repository.persist(new InputReport(request.unit(), period, publication));
