@@ -17,6 +17,7 @@ const SCREEN_OF_PATH: readonly (readonly [string, string])[] = [
   ["/report-calendar", "report_calendar"],
   ["/report-units", "report_units"],
   ["/users", "users"],
+  ["/annual-review", "annual_review"],
 ];
 
 /**

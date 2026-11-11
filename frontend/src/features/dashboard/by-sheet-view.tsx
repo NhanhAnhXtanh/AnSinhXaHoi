@@ -1,18 +1,4 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  BuildingComplex,
-  CalendarDays,
-  ChartColumn,
-  CircleCheck,
-  ClipboardCheck,
-  Clock,
-  ClockAlert,
-  FileText,
-  ListChecks,
-  SquarePen,
-  Users,
-} from "lucide-react";
-import { useMemo } from "react";
+import { CircleCheck, Clock, ClockAlert, SquarePen } from "lucide-react";
 import { Link } from "react-router";
 
 import { StatusBadge, formatNumber } from "@/shared/components/asxh";
@@ -36,29 +22,11 @@ import {
   todoDetail,
   type SheetStatus,
 } from "./status";
+import { QuickLinkGrid } from "./quick-link-grid";
+import { useQuickLinks } from "./quick-links";
 import type { Counts, HomeDashboard, TodoItem } from "./types";
 import { useCanOpen } from "./use-can-open";
 
-/** Nút chỉ hiện khi tài khoản mở được màn đích (`useCanOpen`). */
-const QUICK_LINKS: { label: string; to: string; icon: LucideIcon }[] = [
-  { label: "Nhập liệu báo cáo", to: "/input-reports", icon: SquarePen },
-  { label: "Duyệt phiếu nhập", to: "/report-review", icon: ClipboardCheck },
-  { label: "Tổng hợp báo cáo", to: "/summary", icon: ChartColumn },
-  { label: "Thiết lập & điều hành", to: "/period-setup", icon: ListChecks },
-  { label: "Bộ biểu mẫu", to: "/templates", icon: FileText },
-  { label: "Lịch và kỳ báo cáo", to: "/report-calendar", icon: CalendarDays },
-  { label: "Danh sách đơn vị", to: "/report-units", icon: BuildingComplex },
-  { label: "Người dùng", to: "/users", icon: Users },
-];
-
-/**
- * Các nút Truy cập nhanh tài khoản mở được (`useCanOpen`, cùng luật lọc menu bên trái). Chưa tải
- * xong danh sách quyền thì chưa hiện nút nào, để không nháy nút rồi mất.
- */
-function useQuickLinks() {
-  const canOpen = useCanOpen();
-  return useMemo(() => QUICK_LINKS.filter((link) => canOpen(link.to)), [canOpen]);
-}
 
 /** Số đếm của một tình trạng hiển thị. */
 const countOf = (counts: Counts, s: SheetStatus): number => counts[s];
@@ -289,24 +257,7 @@ export function BySheetView({ data }: { data: HomeDashboard }) {
         {/* Truy cập nhanh */}
         <Panel>
           <PanelHeader title="Truy cập nhanh" />
-          <div className="scrollbar-fade grid min-h-0 grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2">
-            {quickLinks.map(({ label, to, icon: Icon }) => (
-              <Link
-                key={to}
-                to={to}
-                className={cn(
-                  "flex h-14 items-center gap-3 rounded-md border bg-surface-subtle px-3",
-                  "text-sm font-medium transition-colors hover:bg-accent",
-                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                )}
-              >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent text-primary">
-                  <Icon className="size-4" aria-hidden />
-                </span>
-                <span className="min-w-0 truncate">{label}</span>
-              </Link>
-            ))}
-          </div>
+          <QuickLinkGrid links={quickLinks} />
         </Panel>
       </div>
     </>
