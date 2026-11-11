@@ -84,7 +84,10 @@ export function fieldLabel(path: string): string {
 
 const CONTEXT_LABELS: Record<string, string> = {
   "user.id": "tài khoản đang đăng nhập",
-  "user.organizationId": "đơn vị của tài khoản đang đăng nhập",
+  // Tài khoản đơn vị báo cáo (ASXH) lưu đơn vị ở `reportUnitId`; `organizationId` là cột của khung
+  // gốc và để trống với các tài khoản đó — đặt phạm vi phiếu theo `organizationId` sẽ không khớp dòng nào.
+  "user.reportUnitId": "đơn vị báo cáo của tài khoản đang đăng nhập",
+  "user.organizationId": "tổ chức (khung gốc) của tài khoản đang đăng nhập",
   "user.departmentId": "phòng ban của tài khoản đang đăng nhập",
   "user.roleCodes": "vai trò của tài khoản đang đăng nhập",
   today: "ngày hôm nay",
