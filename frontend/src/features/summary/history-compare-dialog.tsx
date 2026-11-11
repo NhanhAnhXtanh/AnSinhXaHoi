@@ -71,6 +71,9 @@ type SheetCompare = {
 
 const num = (v: number | null) => v ?? 0;
 
+/** Đơn vị kinh phí: cả 20 biểu ASXH ghi "Đơn vị: Triệu đồng" — ghi khác đi là đọc lệch 1.000 lần. */
+const MONEY_UNIT = "triệu đồng";
+
 /** Số của hai phiên bản đặt cạnh nhau, từng biểu, từng chỉ tiêu (đã cộng qua đơn vị). */
 function toSheetCompare(sheet: ApiCompareSheet): SheetCompare {
   const rows: CompareRow[] = [];
@@ -312,7 +315,7 @@ export function HistoryCompareDialog({
             value={formatSignedPercent(summary.totalB - summary.totalA, summary.totalA)}
             valueClass={summary.totalB >= summary.totalA ? "text-success-text" : "text-destructive-text"}
             caption={`Tổng kinh phí ${summary.totalB >= summary.totalA ? "tăng" : "giảm"}`}
-            note={`${formatSigned(summary.totalB - summary.totalA)} nghìn đồng`}
+            note={`${formatSigned(summary.totalB - summary.totalA)} ${MONEY_UNIT}`}
           >
             <Sparkbars values={summary.sheetDeltas} />
           </StatCard>
@@ -400,7 +403,7 @@ export function HistoryCompareDialog({
             <div className="flex min-w-0 flex-col gap-0.5">
               <DialogTitle className="text-xl leading-6.5 font-semibold">Lịch sử và so sánh số liệu</DialogTitle>
               <DialogDescription className="text-[13px] leading-4.5">
-                {periodName} · {scopeLabel} · Kinh phí tính bằng nghìn đồng
+                {periodName} · {scopeLabel} · Kinh phí tính bằng {MONEY_UNIT}
               </DialogDescription>
             </div>
           </div>
@@ -754,7 +757,7 @@ function CompareTable({
         <thead>
           <tr className="bg-surface-subtle text-muted-foreground h-10 border-b text-xs">
             <th scope="col" className="px-4 text-left font-medium">
-              Chỉ tiêu · kinh phí tính bằng nghìn đồng
+              Chỉ tiêu · kinh phí tính bằng {MONEY_UNIT}
             </th>
             <th scope="col" className="px-4 text-right font-medium">
               <span className="inline-flex items-center gap-2">
