@@ -29,7 +29,8 @@ Trước khi chạy 171 trên một DB đã có dữ liệu, đếm trước b�
 - `sql/170-dem-khoi-truoc-khi-tach.sql` — câu SELECT chỉ đọc: số kịch bản sẽ tách cho từng phiên bản.
 
 Thay đổi gần nhất (11/11/2026): changeset 186 — kịch bản khoá ô (`1-khoa-o-nhap-lieu`) của 18 biểu nhập điền năm vào cuối
-tiêu đề và tên kỳ vào dòng "Kết quả thực hiện" khi hai ô còn là chữ mẫu; changeset 187 — nhãn dòng tổng của
+tiêu đề và tên kỳ vào dòng "Kết quả thực hiện" khi hai ô còn là chữ mẫu (changeset 188 chuyển đoạn này lên trước dòng
+kiểm chế độ để màn Tổng hợp theo kỳ cũng được điền); changeset 187 — nhãn dòng tổng của
 `4-tonghop-theo-ky` ghi "Tổng cộng" có dấu.
 
 ## Quy tắc đồng bộ

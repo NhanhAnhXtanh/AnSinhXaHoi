@@ -45,14 +45,9 @@ function containsOnlyEditableCells(range) {
 
 return defineScript({
   onLoad(ctx) {
-    if (ctx.mode && ctx.mode !== 'input') return;
-    ctx.cell.lockAll(SHEET, true);
-    unlockEditableCells(ctx);
-    // Tên đơn vị của phiếu (app đưa vào ctx.shared.orgName): ghi vào ô "Chỉ tiêu / Đơn vị"
-    // của dòng nhập + dòng ĐƠN VỊ đầu biểu (A1), giống các biểu 1g–1s.
-    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
     // Tiêu đề (dòng 2) và dòng "Kết quả thực hiện" (B3) theo kỳ của phiếu: mẫu ghi cứng "NĂM 2027" ở tiêu đề và
     // để trống "Tháng …… Năm ……". Chỉ điền khi còn là chữ mẫu — chữ người dùng đã sửa tay được giữ.
+    // Đặt TRƯỚC dòng kiểm chế độ để màn Tổng hợp theo kỳ (mode summary) cũng được điền, không chỉ màn nhập.
     const _year = ctx.shared && ctx.shared.year ? String(ctx.shared.year) : '';
     const _per = ctx.shared && ctx.shared.periodName ? String(ctx.shared.periodName) : '';
     if (_year) {
@@ -65,6 +60,12 @@ return defineScript({
       const _when = ctx.cell.get(SHEET, 2, 1);
       if (typeof _when === 'string' && _when.indexOf('……') >= 0) ctx.cell.set(SHEET, 2, 1, 'Kết quả thực hiện: ' + _per);
     }
+    if (ctx.mode && ctx.mode !== 'input') return;
+    ctx.cell.lockAll(SHEET, true);
+    unlockEditableCells(ctx);
+    // Tên đơn vị của phiếu (app đưa vào ctx.shared.orgName): ghi vào ô "Chỉ tiêu / Đơn vị"
+    // của dòng nhập + dòng ĐƠN VỊ đầu biểu (A1), giống các biểu 1g–1s.
+    const _org = ctx.shared && ctx.shared.orgName ? String(ctx.shared.orgName) : '';
     if (_org) {
       ctx.cell.set(SHEET, DATA_ROW, 1, _org);
       ctx.cell.set(SHEET, 0, 0, 'ĐƠN VỊ (Xã/phường/Sở ngành/Trường): ' + _org);
