@@ -15,12 +15,14 @@ export const RESOURCE_LABELS: Record<string, string> = {
   roles: "Vai trò",
   permissions: "Quyền",
   row_level_policies: "Phạm vi dữ liệu",
-  organizations: "Đơn vị",
-  departments: "Phòng ban",
+  // Các tài nguyên của khung dự án gốc: ứng dụng ASXH không có màn nào cho chúng. Ghi rõ "(khung
+  // gốc)" để không nhầm "Đơn vị" với "Danh sách đơn vị" khi cấp quyền.
+  organizations: "Đơn vị (khung gốc)",
+  departments: "Phòng ban (khung gốc)",
   notifications: "Thông báo",
-  tasks: "Công việc",
-  blog_posts: "Bài viết",
-  categories: "Danh mục",
+  tasks: "Công việc (khung gốc)",
+  blog_posts: "Bài viết (khung gốc)",
+  categories: "Danh mục (khung gốc)",
   dashboard: "Trang chủ",
   report_units: "Danh sách đơn vị",
   input_reports: "Nhập liệu báo cáo",
@@ -42,6 +44,7 @@ export const RESOURCE_LABELS: Record<string, string> = {
   report_periods: "Kỳ báo cáo",
   template_sets: "Bộ mẫu",
   template_versions: "Phiên bản mẫu",
+  indicator_measures: "Bản chất chỉ tiêu",
 };
 
 export function resourceLabel(resource: string | null | undefined): string {
@@ -49,11 +52,15 @@ export function resourceLabel(resource: string | null | undefined): string {
   return RESOURCE_LABELS[resource] ?? humanizeResource(resource);
 }
 
-/** `read` / `write` / `delete` của mã quyền và của phạm vi dữ liệu. */
+/** Thao tác của mã quyền (`users:read`…) và của phạm vi dữ liệu. */
 export const ACTION_LABELS: Record<string, string> = {
   read: "Xem",
   write: "Thêm, sửa",
   delete: "Xoá",
+  approve: "Duyệt",
+  cancel: "Huỷ / thu hồi",
+  import: "Nhập từ tệp",
+  lock: "Khoá",
 };
 
 export function actionLabel(action: string | null | undefined): string {

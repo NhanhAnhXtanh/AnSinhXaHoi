@@ -28,7 +28,7 @@ import {
 } from "@/shared/ui/card";
 import { cn } from "@/shared/lib/utils";
 import type { User } from "@/domains/user/types";
-import { workLabels } from "./labels";
+import { roleName, workLabels } from "./labels";
 
 /**
  * Identity kèm đơn vị báo cáo: `/auth/me` và cặp khoá lúc đăng nhập trả thêm `reportUnit`
@@ -182,7 +182,7 @@ export const Profile = () => {
   };
 
   const roleNames =
-    me?.roles?.map((role) => role.name) ?? authorities?.roles ?? [];
+    me?.roles?.map((role) => role.name) ?? authorities?.roles?.map(roleName) ?? [];
 
   const unitName = me?.reportUnit?.name ?? identity?.reportUnit?.name ?? null;
 
