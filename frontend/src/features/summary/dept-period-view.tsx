@@ -361,7 +361,9 @@ export function DeptPeriodView({
             : pendingSheets.length > 0
               ? ` · Biểu ${joinVi(pendingSheets)} đang sửa dở, chưa Lưu`
               : " · Đang sửa"
-          : ` · Lưu ${formatDateTime(detail.createdAt)}${detail.createdBy ? ` · ${detail.createdBy}` : ""}`
+          // `createdAt` / `createdBy` là lần lưu ĐẦU của kỳ, không phải của phiên bản đang xem — từ
+          // phiên bản 2 trở đi ghi "Lưu lần đầu" để không tưởng đó là giờ và người của bản mới nhất.
+          : ` · ${detail.ledgerVersion > 1 ? "Lưu lần đầu" : "Lưu"} ${formatDateTime(detail.createdAt)}${detail.createdBy ? ` · ${detail.createdBy}` : ""}`
       }${yearLock ? ` · ${yearLock}` : ""}`
     : "Số liệu tổng hợp";
   if (detail?.sourceStale) {
