@@ -26,6 +26,19 @@ export interface ScriptContextOptions {
   /** Vùng nhớ chung — truyền cùng object để onLoad và validate thấy chung dữ liệu. */
   shared: Record<string, unknown>;
   onMessage?: (text: string) => void;
+  /**
+   * Một lời gọi `ctx.api` hỏng. Script thường tự bắt lỗi rồi chỉ ghi `ctx.ui.message`, nên màn
+   * hình không biết số liệu thiếu — báo riêng ở đây để màn hiện cho người dùng.
+   */
+  onApiError?: (failure: ScriptApiFailure) => void;
+}
+
+/** Lời gọi `ctx.api` thất bại: đường dẫn script gọi, mã HTTP ("?" khi mất mạng), câu của máy chủ. */
+export interface ScriptApiFailure {
+  method: string;
+  path: string;
+  status: string;
+  message?: string;
 }
 
 export interface ScriptContextHandle {
@@ -132,7 +145,7 @@ export function createScriptContext(
         adapter.deleteRow(resolveSheet(adapter, sheetName), row);
       },
     }),
-    api: Object.freeze(createScriptApi(options.shared)),
+    api: Object.freeze(createScriptApi(options.shared, options.onApiError)),
     ui: Object.freeze({
       message(text: string) {
         options.onMessage?.(String(text));
@@ -226,7 +239,81 @@ function rewriteSummaryDataPath(path: string, shared: Record<string, unknown>): 
   return target + path.slice(live.length);
 }
 
-function createScriptApi(shared: Record<string, unknown>): ScriptContext["api"] {
+/** Đường số liệu tổng hợp nhận phạm vi đơn vị (`scopeKind` + đơn vị / khối / loại đơn vị). */
+const SCOPED_SUMMARY_PATHS = [
+  "/rest/qt/summary/data",
+  "/api/summary/data",
+  "/rest/qt/summary/school-year",
+  "/api/summary/school-year",
+] as const;
+
+/** Danh sách đơn vị được giao biểu — script dựng dòng đơn vị từ đây. */
+const PERIOD_UNIT_PATHS = ["/rest/qt/summary/period-organizations", "/api/summary/period-organizations"] as const;
+
+function matchesPath(path: string, bases: readonly string[]): string | undefined {
+  return bases.find((base) => path === base || path.startsWith(`${base}?`));
+}
+
+function sharedText(shared: Record<string, unknown>, key: string): string | undefined {
+  const value = shared[key];
+  if (value == null) return undefined;
+  const text = String(value).trim();
+  return text === "" ? undefined : text;
+}
+
+/**
+ * Script tổng hợp (viết từ bản Jmix) chỉ ghép `&scopeKind=…` vào đường số liệu, không kèm đơn vị
+ * hay khối — máy chủ trả 400 "Hãy chọn đơn vị cho phạm vi tổng hợp." và bảng ra toàn số 0. Bổ sung
+ * tham số còn thiếu từ phạm vi màn hình đang chọn (`shared.organizationId` / `block` / `orgType`);
+ * tham số script đã ghi thì giữ nguyên.
+ */
+function withSummaryScope(path: string, shared: Record<string, unknown>): string {
+  if (!matchesPath(path, SCOPED_SUMMARY_PATHS)) return path;
+  const queryAt = path.indexOf("?");
+  const params = new URLSearchParams(queryAt < 0 ? "" : path.slice(queryAt + 1));
+  const kind = params.get("scopeKind");
+  if (!kind || kind === "ALL") return path;
+  const fill = (key: string) => {
+    const value = sharedText(shared, key);
+    if (!params.has(key) && value) params.set(key, value);
+  };
+  if (kind === "ORGANIZATION" || kind === "ORG_TREE") fill("organizationId");
+  else if (kind === "BLOCK") fill("block");
+  else if (kind === "ORG_TYPE") fill("orgType");
+  return `${queryAt < 0 ? path : path.slice(0, queryAt)}?${params.toString()}`;
+}
+
+/**
+ * Danh sách đơn vị được giao biểu không nhận phạm vi; khi màn đang xem một đơn vị hay một khối thì
+ * chỉ giữ các đơn vị thuộc phạm vi đó, để biểu dựng dòng theo đơn vị không hiện dòng trống của
+ * đơn vị ngoài phạm vi.
+ */
+function scopeUnitList(path: string, value: unknown, shared: Record<string, unknown>): unknown {
+  if (!matchesPath(path, PERIOD_UNIT_PATHS) || !Array.isArray(value)) return value;
+  const kind = sharedText(shared, "scopeKind");
+  if (kind === "ORGANIZATION") {
+    const id = sharedText(shared, "organizationId");
+    return id ? value.filter((unit) => String((unit as { id?: unknown })?.id) === id) : value;
+  }
+  if (kind === "BLOCK") {
+    const block = sharedText(shared, "block")?.toLowerCase();
+    return block
+      ? value.filter((unit) => String((unit as { block?: unknown })?.block ?? "").toLowerCase() === block)
+      : value;
+  }
+  return value;
+}
+
+function failureMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== "object" || !("message" in error)) return undefined;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" && message.trim() !== "" ? message.trim() : undefined;
+}
+
+function createScriptApi(
+  shared: Record<string, unknown>,
+  onApiError?: (failure: ScriptApiFailure) => void
+): ScriptContext["api"] {
   // GET trùng đường dẫn trong CÙNG một ctx (một lần nạp bảng tính: onLoad + afterInject) chỉ
   // gọi máy chủ một lần — script tổng hợp năm đọc lại cùng một nguồn cho từng sheet. Lưu CHỮ
   // của response, mỗi lần gọi parse lại nên script sửa kết quả không ảnh hưởng lần gọi sau.
@@ -249,11 +336,13 @@ function createScriptApi(shared: Record<string, unknown>): ScriptContext["api"] 
         error && typeof error === "object" && "statusCode" in error
           ? String((error as { statusCode?: unknown }).statusCode)
           : "?";
+      onApiError?.({ method, path, status, message: failureMessage(error) });
       throw new Error(`ctx.api ${method} ${path} thất bại (HTTP ${status}).`);
     }
   };
   const request = async (path: string, init: RequestInit = {}): Promise<unknown> => {
-    const relative = resolveApiPath(rewriteSummaryDataPath(String(path ?? ""), shared));
+    const scoped = withSummaryScope(String(path ?? ""), shared);
+    const relative = resolveApiPath(rewriteSummaryDataPath(scoped, shared));
     const method = (init.method ?? "GET").toUpperCase();
     if (!SCRIPT_API_METHODS.has(method)) {
       throw new Error(
@@ -275,7 +364,7 @@ function createScriptApi(shared: Record<string, unknown>): ScriptContext["api"] 
     }
     if (text.trim() === "") return null;
     try {
-      return JSON.parse(text) as unknown;
+      return scopeUnitList(scoped, JSON.parse(text) as unknown, shared);
     } catch {
       return text;
     }

@@ -46,6 +46,7 @@ import {
 } from "./api";
 import { CompleteDialog } from "./complete-dialog";
 import { HistoryCompareDialog } from "./history-compare-dialog";
+import { scriptApiErrorText } from "./period-text";
 import { ScopePicker } from "./scope-picker";
 import { SheetBody, SheetError, SheetFrame } from "./sheet-frame";
 import { joinVi, summaryExportName } from "./utils";
@@ -420,7 +421,9 @@ export function DeptPeriodView({
             apiRef.current = api;
           }}
           onScriptResult={(result) => {
-            if (!result.ok) {
+            if (result.apiErrors && result.apiErrors.length > 0) {
+              toast.error(scriptApiErrorText(runtime.shortName, result.apiErrors));
+            } else if (!result.ok) {
               console.warn("Script số liệu tổng hợp báo lỗi:", result.messages);
               toast.warning(
                 `Một số ô của biểu ${runtime.shortName} chưa đổ được số liệu. Vui lòng báo người quản trị mẫu biểu kiểm tra.`

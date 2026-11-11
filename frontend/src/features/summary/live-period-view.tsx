@@ -28,7 +28,7 @@ import {
   type PeriodOverview,
   type PeriodSheet,
 } from "./api";
-import { borrowedNote, scopeQuery } from "./period-text";
+import { borrowedNote, scopeQuery, scriptApiErrorText } from "./period-text";
 import { ScopePicker } from "./scope-picker";
 import { SheetBody, SheetEmpty, SheetError, SheetFrame } from "./sheet-frame";
 import { summaryExportName } from "./utils";
@@ -101,6 +101,9 @@ export function LivePeriodView({
       periodName: period.name,
       sheetCode: data.sheetCode,
       scopeKind: query.scopeKind,
+      // Script chỉ ghép `scopeKind` vào đường số liệu; ctx.api bổ sung đơn vị / khối từ đây.
+      organizationId: query.organizationId,
+      block: query.block,
       sourceSheet: "",
       a: year,
       b: year,
@@ -108,7 +111,7 @@ export function LivePeriodView({
       unitName: scopeLabel,
       summaryDataUrl: data.summaryDataUrl,
     } satisfies Record<string, unknown>;
-  }, [data, period.id, period.name, year, query.scopeKind, scopeLabel]);
+  }, [data, period.id, period.name, year, query.scopeKind, query.organizationId, query.block, scopeLabel]);
 
   const doExport = async () => {
     const api = apiRef.current;
@@ -238,7 +241,9 @@ export function LivePeriodView({
             apiRef.current = api;
           }}
           onScriptResult={(result) => {
-            if (!result.ok) {
+            if (result.apiErrors && result.apiErrors.length > 0) {
+              toast.error(scriptApiErrorText(data.shortName, result.apiErrors));
+            } else if (!result.ok) {
               console.warn("Script tổng hợp báo lỗi:", result.messages);
               toast.warning(
                 `Một số ô của biểu ${data.shortName} chưa đổ được số liệu. Vui lòng báo người quản trị mẫu biểu kiểm tra.`

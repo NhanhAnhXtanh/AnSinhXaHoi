@@ -13,6 +13,15 @@ export function isPerUnitSheet(shortName: string): boolean {
   return shortName.trim().toLowerCase() === "1g";
 }
 
+/**
+ * Câu báo khi script của biểu gọi máy chủ lấy số không thành công (bảng có thể thiếu số). Chỉ
+ * trích câu của máy chủ khi đó là câu tiếng Việt viết cho người dùng.
+ */
+export function scriptApiErrorText(shortName: string, errors: string[]): string {
+  const said = errors.find((text) => /[À-ỹ]/.test(text));
+  return `Chưa lấy đủ số liệu tổng hợp của biểu ${shortName}${said ? `: ${said.replace(/\.$/, "")}` : ""}. Bạn bấm Làm mới hoặc thử lại sau ít phút.`;
+}
+
 /** Câu báo kỳ quá khứ mượn phiên bản ban hành sớm nhất (UC-50 3b). */
 export function borrowedNote(periodName: string, versionNo: number | null): string {
   return `${periodName} đứng trước ngày áp dụng của mẫu — đang dùng phiên bản ${versionNo ?? ""} ban hành sớm nhất.`.replace(
