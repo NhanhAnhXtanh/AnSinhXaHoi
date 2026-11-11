@@ -331,6 +331,12 @@ export function DeptPeriodView({
       label: "Lịch sử và so sánh",
       icon: GitCompare,
       onSelect: () => setDialog("history"),
+      // Đang sửa dở: khôi phục / so sánh lúc này có thể đè lên số đang sửa.
+      disabled: busy !== null || editing || dirty || pendingSheets.length > 0,
+      reason:
+        editing || dirty || pendingSheets.length > 0
+          ? "Lưu hoặc bỏ các số đang sửa trước đã."
+          : undefined,
     },
     ...(canEdit && (pendingSheets.length > 0 || dirty)
       ? [
