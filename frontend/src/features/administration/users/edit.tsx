@@ -36,6 +36,8 @@ import { errorDescription, formatDateTimeVi } from "../labels";
 import type { User } from "@/domains/user/types";
 import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
 import { useBackOr } from "@/shared/hooks/use-back-or";
+import { UsernameAvailabilityHint } from "./username-availability";
+import { USERNAME_TAKEN_MESSAGE, useUsernameAvailability } from "./use-username-availability";
 
 /**
  * Rút đơn vị báo cáo về dạng `{ id }` API đọc, giữ nguyên ba trạng thái API phân biệt.
@@ -84,6 +86,9 @@ export const UserEdit = () => {
 
   const user = query?.data?.data as User | undefined;
   const userId = user?.id;
+  // Đổi tên đăng nhập sang tên đã có người dùng: báo ngay dưới ô như form Thêm (tên cũ của chính
+  // tài khoản này không tính).
+  const usernameState = useUsernameAvailability(form.watch("username"), user?.username);
 
   /**
    * Đổ bản ghi vào form một lần.
@@ -100,6 +105,10 @@ export const UserEdit = () => {
   }, [user, reset]);
 
   function onSubmit(values: Record<string, unknown>) {
+    if (usernameState === "taken") {
+      form.setError("username", { type: "server", message: USERNAME_TAKEN_MESSAGE });
+      return;
+    }
     // `roles` về từ API là đối tượng đầy đủ, gửi lại dạng `{ id }`.
     const roles = Array.isArray(values.roles)
       ? (values.roles as { id: number }[]).map((role) => ({ id: role.id }))
@@ -198,9 +207,13 @@ export const UserEdit = () => {
                     <FormControl>
                       <Input {...field} value={field.value ?? ""} />
                     </FormControl>
-                    <FormDescription>
-                      Dùng để đăng nhập. Không được trùng với tài khoản khác.
-                    </FormDescription>
+                    {usernameState === "idle" ? (
+                      <FormDescription>
+                        Dùng để đăng nhập. Không được trùng với tài khoản khác.
+                      </FormDescription>
+                    ) : (
+                      <UsernameAvailabilityHint state={usernameState} />
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
