@@ -289,6 +289,17 @@ function YearPanel({ year }: { year: number }) {
   if (resubmit && latest) {
     meta = `${meta} · UBND ${latest.reopened ? "mở lại" : "trả lại"} ${formatDate(latest.decidedAt ?? "")} · Lý do: ${latest.returnReason ?? "—"}`;
   }
+  const versionNotes = overview.versionNotes ?? [];
+  if (versionNotes.length > 0 && !data?.borrowedEarliest) {
+    meta = (
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate">{meta}</span>
+        <span className="text-warning-text truncate" title={versionNotes.join("; ")}>
+          Biểu đổi phiên bản giữa các kỳ ({versionNotes.join("; ")}) — kiểm tra mã chỉ tiêu có khớp không.
+        </span>
+      </span>
+    );
+  }
   if (data?.borrowedEarliest) {
     meta = (
       <span className="flex min-w-0 flex-col">

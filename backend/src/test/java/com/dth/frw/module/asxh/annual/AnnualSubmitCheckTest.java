@@ -69,7 +69,7 @@ class AnnualSubmitCheckTest {
     private void overview(int version, int saved, String lockReason, List<SheetOption> sheets,
                           List<DeptYearPeriod> periods, List<String> unfinished) {
         when(summaryReports.year(YEAR)).thenReturn(new YearOverview(YEAR, version, saved > 0 ? "DEPT" : "LIVE",
-                saved, periods.size(), lockReason, sheets, periods, unfinished));
+                saved, periods.size(), lockReason, sheets, periods, unfinished, List.of()));
     }
 
     @Test

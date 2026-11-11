@@ -317,6 +317,8 @@ export type YearOverview = {
   sheets: SheetOption[];
   periods: DeptYearPeriod[];
   unfinishedSheets: string[];
+  /** Biểu nhập đã đổi phiên bản giữa các kỳ của năm, ví dụ "1e: bản 1 (Quý I), bản 3 (Quý III)". */
+  versionNotes?: string[];
 };
 
 export type YearSheet = {
