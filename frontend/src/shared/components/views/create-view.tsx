@@ -2,7 +2,6 @@
 
 import { cn } from "@/shared/lib/utils";
 import {
-  useBack,
   useResourceParams,
   useUserFriendlyName,
 } from "@refinedev/core";
@@ -10,6 +9,7 @@ import type { PropsWithChildren } from "react";
 import { Breadcrumb } from "@/shared/components/layout/breadcrumb";
 import { Button } from "@/shared/ui/button";
 import { ArrowLeftIcon } from "lucide-react";
+import { useBackToList } from "@/shared/hooks/use-back-or";
 
 type CreateViewProps = PropsWithChildren<{
   className?: string;
@@ -46,7 +46,8 @@ export const CreateViewHeader = ({
   wrapperClassName,
   headerClassName,
 }: CreateHeaderProps) => {
-  const back = useBack();
+  // Quay lại: trang trước trong app, mở thẳng / sau F5 thì về danh sách (useBack = navigate(-1)).
+  const back = useBackToList();
 
   const getUserFriendlyName = useUserFriendlyName();
 

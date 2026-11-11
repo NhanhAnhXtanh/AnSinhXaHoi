@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useForm } from "@refinedev/react-hook-form";
-import { useNavigate } from "react-router";
 
 import { EditView } from "@/shared/components/views/edit-view";
 import { Button } from "@/shared/ui/button";
@@ -36,6 +35,7 @@ import { AdminPageHeader } from "../record-actions";
 import { errorDescription, formatDateTimeVi } from "../labels";
 import type { User } from "@/domains/user/types";
 import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
+import { useBackOr } from "@/shared/hooks/use-back-or";
 
 /**
  * Rút đơn vị báo cáo về dạng `{ id }` API đọc, giữ nguyên ba trạng thái API phân biệt.
@@ -59,7 +59,8 @@ function toRef(value: unknown): { id: number | null } | null {
  * khác và đăng xuất cán bộ khỏi mọi máy, nên nó không phải một ô của form.
  */
 export const UserEdit = () => {
-  const navigate = useNavigate();
+  // Huỷ: về trang trước trong app; mở thẳng / sau F5 thì về danh sách (navigate(-1) đứng yên).
+  const goBack = useBackOr("/users");
 
   const {
     refineCore: { onFinish, query },
@@ -298,7 +299,7 @@ export const UserEdit = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate(-1)}
+                onClick={goBack}
               >
                 Huỷ
               </Button>

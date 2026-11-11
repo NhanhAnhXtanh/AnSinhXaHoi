@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import {
   type BaseKey,
-  useBack,
   useDeleteButton,
   useEditButton,
   useNavigation,
@@ -41,6 +40,7 @@ import {
 } from "@/shared/ui/alert-dialog";
 import { cn } from "@/shared/lib/utils";
 import { errorDescription } from "./labels";
+import { useBackToList } from "@/shared/hooks/use-back-or";
 
 /**
  * Thao tác trên một bản ghi của màn quản trị: nút ⋯ trên dòng bảng, cụm nút ở
@@ -351,7 +351,8 @@ export function AdminPageHeader({
   actions?: ReactNode;
   back?: boolean;
 }) {
-  const goBack = useBack();
+  // Quay lại: trang trước trong app, mở thẳng / sau F5 thì về danh sách (useBack = navigate(-1)).
+  const goBack = useBackToList();
 
   return (
     <div className="flex flex-col gap-3">

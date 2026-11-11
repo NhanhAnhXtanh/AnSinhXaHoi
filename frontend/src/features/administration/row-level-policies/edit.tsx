@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useForm } from "@refinedev/react-hook-form";
-import { useNavigate } from "react-router";
 
 import { EditView } from "@/shared/components/views/edit-view";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -18,9 +17,11 @@ import { DEFAULT_POLICY, normalize } from "./policy-values";
 import { useManagedResources } from "./use-managed-resources";
 import { EMPTY_SCOPE, type RowLevelPolicy } from "@/domains/row-level-policy/types";
 import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
+import { useBackOr } from "@/shared/hooks/use-back-or";
 
 export const RowLevelPolicyEdit = () => {
-  const navigate = useNavigate();
+  // Huỷ: về trang trước trong app; mở thẳng / sau F5 thì về danh sách (navigate(-1) đứng yên).
+  const goBack = useBackOr("/row-level-policies");
   const resources = useManagedResources();
 
   const {
@@ -172,7 +173,7 @@ export const RowLevelPolicyEdit = () => {
             <Button type="submit" disabled={!hydrated || form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+            <Button type="button" variant="outline" onClick={goBack}>
               Huỷ
             </Button>
           </FormSectionActions>

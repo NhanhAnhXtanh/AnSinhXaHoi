@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useCan } from "@refinedev/core";
 import { useForm } from "@refinedev/react-hook-form";
-import { useNavigate } from "react-router";
 
 import { EditView } from "@/shared/components/views/edit-view";
 import { Button } from "@/shared/ui/button";
@@ -35,6 +34,7 @@ import { RoleDataScopes } from "./data-scopes";
 import { AdminPageHeader, RecordHeaderActions } from "../record-actions";
 import { errorDescription } from "../labels";
 import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
+import { useBackOr } from "@/shared/hooks/use-back-or";
 
 /**
  * What the tab band says beside each tab, in one line.
@@ -78,7 +78,8 @@ const TAB_HINTS: Record<string, string> = {
  * more than it saved.
  */
 export const RoleEdit = () => {
-  const navigate = useNavigate();
+  // Huỷ: về trang trước trong app; mở thẳng / sau F5 thì về danh sách (navigate(-1) đứng yên).
+  const goBack = useBackOr("/roles");
 
   const {
     refineCore: { onFinish, query },
@@ -422,7 +423,7 @@ export const RoleEdit = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate(-1)}
+              onClick={goBack}
             >
               Huỷ
             </Button>
