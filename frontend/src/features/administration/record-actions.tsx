@@ -40,6 +40,7 @@ import {
 } from "@/shared/ui/alert-dialog";
 import { cn } from "@/shared/lib/utils";
 import { errorDescription } from "./labels";
+import { markRecordDeleting, unmarkRecordDeleting } from "@/shared/lib/deleted-records";
 import { useBackToList } from "@/shared/hooks/use-back-or";
 
 /**
@@ -153,6 +154,7 @@ export function RecordActionsMenu({
   ariaLabel = "Thao tác",
 }: RecordActionsMenuProps) {
   const navigate = useNavigate();
+  const { identifier } = useResourceParams({ resource });
   const edit = useEditButton({ resource, id });
   const show = useShowButton({ resource, id });
   const del = useDeleteButton({
@@ -162,11 +164,15 @@ export function RecordActionsMenu({
     successNotification: remove
       ? { type: "success", message: remove.successMessage }
       : undefined,
-    errorNotification: (error) => ({
-      type: "error",
-      message: "Không xoá được",
-      description: errorDescription(error),
-    }),
+    errorNotification: (error) => {
+      // Xoá hỏng thì bản ghi vẫn còn: các lỗi tải sau đó phải hiện lại như bình thường.
+      if (identifier) unmarkRecordDeleting(identifier, id);
+      return {
+        type: "error",
+        message: "Không xoá được",
+        description: errorDescription(error),
+      };
+    },
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -255,6 +261,7 @@ export function RecordActionsMenu({
           confirmLabel={remove.confirmLabel ?? remove.label}
           destructive
           onConfirm={() => {
+            if (identifier) markRecordDeleting(identifier, id);
             del.onConfirm();
             setConfirmOpen(false);
           }}

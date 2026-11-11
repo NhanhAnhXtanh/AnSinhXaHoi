@@ -20,6 +20,7 @@ import { resources } from "./resources";
 import { AppRoutes } from "./router/routes";
 import { Landmark } from "lucide-react";
 import { ReportYearProvider } from "@/shared/components/asxh";
+import { isDeletedRecordNotification } from "@/shared/lib/deleted-records";
 // The `@font-face` behind `"Inter Variable"` in `--font-sans`. Without it the
 // name resolves only where Inter happens to be installed.
 import "@fontsource-variable/inter";
@@ -39,6 +40,8 @@ function useAppNotificationProvider(): NotificationProvider {
     ...base,
     open: (params) => {
       if (params.key === "login-error") return;
+      // Lỗi tải lại bản ghi vừa xoá (màn Sửa còn đang theo dõi nó): bỏ, đã có "Đã xoá".
+      if (params.type === "error" && isDeletedRecordNotification(params.key)) return;
       base.open?.(params);
     },
   };
