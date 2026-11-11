@@ -46,6 +46,7 @@ import type {
   UnitRow,
   UnitState,
 } from "./types";
+import { includesFolded } from "@/shared/lib/fold-vi";
 
 const ALL = "all";
 
@@ -109,11 +110,10 @@ export function ByUnitView({
 
   // Lọc theo tìm kiếm, kỳ, loại; chip trạng thái đếm trên kết quả đó.
   const scoped = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase("vi");
     const rows: { unit: UnitRow; progress: UnitState }[] = [];
     for (const unit of units) {
       if (unitType !== ALL && unit.type !== unitType) continue;
-      if (q && !unit.name.toLocaleLowerCase("vi").includes(q)) continue;
+      if (!includesFolded(unit.name, search)) continue;
       const p = unitProgress(unit, periodId);
       if (p) rows.push({ unit, progress: p });
     }

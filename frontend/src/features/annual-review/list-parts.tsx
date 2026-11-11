@@ -16,6 +16,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 
 import { STATUS, type AnnualStatus } from "./api";
+import { includesFolded } from "@/shared/lib/fold-vi";
 
 /** Một tấm panel: thanh lọc · bảng · phân trang. */
 export function ListPanel({
@@ -239,7 +240,6 @@ export function matchSubmission(
 ): boolean {
   if (status !== "all" && s.status !== status) return false;
   if (year !== null && s.year !== year) return false;
-  const q = search.trim().toLocaleLowerCase("vi");
-  if (!q) return true;
-  return String(s.year).includes(q) || s.docNo.toLocaleLowerCase("vi").includes(q);
+  if (!search.trim()) return true;
+  return String(s.year).includes(search.trim()) || includesFolded(s.docNo, search);
 }

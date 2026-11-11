@@ -42,6 +42,7 @@ import {
   isEditable,
   versionLabel,
 } from "../model";
+import { includesFolded } from "@/shared/lib/fold-vi";
 
 export type FormRow = {
   form: TemplateForm;
@@ -100,13 +101,10 @@ export function FormsPanel({
   const [kind, setKind] = useState<KindFilter>("all");
 
   const shown = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase("vi");
     return rows.filter(
       ({ form }) =>
         (kind === "all" || form.kind === kind) &&
-        (!q ||
-          formLabel(form).toLocaleLowerCase("vi").includes(q) ||
-          (form.title ?? "").toLocaleLowerCase("vi").includes(q))
+        (includesFolded(formLabel(form), query) || includesFolded(form.title, query))
     );
   }, [rows, query, kind]);
 
