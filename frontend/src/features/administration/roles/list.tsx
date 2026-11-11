@@ -166,6 +166,7 @@ export const RoleList = () => {
       />
       <DataTable
         table={table}
+        itemLabel="vai trò"
         toolbar={
           <>
             <ListToolbar

@@ -177,6 +177,7 @@ export const PermissionList = () => {
       />
       <DataTable
         table={table}
+        itemLabel="quyền"
         toolbar={
           <>
             <ListToolbar

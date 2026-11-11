@@ -229,6 +229,7 @@ export const NotificationList = () => {
       />
       <DataTable
         table={table}
+        itemLabel="thông báo"
         toolbar={
           <>
             <ListToolbar

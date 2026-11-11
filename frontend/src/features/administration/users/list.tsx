@@ -283,6 +283,7 @@ export const UserList = () => {
       />
       <DataTable
         table={table}
+        itemLabel="người dùng"
         toolbar={
           <>
             <ListToolbar
