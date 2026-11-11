@@ -97,7 +97,7 @@ return defineScript({
       }
     });
     // Dong TONG CONG
-    setText(ctx, ROW0, ORG_COL, 'Tong cong');
+    setText(ctx, ROW0, ORG_COL, 'Tổng cộng');
     setText(ctx, ROW0, 0, '');
     for (const b of BINDINGS) {
       const t = total[b.code];
