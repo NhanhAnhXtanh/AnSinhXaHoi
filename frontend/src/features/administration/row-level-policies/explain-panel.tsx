@@ -87,6 +87,8 @@ export function ExplainPanel({
 
   function runSimulation() {
     if (!userId || !recordId) return;
+    // Bỏ kết quả của lần trước: lần này hỏng thì không để lại câu trả lời cũ trông như mới.
+    setSimulation(null);
     simulate(
       {
         url: `${API_URL}/row_level_policies/simulate`,
@@ -97,6 +99,9 @@ export function ExplainPanel({
           userId: Number(userId),
           recordId: Number(recordId),
         },
+        // Data provider tự tuần tự hoá thân yêu cầu thành chuỗi; thiếu kiểu nội dung thì máy chủ
+        // trả 415 và nút không bao giờ ra kết quả (như reset-password-card).
+        config: { headers: { "Content-Type": "application/json" } },
         successNotification: false,
         errorNotification: (error) => ({
           type: "error",
