@@ -25,6 +25,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = "Quay lại",
   destructive = false,
+  confirmDisabled = false,
   onConfirm,
 }: {
   open: boolean;
@@ -34,6 +35,8 @@ export function ConfirmDialog({
   confirmLabel: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /** Nút xác nhận mờ (kèm lý do trong `description`): việc chưa làm được, bấm chỉ nhận lỗi. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
 }) {
   return (
@@ -49,6 +52,7 @@ export function ConfirmDialog({
           <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             className={cn(destructive && buttonVariants({ variant: "destructive" }))}
+            disabled={confirmDisabled}
             onClick={onConfirm}
           >
             {confirmLabel}
