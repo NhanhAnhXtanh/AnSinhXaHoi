@@ -59,7 +59,13 @@ const NO_RETRY_STATUSES = new Set([400, 401, 403, 404, 409, 410, 422]);
 const reactQueryClientConfig = {
   defaultOptions: {
     queries: {
+      // Mặc định ("online") react-query TẠM DỪNG truy vấn khi trình duyệt báo mất mạng: màn hình
+      // hiện khung chờ mãi, không bao giờ tới trạng thái lỗi "Máy tính đang mất kết nối mạng".
+      // "always" cho truy vấn chạy và hỏng ngay; có mạng lại thì tự tải lại (refetchOnReconnect).
+      networkMode: "always" as const,
       retry: (failureCount: number, error: unknown) => {
+        // Mất mạng: thử lại chỉ kéo dài khung chờ — báo ngay để người dùng kiểm tra mạng.
+        if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
         const status =
           error && typeof error === "object" && "statusCode" in error
             ? Number((error as { statusCode?: unknown }).statusCode)

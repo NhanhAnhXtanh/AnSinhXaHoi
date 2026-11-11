@@ -51,6 +51,7 @@ import { TreasuryDialog } from "./components/treasury-dialog";
 import { VersionHistoryDialog } from "./components/version-history-dialog";
 import { NO_DATA_REASON, badgeOf, hasNoData, reviewStatus } from "./model";
 import { useReportExport } from "./use-report-export";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 const LIST_PATH = "/report-review";
 
@@ -331,7 +332,7 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
         <EmptyState
           icon={TriangleAlert}
           title="Chưa mở được biểu"
-          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          description={loadErrorText(sheetsQuery.error ?? contentQuery.error, "Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây.")}
           action={
             <Button
               type="button"

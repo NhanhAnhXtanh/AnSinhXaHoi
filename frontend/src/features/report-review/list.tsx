@@ -69,6 +69,7 @@ import {
   type ReviewStatus,
 } from "./model";
 import { useReportExport } from "./use-report-export";
+import { isForbiddenError, loadErrorText } from "@/shared/lib/user-message";
 
 /**
  * Duyệt phiếu nhập (Sở) — hàng đợi phiếu các đơn vị trong năm đang chọn (UC-39).
@@ -251,11 +252,13 @@ export function ReviewList() {
         <EmptyState
           icon={TriangleAlert}
           title="Chưa tải được danh sách phiếu"
-          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          description={loadErrorText(query.error, "Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây.")}
           action={
-            <Button type="button" variant="outline" onClick={refresh}>
-              Thử lại
-            </Button>
+            isForbiddenError(query.error) ? undefined : (
+              <Button type="button" variant="outline" onClick={refresh}>
+                Thử lại
+              </Button>
+            )
           }
         />
       );

@@ -11,6 +11,7 @@ import {
   LoaderCircleIcon,
   RefreshCwIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/shared/ui/button";
 import {
@@ -28,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 /* --------------------------------------------------------------------------
    Refresh
@@ -64,7 +66,17 @@ export function DataTableRefresh<TData extends BaseRecord>({
           size="icon"
           aria-label="Làm mới"
           disabled={isFetching}
-          onClick={() => void tableQuery.refetch()}
+          onClick={() =>
+            void tableQuery.refetch().then((result) => {
+              // Bảng còn dữ liệu cũ thì khung lỗi không hiện — phải báo, kẻo người dùng tưởng
+              // danh sách đã là mới nhất.
+              if (result.isError) {
+                toast.error(
+                  loadErrorText(result.error, "Chưa làm mới được danh sách. Bạn thử lại sau ít giây.")
+                );
+              }
+            })
+          }
           className={className}
         >
           <RefreshCwIcon className={cn(isFetching && "animate-spin")} />

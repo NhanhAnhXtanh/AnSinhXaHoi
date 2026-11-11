@@ -1,6 +1,7 @@
 import { API_URL } from "@/shared/api/constants";
 import { getAccessToken, refreshSession } from "@/shared/api/session";
 import type { StatusTone } from "@/shared/components/asxh";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 /**
  * Báo cáo năm — hình dạng dữ liệu của `/api/annual_reports` (xem `AnnualReportController` phía máy
@@ -129,11 +130,9 @@ export function latestPerYear(list: AnnualReportRecord[]): AnnualReportRecord[] 
 
 /** Câu lỗi tiếng Việt máy chủ trả (`ApiExceptionHandler`), hoặc câu dự phòng. */
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    if (message !== "" && /[À-ỹ]/.test(message)) return message;
-  }
-  return fallback;
+  // Câu tiếng Việt của máy chủ nếu có; mất mạng và thiếu quyền (403) có câu riêng thay cho
+  // `fallback` (trước đây 403 cũng hiện thành "mạng có thể đang chập chờn").
+  return loadErrorText(error, fallback);
 }
 
 /** Mã lỗi HTTP của một lỗi Refine (`HttpError.statusCode`). */

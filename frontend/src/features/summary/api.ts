@@ -4,6 +4,7 @@ import { API_URL } from "@/shared/api/constants";
 import { customResult } from "@/shared/hooks/use-custom-result";
 import type { StatusTone } from "@/shared/components/asxh";
 import type { PeriodKind } from "@/shared/components/asxh";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 /**
  * Hình dạng dữ liệu của `/api/summary/*`, `/api/dept_reports/*`, `/api/dept_years/*` (xem
@@ -426,11 +427,9 @@ export function useApiArray<T>(url: string | null, query: Query | undefined): Ap
 
 /** Câu lỗi tiếng Việt máy chủ trả (`ApiExceptionHandler`), hoặc câu dự phòng. */
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    if (message !== "" && /[À-ỹ]/.test(message)) return message;
-  }
-  return fallback;
+  // Câu tiếng Việt của máy chủ nếu có; mất mạng và thiếu quyền (403) có câu riêng thay cho
+  // `fallback` (trước đây 403 cũng hiện thành "mạng có thể đang chập chờn").
+  return loadErrorText(error, fallback);
 }
 
 // ---------------------------------------------------------------- nhãn

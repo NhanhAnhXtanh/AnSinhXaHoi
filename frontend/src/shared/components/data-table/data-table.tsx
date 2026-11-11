@@ -33,6 +33,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { DataTablePagination } from "@/shared/components/data-table/data-table-pagination";
 import { cn } from "@/shared/lib/utils";
 import { isScopedResource } from "@/shared/api/session";
+import { FORBIDDEN_TEXT, isForbiddenError, loadErrorText } from "@/shared/lib/user-message";
 
 /**
  * `defaultColumn` for a table that opts into column resizing.
@@ -452,6 +453,7 @@ export function DataTable<TData extends BaseRecord>({
                 columnFilters={table.reactTable.getState().columnFilters}
                 onClearFilters={() => table.reactTable.setColumnFilters([])}
                 isError={tableQuery.isError}
+                error={tableQuery.error}
                 isRetrying={tableQuery.isFetching}
                 onRetry={() => void tableQuery.refetch()}
                 itemLabel={itemLabel}
@@ -543,6 +545,7 @@ function DataTableNoData({
   columnFilters,
   onClearFilters,
   isError,
+  error,
   isRetrying,
   onRetry,
   itemLabel,
@@ -555,6 +558,8 @@ function DataTableNoData({
   columnFilters: ColumnFiltersState;
   onClearFilters: () => void;
   isError: boolean;
+  /** Lỗi của truy vấn bảng — 403 có câu riêng, không mời bấm Thử lại. */
+  error?: unknown;
   isRetrying: boolean;
   onRetry: () => void;
   itemLabel?: string;
@@ -596,6 +601,15 @@ function DataTableNoData({
           description:
             "Kiểm tra dây mạng hoặc wifi. Khi có mạng lại, bấm Thử lại.",
           action: retry,
+        }
+      : isForbiddenError(error)
+      ? {
+          // 403: thiếu quyền — không phải lỗi mạng, bấm Thử lại cũng ra đúng câu đó.
+          icon: ShieldOff,
+          title: label
+            ? `Chưa được xem danh sách ${label}`
+            : "Chưa được xem danh sách này",
+          description: loadErrorText(error, FORBIDDEN_TEXT),
         }
       : {
           icon: CloudOff,

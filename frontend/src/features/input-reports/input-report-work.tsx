@@ -68,6 +68,7 @@ import { RevisionHistoryDialog } from "./revision-history-dialog";
 import { SheetValidator, type ValidationJob } from "./sheet-validator";
 import { TreasurySubmitDialog } from "./treasury-submit-dialog";
 import { CheckErrorsDialog, SubmitConfirmDialog, type SheetIssue } from "./work-dialogs";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 /** Đủ rộng cho mọi biểu của một phiếu (bộ mẫu thật ≈10 biểu). */
 const MAX_SHEETS = 200;
@@ -689,7 +690,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
         <EmptyState
           icon={TriangleAlert}
           title="Chưa mở được biểu"
-          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          description={loadErrorText(sheetsQuery.error ?? contentQuery.error, "Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây.")}
           action={
             <Button
               type="button"
