@@ -349,7 +349,9 @@ export function DataTable<TData extends BaseRecord>({
                           onClick={(event) => event.stopPropagation()}
                           onDoubleClick={() => header.column.resetSize()}
                           className={cn(
-                            "absolute inset-y-0 -right-1 z-20 flex w-2 touch-none",
+                            // Nằm HẲN trong ô tiêu đề (right-0): đặt lệch ra ngoài (-right-1) thì phần
+                            // tràn sang ô bên cạnh bị ô đó che / cắt, chỉ 1–2px mép trái bấm kéo được.
+                            "absolute inset-y-0 right-0 z-20 flex w-2 touch-none",
                             "cursor-col-resize select-none items-center justify-center",
                             // Grab area is 8px wide for the pointer; the line
                             // that appears under it is 2px, so the header still
