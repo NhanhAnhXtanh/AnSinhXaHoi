@@ -152,33 +152,36 @@ function VersionCard({
   items: ActionItem[];
   onSelect: () => void;
 }) {
+  // Thẻ KHÔNG là một nút lớn: nút ⋯ nằm trong nút khác là HTML không hợp lệ (trình đọc màn hình đọc cả
+  // thẻ thành một nút, công cụ kiểm thử không thấy nút ⋯). Phần chọn là một nút riêng (tên + trạng
+  // thái); bấm ra chỗ khác của thẻ vẫn chọn được bằng chuột.
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
       onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
       className={cn(
         "bg-card flex cursor-pointer flex-col gap-1.5 rounded-lg border px-3.5 py-3",
-        "transition-colors duration-150 outline-none",
-        "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "transition-colors duration-150",
+        "has-[button:focus-visible]:ring-ring/50 has-[button:focus-visible]:ring-[3px]",
         selected ? "border-primary" : "hover:bg-surface-subtle"
       )}
     >
       <div className="flex items-center gap-2">
-        <span className="text-sm leading-5 font-semibold">
-          {versionLabel(version)}
-        </span>
-        <StatusBadge tone={STATUS_TONE[version.status]}>
-          {STATUS_LABEL[version.status]}
-        </StatusBadge>
+        <button
+          type="button"
+          aria-pressed={selected}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          className="flex min-w-0 items-center gap-2 rounded text-left outline-none"
+        >
+          <span className="text-sm leading-5 font-semibold">
+            {versionLabel(version)}
+          </span>
+          <StatusBadge tone={STATUS_TONE[version.status]}>
+            {STATUS_LABEL[version.status]}
+          </StatusBadge>
+        </button>
         <div
           className="ms-auto"
           onClick={(e) => e.stopPropagation()}
