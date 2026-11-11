@@ -23,6 +23,7 @@ import {
 import {
   fmt,
   fmtRange,
+  todayIso,
   UNIT_GROUP_LABEL,
   type Period,
   type SupplementRoute,
@@ -54,6 +55,8 @@ export function OpenPeriodDialog({
   onConfirm: () => void;
 }) {
   const forms = rows.reduce((s, r) => s + r.forms, 0);
+  // Hạn nộp đã qua: kỳ chuyển "quá hạn" lúc 0 giờ hôm sau và khoá nhập, nên đơn vị chỉ còn tới hết hôm nay.
+  const pastDeadline = period.deadline != null && period.deadline < todayIso();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
@@ -82,6 +85,19 @@ export function OpenPeriodDialog({
             { label: "Phiếu đã có", value: "0 phiếu" },
           ]}
         />
+        {pastDeadline && (
+          <p
+            role="alert"
+            className="flex items-start gap-2 rounded-lg bg-warning-subtle px-3 py-2 text-sm text-warning-text"
+          >
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              Hạn nộp của kỳ này đã qua ({fmt(period.deadline)}). Mở đợt bây giờ thì đơn vị chỉ
+              nhập và nộp được đến hết hôm nay; sang ngày mai kỳ tự khoá và phải gia hạn mới mở
+              lại được.
+            </span>
+          </p>
+        )}
         <button
           type="button"
           onClick={onShowPreview}
