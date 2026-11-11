@@ -40,29 +40,6 @@ const RESOURCE_LABELS: Record<string, string> = {
   template_versions: "Phiên bản mẫu",
 };
 
-/**
- * Tên vai trò theo mã — dùng khi tài khoản không có quyền xem người dùng nên không đọc được tên
- * vai trò từ bản ghi, chỉ có mã trong phiên đăng nhập (mã có thể viết thường).
- */
-const ROLE_NAMES: Record<string, string> = {
-  ADMIN: "Quản trị hệ thống",
-  MANAGER: "Quản lý nội dung",
-  USER: "Người xem nội dung",
-  ORGANIZATION_REPORTER: "Cán bộ đơn vị nhập liệu",
-  REPORT_APPROVER: "Cán bộ Sở duyệt phiếu",
-  REPORT_ADMIN: "Cán bộ Sở điều hành kỳ báo cáo",
-  TEMPLATE_ADMIN: "Cán bộ quản lý biểu mẫu",
-  DEPT_REPORT_COMPILER: "Cán bộ Sở tổng hợp số liệu",
-  DEPT_REPORT_SUBMITTER: "Cán bộ Sở nộp báo cáo năm",
-  UBND_APPROVER: "Lãnh đạo UBND duyệt báo cáo năm",
-  AUDITOR: "Kiểm tra (chỉ xem)",
-};
-
-/** Tên vai trò tiếng Việt cho một mã vai trò; chưa biết mã thì giữ nguyên chữ nhận được. */
-export function roleName(code: string): string {
-  return ROLE_NAMES[code.trim().toUpperCase()] ?? code;
-}
-
 function fallbackLabel(resource: string): string {
   const spaced = resource.replace(/_/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);

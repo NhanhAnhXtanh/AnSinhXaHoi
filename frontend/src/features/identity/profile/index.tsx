@@ -28,7 +28,8 @@ import {
 } from "@/shared/ui/card";
 import { cn } from "@/shared/lib/utils";
 import type { User } from "@/domains/user/types";
-import { roleName, workLabels } from "./labels";
+import { roleName } from "@/shared/lib/role-names";
+import { workLabels } from "./labels";
 
 /**
  * Identity kèm đơn vị báo cáo: `/auth/me` và cặp khoá lúc đăng nhập trả thêm `reportUnit`

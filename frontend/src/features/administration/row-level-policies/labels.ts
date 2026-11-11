@@ -68,6 +68,7 @@ const FIELD_PART_LABELS: Record<string, string> = {
   period: "Kỳ báo cáo",
   template: "Biểu mẫu",
   report: "Phiếu nhập",
+  publication: "Đợt báo cáo",
 };
 
 export function fieldLabel(path: string): string {
@@ -133,4 +134,27 @@ export function readConditionVi(node: ScopeNode | undefined | null): string {
     return `${field} ${op} ${literal}`;
   }
   return `${field} ${op}`;
+}
+
+const COMPILED_LEAF =
+  /\b([A-Za-z]\w*(?:\.\w+)+)\s+(eq|ne|in|notIn|lt|lte|gt|gte|between|like|notLike|isNull|isNotNull)\b(?:\s+([^\s()]+))?/g;
+
+/**
+ * Điều kiện máy chủ đã biên dịch (`((unit.id eq user.organizationId)) AND …`) thành chữ cho cán bộ:
+ * tên trường, phép so sánh và giá trị lấy từ tài khoản đọc bằng nhãn tiếng Việt; AND / OR / NOT
+ * thành và / hoặc / không. Phần máy chủ đã viết sẵn bằng tiếng Việt giữ nguyên.
+ */
+export function readCompiledVi(text: string | null | undefined): string {
+  if (!text) return "—";
+  return text
+    .replace(COMPILED_LEAF, (_match, field: string, op: string, value?: string) => {
+      const label = fieldLabel(field);
+      const shown = value === undefined ? "" : ` ${CONTEXT_LABELS[value] ?? value}`;
+      return `${label} ${operatorLabelVi(op)}${shown}`;
+    })
+    .replace(/\bAND\b/g, "và")
+    .replace(/\bOR\b/g, "hoặc")
+    .replace(/\bNOT\b/g, "không phải")
+    .replace(/\beverything\b/g, "mọi dòng")
+    .replace(/\bnothing\b/g, "không dòng nào");
 }

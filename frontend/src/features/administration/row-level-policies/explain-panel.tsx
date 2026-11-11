@@ -24,6 +24,8 @@ import {
 } from "@/shared/ui/select";
 import { Separator } from "@/shared/ui/separator";
 import { ACTIONS, type ExplainResponse } from "@/domains/row-level-policy/types";
+import { roleName } from "@/shared/lib/role-names";
+import { readCompiledVi } from "./labels";
 import { actionLabel, resourceLabel } from "../labels";
 
 const EVALUATED_LABELS: Record<string, string> = {
@@ -212,23 +214,19 @@ export function ExplainPanel({
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">Vai trò:</span>
               {explanation.principal.roleCodes.map((role) => (
-                <Badge key={role} variant="secondary" className="font-mono text-[11px]">
-                  {role}
+                <Badge key={role} variant="secondary" className="text-[11px]">
+                  {roleName(role)}
                 </Badge>
               ))}
-              <span className="text-muted-foreground">Phòng ban:</span>
-              <span className="font-mono text-xs">
-                {explanation.principal.departmentId ?? "—"}
-              </span>
             </div>
 
             <div className="flex flex-col gap-2">
               <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                 Điều kiện đang áp dụng
               </span>
-              <code className="bg-muted rounded-md p-3 text-xs break-words">
-                {explanation.effective}
-              </code>
+              <p className="bg-muted rounded-md p-3 text-sm break-words">
+                {readCompiledVi(explanation.effective)}
+              </p>
             </div>
 
             <RuleList
@@ -286,9 +284,6 @@ function RuleList({
                   {rule.applies ? "Đang áp dụng" : "Không giữ vai trò"}
                 </Badge>
                 <span className="text-sm font-medium">{rule.name}</span>
-                <span className="text-muted-foreground font-mono text-[11px]">
-                  {rule.source}
-                </span>
               </div>
               {/*
                 The compiled form, not the JSON that was typed. Normalisation is
@@ -296,16 +291,16 @@ function RuleList({
                 showing the authored version here would be showing the wrong
                 thing.
               */}
-              <code className="text-xs break-words">{rule.reads}</code>
+              <p className="text-sm break-words">{readCompiledVi(rule.reads)}</p>
               {/*
                 Only when the two clauses differ. Repeating an identical
                 condition twice reads like a mistake in the rule rather than a
                 property of it.
               */}
               {rule.checks && (
-                <code className="text-muted-foreground text-xs break-words">
-                  sau khi lưu: {rule.checks}
-                </code>
+                <p className="text-muted-foreground text-sm break-words">
+                  Sau khi lưu: {readCompiledVi(rule.checks)}
+                </p>
               )}
             </div>
           ))}
