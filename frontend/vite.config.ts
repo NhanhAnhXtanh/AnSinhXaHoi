@@ -7,7 +7,7 @@ import { defineConfig, loadEnv, type PluginOption } from "vite";
 // `ANALYZE=1 npm run build` ghi dist/stats.html (treemap kích thước raw/gzip từng module).
 const analyze = process.env.ANALYZE === "1";
 
-// frontend/.env (xem .env.example): FRONTEND_PORT, FRONTEND_HOST cho dev; VITE_* cho mã trình duyệt.
+// frontend/.env: FRONTEND_PORT, FRONTEND_HOST cho dev; VITE_* cho mã trình duyệt.
 const envDir = __dirname;
 
 // https://vite.dev/config/
