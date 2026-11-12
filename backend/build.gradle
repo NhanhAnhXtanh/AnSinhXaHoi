@@ -63,6 +63,40 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+// `gradlew bootRun` nạp backend/.env làm biến môi trường (biến thật thắng, giá trị trống bỏ qua).
+// Task test không đọc tệp này.
+def readDotEnv(File file) {
+    def values = [:]
+    if (!file.exists()) {
+        return values
+    }
+    file.eachLine('UTF-8') { line ->
+        def text = line.trim()
+        if (!text || text.startsWith('#')) {
+            return
+        }
+        int eq = text.indexOf('=')
+        if (eq < 1) {
+            return
+        }
+        def key = text.substring(0, eq).trim()
+        def value = text.substring(eq + 1).trim()
+        if (value.length() >= 2 && ((value.startsWith('"') && value.endsWith('"'))
+                || (value.startsWith("'") && value.endsWith("'")))) {
+            value = value.substring(1, value.length() - 1)
+        }
+        value = value.replaceAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/) { all, name ->
+            System.getenv(name) ?: values[name] ?: ''
+        }
+        values[key] = value
+    }
+    return values.findAll { key, value -> value && System.getenv(key) == null }
+}
+
+tasks.named('bootRun') {
+    environment readDotEnv(file('.env'))
+}
+
 // CI chia test làm hai job: -PtestGroup=asxh chỉ chạy test nghiệp vụ ASXH
 // (com.dth.frw.module.asxh), -PtestGroup=platform chạy mọi test còn lại.
 // Không truyền thì chạy hết như trước.
