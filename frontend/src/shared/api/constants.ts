@@ -1,8 +1,8 @@
 /**
  * Base URL of the REST API backing every resource.
  *
- * <p>Read from `VITE_API_URL` (repo-root `.env`, shared with the backend — see
- * `.env.example`) so a deployment can repoint it without a code change; the
+ * <p>Read from `VITE_API_URL` (`frontend/.env` — see `frontend/.env.example`) so
+ * a deployment can repoint it without a code change; the
  * fallback is the `backend/` Spring Boot app in this repo on its default port
  * (8114). `.env` is gitignored, so the fallback — not the env file — is what a
  * fresh checkout gets.

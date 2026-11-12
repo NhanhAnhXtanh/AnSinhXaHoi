@@ -38,7 +38,7 @@ Backend commands run from `backend/` (`.\gradlew.bat` on Windows, `./gradlew` un
 
 Gradle wrapper 9.7.1, Java toolchain 25. Both `bootRun` and `test` need the PostgreSQL database reachable — `contextLoads` starts the full context, so it fails on a datasource it cannot open.
 
-Running the stack means two terminals: `./gradlew bootRun` in `backend/` (port `BACKEND_PORT`, default 8114), `npm run dev` in `frontend/` (port `FRONTEND_PORT`, default 8765, the origin the backend's CORS config allows). Both read **one shared `.env` at the repo root** (copy `.env.example`): `bootRun` loads it as environment variables (real environment variables win; empty values mean "use the default"), Vite reads it through `envDir`. `gradlew test` deliberately does not read it, so tests never follow a developer's database settings.
+Running the stack means two terminals: `./gradlew bootRun` in `backend/` (port 8114), `npm run dev` in `frontend/` (port 8765, the origin the backend's CORS config allows). Each side has its own env file, copied from its `.env.example`: `backend/.env` (loaded by `bootRun` as environment variables; real environment variables win, empty values mean "use the default", `gradlew test` never reads it) and `frontend/.env` (read by Vite: `FRONTEND_PORT`, `FRONTEND_HOST`, `VITE_*`).
 
 ## Frontend architecture
 
@@ -130,7 +130,7 @@ File names stay kebab-case (`list.tsx`, `use-notifications.ts`) rather than *san
 
 ### Data layer
 
-`src/shared/api/data.ts` builds a `@refinedev/rest` simple-REST provider from `API_URL` in `src/shared/api/constants.ts`, which reads `VITE_API_URL` and falls back to `http://localhost:8114/api` — the `backend/` in this repo. `.env` (repo root, shared with the backend) is gitignored, so the fallback, not the env file, is what a fresh checkout gets; the root `.env.example` records every variable.
+`src/shared/api/data.ts` builds a `@refinedev/rest` simple-REST provider from `API_URL` in `src/shared/api/constants.ts`, which reads `VITE_API_URL` and falls back to `http://localhost:8114/api` — the `backend/` in this repo. `frontend/.env` is gitignored, so the fallback, not the env file, is what a fresh checkout gets; `frontend/.env.example` records the variables.
 
 **A Radix `Select` cannot render a value whose option has not arrived.** It draws its label from the matching `SelectItem`, so a value the form receives *after* mount — or one whose option list is still in flight — shows the placeholder and reads as an empty field. Two separate causes, both on edit screens, and both need handling:
 

@@ -63,11 +63,8 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-// `gradlew bootRun` nạp tệp .env ở GỐC repo (một tệp dùng chung với giao diện — xem .env.example)
-// làm biến môi trường cho ứng dụng: cổng, CSDL, khoá ký phiên… Biến môi trường thật của máy / CI
-// được ưu tiên hơn tệp; giá trị để trống coi như không khai (dùng mặc định trong
-// application.properties); ${TÊN} trong giá trị lấy biến đã khai trước đó. Task `test` KHÔNG đọc
-// tệp này: test luôn chạy trên CSDL thử, không bao giờ theo cấu hình chạy trên máy.
+// `gradlew bootRun` nạp backend/.env làm biến môi trường (biến thật thắng, giá trị trống bỏ qua).
+// Task test không đọc tệp này.
 def readDotEnv(File file) {
     def values = [:]
     if (!file.exists()) {
@@ -97,7 +94,7 @@ def readDotEnv(File file) {
 }
 
 tasks.named('bootRun') {
-    environment readDotEnv(file('../.env'))
+    environment readDotEnv(file('.env'))
 }
 
 // CI chia test làm hai job: -PtestGroup=asxh chỉ chạy test nghiệp vụ ASXH

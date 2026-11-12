@@ -7,9 +7,8 @@ import { defineConfig, loadEnv, type PluginOption } from "vite";
 // `ANALYZE=1 npm run build` ghi dist/stats.html (treemap kích thước raw/gzip từng module).
 const analyze = process.env.ANALYZE === "1";
 
-// Một tệp .env ở GỐC repo dùng chung cho backend và giao diện (xem ../.env.example). Chỉ biến VITE_*
-// được đưa vào mã chạy trên trình duyệt; biến khác (cổng, mật khẩu DB…) chỉ đọc ở tệp cấu hình này.
-const envDir = path.resolve(__dirname, "..");
+// frontend/.env (xem .env.example): FRONTEND_PORT, FRONTEND_HOST cho dev; VITE_* cho mã trình duyệt.
+const envDir = __dirname;
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -27,9 +26,7 @@ export default defineConfig(({ mode }) => {
           gzipSize: true,
         }) as PluginOption),
     ],
-    // Backend chỉ nhận CORS từ đúng cổng này (app.cors.allowed-origins theo FRONTEND_PORT). Không có
-    // strictPort thì cổng bận làm Vite lặng lẽ chạy cổng kế tiếp và mọi lời gọi API hỏng ở bước
-    // preflight thay vì báo lỗi ngay tại đây. FRONTEND_HOST=all: máy khác trong mạng mở được.
+    // strictPort: cổng bận thì báo lỗi, không lặng lẽ sang cổng khác (backend chỉ nhận CORS đúng cổng).
     server: {
       port,
       strictPort: true,
