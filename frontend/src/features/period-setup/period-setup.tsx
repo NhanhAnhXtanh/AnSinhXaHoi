@@ -18,7 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useCan, useWarnAboutChange } from "@refinedev/core";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import {
@@ -112,6 +112,9 @@ function toRefs(keys: Iterable<string>): CellRef[] {
 
 export function PeriodSetup() {
   const navigate = useNavigate();
+  // `?ky={id}`: màn khác (Lịch sử mở đợt) mở sẵn đúng kỳ này thay vì kỳ mặc định.
+  const [searchParams] = useSearchParams();
+  const wantedPeriod = searchParams.get("ky");
   const { year } = useReportYear();
   const today = useMemo(() => todayIso(), []);
 
@@ -152,8 +155,10 @@ export function PeriodSetup() {
   useEffect(() => {
     if (periods.length === 0) return;
     if (selectedId && periods.some((p) => p.id === selectedId)) return;
-    setSelectedId(pickDefault(periods, locks));
-  }, [periods, locks, selectedId]);
+    setSelectedId(
+      wantedPeriod && periods.some((p) => p.id === wantedPeriod) ? wantedPeriod : pickDefault(periods, locks)
+    );
+  }, [periods, locks, selectedId, wantedPeriod]);
 
   // Rời màn (bấm mục menu khác…) hoặc đổi năm khi còn ô chưa lưu: hộp hỏi chung của ứng
   // dụng (UnsavedChangesGuard) — trước đây các ô chờ lưu mất mà không hỏi.

@@ -16,10 +16,18 @@ function checkable(username: string): boolean {
 
 /**
  * Tên đăng nhập đã có tài khoản nào dùng chưa (lọc `username` bằng, không phân biệt hoa
- * thường — như máy chủ kiểm khi lưu). Chỉ là gợi ý sớm: máy chủ vẫn kiểm lại khi tạo.
+ * thường — như máy chủ kiểm khi lưu). Chỉ là gợi ý sớm: máy chủ vẫn kiểm lại khi lưu.
+ *
+ * `ownUsername`: khi SỬA tài khoản, tên hiện tại của chính tài khoản đó không tính là "đã có
+ * người dùng" — gõ lại đúng tên cũ thì không hỏi, không báo.
  */
-export function useUsernameAvailability(raw: string | undefined): UsernameAvailability {
+export function useUsernameAvailability(
+  raw: string | undefined,
+  ownUsername?: string
+): UsernameAvailability {
   const username = (raw ?? "").trim();
+  const isOwn =
+    ownUsername !== undefined && username.toLowerCase() === ownUsername.trim().toLowerCase();
   const [debounced, setDebounced] = useState(username);
 
   useEffect(() => {
@@ -27,7 +35,7 @@ export function useUsernameAvailability(raw: string | undefined): UsernameAvaila
     return () => window.clearTimeout(timer);
   }, [username]);
 
-  const enabled = checkable(debounced);
+  const enabled = !isOwn && checkable(debounced);
   const { result, query } = useList({
     resource: "users",
     filters: [{ field: "username", operator: "eq", value: debounced }],
@@ -36,7 +44,7 @@ export function useUsernameAvailability(raw: string | undefined): UsernameAvaila
     errorNotification: false,
   });
 
-  if (!checkable(username)) return "idle";
+  if (isOwn || !checkable(username)) return "idle";
   if (username !== debounced || query.isFetching) return "checking";
   if (query.isError) return "idle";
   return (result?.total ?? 0) > 0 ? "taken" : "available";

@@ -256,6 +256,8 @@ function PeriodPanel({ periodId, year, onChanged }: { periodId: number; year: nu
             : ""
         }${overview.canWrite ? " Số liệu tổng hợp của kỳ sẽ được lưu lại ngay sau khi chốt." : ""}`}
         confirmLabel={`Chốt đợt ${period.name}`}
+        // Còn phiếu chờ duyệt thì máy chủ từ chối chốt — làm mờ nút như màn Thiết lập & điều hành.
+        confirmDisabled={period.submittedUnits > 0}
         onConfirm={() => void doClose()}
       />
       <ConfirmDialog

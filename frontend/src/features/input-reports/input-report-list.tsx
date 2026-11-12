@@ -49,6 +49,7 @@ import { ListToolbar, type FilterOption } from "./list-toolbar";
 import { STATUS_META, displayStatus, dueLine, formatRange, hasAnyData } from "./model";
 import { RevisionHistoryDialog } from "./revision-history-dialog";
 import { reportKindLabel, statusLine, workPath } from "./report-text";
+import { isForbiddenError, loadErrorText } from "@/shared/lib/user-message";
 
 /** Bốn thẻ lọc nhanh (UC-33 bước 2). "Cần nhập" không tính phiếu của kỳ quá hạn (4a). */
 const QUICK: { key: DisplayKey; label: string }[] = [
@@ -187,11 +188,13 @@ export function InputReportList() {
         <EmptyState
           icon={TriangleAlert}
           title="Chưa tải được danh sách phiếu"
-          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          description={loadErrorText(query.error, "Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây.")}
           action={
-            <Button type="button" variant="outline" onClick={refresh}>
-              Thử lại
-            </Button>
+            isForbiddenError(query.error) ? undefined : (
+              <Button type="button" variant="outline" onClick={refresh}>
+                Thử lại
+              </Button>
+            )
           }
         />
       );

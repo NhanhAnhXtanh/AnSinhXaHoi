@@ -8,6 +8,7 @@ import com.dth.frw.module.asxh.inputreport.api.dto.ReturnReportRequest;
 import com.dth.frw.module.asxh.inputreport.security.InputReportPermissions;
 import com.dth.frw.module.asxh.inputreport.service.InputReportQueryService;
 import com.dth.frw.module.asxh.inputreport.service.InputReportService;
+import com.dth.frw.module.asxh.notification.service.AsxhNotifier;
 import com.dth.frw.shared.web.ListParams;
 import com.dth.frw.shared.web.ListResponse;
 import jakarta.validation.Valid;
@@ -39,10 +40,14 @@ public class InputReportController {
 
     private final InputReportService service;
     private final InputReportQueryService queries;
+    // Báo cho người liên quan SAU khi bước chính đã lưu xong (không nằm trong giao dịch của service).
+    private final AsxhNotifier notifier;
 
-    public InputReportController(InputReportService service, InputReportQueryService queries) {
+    public InputReportController(InputReportService service, InputReportQueryService queries,
+                                 AsxhNotifier notifier) {
         this.service = service;
         this.queries = queries;
+        this.notifier = notifier;
     }
 
     /**
@@ -95,14 +100,18 @@ public class InputReportController {
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_WRITE + "')")
     public InputReportResponse submit(@PathVariable Long id) {
-        return one(service.submit(id));
+        InputReport report = service.submit(id);
+        notifier.reportSubmitted(report);
+        return one(report);
     }
 
     /** Sở phê duyệt (UC-41). */
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_APPROVE + "')")
     public InputReportResponse approve(@PathVariable Long id) {
-        return one(service.approve(id));
+        InputReport report = service.approve(id);
+        notifier.reportApproved(report);
+        return one(report);
     }
 
     /**
@@ -112,7 +121,9 @@ public class InputReportController {
     @PostMapping("/{id}/return")
     @PreAuthorize("hasAuthority('" + InputReportPermissions.INPUT_REPORTS_APPROVE + "')")
     public InputReportResponse returnReport(@PathVariable Long id, @Valid @RequestBody ReturnReportRequest request) {
-        return one(service.returnReport(id, request.reason()));
+        InputReport returned = service.returnReport(id, request.reason());
+        notifier.reportReturned(returned);
+        return one(returned);
     }
 
     private InputReportResponse one(InputReport report) {

@@ -2,6 +2,7 @@ package com.dth.frw.module.security.rowlevel.repo;
 
 import com.dth.frw.domain.security.rowlevel.PolicyKind;
 import com.dth.frw.domain.security.rowlevel.RowLevelPolicy;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import jakarta.persistence.criteria.JoinType;
 import java.util.ArrayList;
@@ -43,11 +44,11 @@ public final class RowLevelPolicySpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("name")), pattern),
-                    cb.like(cb.lower(root.get("resource")), pattern),
-                    cb.like(cb.lower(root.get("description")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("name")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("resource")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("description")), pattern));
         }));
 
         List<Long> ids = params.ids();

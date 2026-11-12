@@ -1,4 +1,5 @@
 import { API_URL } from "@/shared/api/constants";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 /**
  * Hình dạng dữ liệu của `/api/input_reports` và `/api/input_report_sheets` (xem
@@ -194,12 +195,9 @@ export const JSON_HEADERS = { headers: { "Content-Type": "application/json" } };
 
 /** Câu lỗi tiếng Việt máy chủ trả (`ApiExceptionHandler`), hoặc câu dự phòng. */
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    // Chỉ hiện câu của máy chủ khi nó là câu tiếng Việt viết cho người dùng.
-    if (message !== "" && /[À-ỹ]/.test(message)) return message;
-  }
-  return fallback;
+  // Câu tiếng Việt của máy chủ nếu có; mất mạng và thiếu quyền (403) có câu riêng thay cho
+  // `fallback` (trước đây 403 cũng hiện thành "mạng có thể đang chập chờn").
+  return loadErrorText(error, fallback);
 }
 
 /** Mã lỗi HTTP của một lỗi Refine (`HttpError.statusCode`). */

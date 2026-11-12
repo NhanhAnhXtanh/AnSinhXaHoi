@@ -34,7 +34,18 @@ export type WorkbookCellRef = { sheetName: string; row: number; column: number }
  * Kết quả chạy script phía trình duyệt. `ok` = không có lỗi mức ERROR.
  * `cells`: các ô mà lỗi mức ERROR chỉ ra (script ghi `source` cho lỗi) — để tô đỏ.
  */
-export type ScriptRunResult = { ok: boolean; messages: string[]; cells?: WorkbookCellRef[] };
+export type ScriptRunResult = {
+  ok: boolean;
+  messages: string[];
+  cells?: WorkbookCellRef[];
+  /**
+   * Lời gọi `ctx.api` hỏng trong lúc chạy (dù script đã tự bắt lỗi) — câu của máy chủ, hoặc
+   * "HTTP {mã}". Có phần tử nghĩa là bảng có thể thiếu số; màn hình nên báo cho người dùng.
+   */
+  apiErrors?: string[];
+  /** Phần tự động của biểu bị dừng vì chạy quá lâu: bảng chưa đủ số, không nên Lưu / Hoàn tất. */
+  timedOut?: boolean;
+};
 
 export type SpreadWorkbookProps = {
   /** null → workbook trống 1 sheet. Đổi NỘI DUNG (không chỉ tham chiếu) mới nạp lại. */

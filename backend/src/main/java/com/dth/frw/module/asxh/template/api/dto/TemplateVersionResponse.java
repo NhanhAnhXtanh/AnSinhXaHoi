@@ -30,6 +30,7 @@ public record TemplateVersionResponse(
         String revokedBy,
         String workbookJson,
         Instant createdAt,
+        String createdBy,
         Instant updatedAt) {
 
     /** {@code locked} = cả biểu đang khoá — màn thiết kế dùng để chặn Ban hành. */
@@ -72,6 +73,7 @@ public record TemplateVersionResponse(
                 row.revokedBy(),
                 null,
                 row.createdAt(),
+                row.createdBy(),
                 row.updatedAt());
     }
 
@@ -97,6 +99,7 @@ public record TemplateVersionResponse(
                 version.getRevokedBy(),
                 withContent ? version.getWorkbookJson() : null,
                 version.getCreatedAt(),
+                version.getCreatedBy(),
                 version.getUpdatedAt());
     }
 }

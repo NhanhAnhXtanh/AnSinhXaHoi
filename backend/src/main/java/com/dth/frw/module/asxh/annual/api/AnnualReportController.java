@@ -4,6 +4,7 @@ import com.dth.frw.domain.asxh.annual.AnnualReport;
 import com.dth.frw.domain.asxh.annual.AnnualReportAttachment;
 import com.dth.frw.domain.asxh.annual.AnnualReportStatus;
 import com.dth.frw.module.asxh.annual.api.dto.AnnualAttachmentResponse;
+import com.dth.frw.module.asxh.notification.service.AsxhNotifier;
 import com.dth.frw.module.asxh.annual.api.dto.AnnualReasonRequest;
 import com.dth.frw.module.asxh.annual.api.dto.AnnualReportResponse;
 import com.dth.frw.module.asxh.annual.api.dto.AnnualSheetResponse;
@@ -65,10 +66,14 @@ public class AnnualReportController {
 
     private final AnnualReportService service;
     private final AnnualReportWorkflowService workflow;
+    // Báo cho Sở / UBND SAU khi bước chính đã lưu xong (không nằm trong giao dịch của workflow).
+    private final AsxhNotifier notifier;
 
-    public AnnualReportController(AnnualReportService service, AnnualReportWorkflowService workflow) {
+    public AnnualReportController(AnnualReportService service, AnnualReportWorkflowService workflow,
+                                  AsxhNotifier notifier) {
         this.service = service;
         this.workflow = workflow;
+        this.notifier = notifier;
     }
 
     @GetMapping
@@ -114,6 +119,7 @@ public class AnnualReportController {
             }
         }
         AnnualReport report = workflow.submit(year, docNo, docDate, uploads);
+        notifier.annualSubmitted(report);
         return detail(report.getId());
     }
 
@@ -126,7 +132,7 @@ public class AnnualReportController {
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAuthority('" + AnnualReportPermissions.ANNUAL_APPROVE + "')")
     public AnnualReportResponse approve(@PathVariable Long id) {
-        workflow.approve(id);
+        notifier.annualApproved(workflow.approve(id));
         return detail(id);
     }
 
@@ -134,7 +140,8 @@ public class AnnualReportController {
     @PreAuthorize("hasAuthority('" + AnnualReportPermissions.ANNUAL_APPROVE + "')")
     public AnnualReportResponse returnReport(@PathVariable Long id,
                                              @RequestBody(required = false) AnnualReasonRequest request) {
-        workflow.returnReport(id, request == null ? null : request.reason());
+        String reason = request == null ? null : request.reason();
+        notifier.annualReturned(workflow.returnReport(id, reason), reason);
         return detail(id);
     }
 
@@ -142,7 +149,8 @@ public class AnnualReportController {
     @PreAuthorize("hasAuthority('" + AnnualReportPermissions.ANNUAL_APPROVE + "')")
     public AnnualReportResponse reopen(@PathVariable Long id,
                                        @RequestBody(required = false) AnnualReasonRequest request) {
-        workflow.reopen(id, request == null ? null : request.reason());
+        String reason = request == null ? null : request.reason();
+        notifier.annualReopened(workflow.reopen(id, reason), reason);
         return detail(id);
     }
 

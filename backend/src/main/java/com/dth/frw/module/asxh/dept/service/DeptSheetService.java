@@ -132,11 +132,18 @@ public class DeptSheetService {
                             Instant completedAt, String completedBy) {
     }
 
-    /** Đầu số liệu Sở của kỳ + các biểu. */
+    /**
+     * Đầu số liệu Sở của kỳ + các biểu.
+     *
+     * @param createdAt lần lưu ĐẦU của kỳ
+     * @param savedAt   giờ lưu của phiên bản HIỆN HÀNH ({@code null} nếu chưa có dòng lịch sử nào)
+     * @param savedBy   người lưu phiên bản hiện hành
+     */
     public record ReportDetail(Long id, Long periodId, String periodName, String periodKind, LocalDate fromDate,
                                LocalDate toDate, String periodStatus, int reportYear, int ledgerVersion,
                                int yearVersion, int sourceCount, boolean sourceStale, String yearLock,
-                               boolean canEdit, Instant createdAt, String createdBy, List<SheetInfo> sheets) {
+                               boolean canEdit, Instant createdAt, String createdBy, Instant savedAt,
+                               String savedBy, List<SheetInfo> sheets) {
     }
 
     /**
@@ -204,12 +211,14 @@ public class DeptSheetService {
         for (DeptReportSheet sheet : sheetRepository.findByReport(reportId)) {
             sheets.add(sheetInfo(sheet));
         }
+        VersionEntry current = versions(reportId).stream().filter(VersionEntry::current).findFirst().orElse(null);
         return new ReportDetail(report.getId(), period.getId(), period.getName(), period.getKind().name(),
                 period.getFromDate(), period.getToDate(), period.getStatus().name(), report.getReportYear(),
                 report.getLedgerVersion(), versionService.currentVersion(report.getReportYear()),
                 report.getSourceCount(), periodService.isSourceStale(report), yearLock,
                 yearLock == null && CurrentUser.has(SummaryPermissions.SUMMARY_WRITE),
-                report.getCreatedAt(), report.getCreatedBy(), sheets);
+                report.getCreatedAt(), report.getCreatedBy(),
+                current == null ? null : current.occurredAt(), current == null ? null : current.actor(), sheets);
     }
 
     /**

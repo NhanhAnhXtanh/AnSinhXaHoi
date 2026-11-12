@@ -28,6 +28,7 @@ import {
 } from "@/shared/ui/card";
 import { cn } from "@/shared/lib/utils";
 import type { User } from "@/domains/user/types";
+import { roleName } from "@/shared/lib/role-names";
 import { workLabels } from "./labels";
 
 /**
@@ -182,7 +183,7 @@ export const Profile = () => {
   };
 
   const roleNames =
-    me?.roles?.map((role) => role.name) ?? authorities?.roles ?? [];
+    me?.roles?.map((role) => role.name) ?? authorities?.roles?.map(roleName) ?? [];
 
   const unitName = me?.reportUnit?.name ?? identity?.reportUnit?.name ?? null;
 

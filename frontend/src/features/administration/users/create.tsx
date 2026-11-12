@@ -36,6 +36,7 @@ import {
   type UserStatus,
 } from "@/domains/user/types";
 import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
+import { useBackOr } from "@/shared/hooks/use-back-or";
 
 /**
  * Giá trị của form tạo. `familyName` / `givenName` / `confirmPassword` chỉ sống
@@ -98,6 +99,8 @@ function usePresetUnit() {
 export const UserCreate = () => {
   const navigate = useNavigate();
   const presetUnit = usePresetUnit();
+  // Huỷ: về trang trước trong app; mở thẳng / sau F5 thì về danh sách (navigate(-1) đứng yên).
+  const goBack = useBackOr(presetUnit ? `/report-units/edit/${presetUnit.id}` : "/users");
 
   const {
     refineCore: { onFinish },
@@ -421,7 +424,7 @@ export const UserCreate = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate(-1)}
+                onClick={goBack}
               >
                 Huỷ
               </Button>

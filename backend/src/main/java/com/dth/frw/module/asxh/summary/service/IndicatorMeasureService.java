@@ -5,6 +5,7 @@ import com.dth.frw.domain.asxh.dept.MeasureKind;
 import com.dth.frw.module.asxh.ledger.query.EffectiveLedgerQuery;
 import com.dth.frw.module.asxh.ledger.query.IndicatorUsage;
 import com.dth.frw.module.asxh.summary.repo.IndicatorMeasureRepository;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,7 +15,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.data.domain.Pageable;
@@ -43,7 +43,6 @@ public class IndicatorMeasureService {
     public static final int MAX_CODES_PER_UPDATE = 1_000;
 
     private static final int NOTE_MAX_LENGTH = 1_000;
-    private static final Locale VI = Locale.forLanguageTag("vi");
 
     private final IndicatorMeasureRepository repository;
     private final EffectiveLedgerQuery ledgerQuery;
@@ -90,7 +89,8 @@ public class IndicatorMeasureService {
     public Page list(ListParams params) {
         List<IndicatorItem> all = catalog();
 
-        String q = params.search().map(term -> term.toLowerCase(VI)).orElse(null);
+        // Bỏ dấu cả hai phía: gõ "mo coi" vẫn ra "mồ côi".
+        String q = params.search().map(TextFold::foldText).orElse(null);
         String sheet = null;
         String kind = null;
         for (ListParams.Criterion criterion : params.filters()) {
@@ -227,8 +227,8 @@ public class IndicatorMeasureService {
     }
 
     private static boolean matches(IndicatorItem item, String q) {
-        return item.indicatorCode().toLowerCase(VI).contains(q)
-                || (item.indicatorName() != null && item.indicatorName().toLowerCase(VI).contains(q));
+        return TextFold.foldText(item.indicatorCode()).contains(q)
+                || (item.indicatorName() != null && TextFold.foldText(item.indicatorName()).contains(q));
     }
 
     private static boolean kindMatches(IndicatorItem item, String kind) {

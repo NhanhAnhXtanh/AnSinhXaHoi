@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
+import { getAuthorities } from "@/shared/api/session";
 import { useConfirmDiscard } from "@/shared/components/form/unsaved-changes-guard";
 import { cn } from "@/shared/lib/utils";
 
@@ -28,6 +29,7 @@ import { cn } from "@/shared/lib/utils";
 const STORAGE_KEY = "asxh.reportYear";
 const DEFAULT_YEARS = [2024, 2025, 2026, 2027];
 const CALENDAR_RESOURCE = "report_calendars";
+const CALENDAR_READ = "report_calendars:read";
 
 type ReportYearValue = {
   year: number;
@@ -68,11 +70,15 @@ function withYear(years: number[], year: number): number[] {
 /** Năm đã có lịch báo cáo; `null` khi chưa đọc được (dùng danh sách mặc định). */
 function useCalendarYears(): number[] | null {
   const { data: auth } = useIsAuthenticated();
+  // Vai trò không xem được lịch (lãnh đạo UBND…) thì không gọi: trước đây mọi màn của họ đều
+  // có một lời gọi bị từ chối 403; danh sách năm mặc định là đủ cho các màn họ dùng.
+  const permissions = getAuthorities()?.permissions;
+  const canReadCalendars = !permissions || permissions.includes(CALENDAR_READ);
   const { result, query } = useList<{ year: number }>({
     resource: CALENDAR_RESOURCE,
     pagination: { currentPage: 1, pageSize: 100 },
     errorNotification: false,
-    queryOptions: { enabled: auth?.authenticated === true, retry: false },
+    queryOptions: { enabled: auth?.authenticated === true && canReadCalendars, retry: false },
   });
   return useMemo(
     () => (query.isSuccess ? (result.data ?? []).map((c) => c.year) : null),

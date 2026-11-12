@@ -155,6 +155,31 @@ public class SummaryQueries {
         return query.getResultList().stream().findFirst();
     }
 
+    /**
+     * Phiên bản mẫu đã ghim trong các phiếu ĐÃ CÓ SỐ (đã duyệt, hoặc khoá sau khi duyệt) của các kỳ, mỗi bộ
+     * (kỳ, biểu, phiên bản) một dòng: {@code [periodId, tên ngắn của biểu, số phiên bản]}. Dùng để báo khi một
+     * biểu nhập đã đổi phiên bản giữa các kỳ trong năm.
+     */
+    public List<Object[]> approvedPinnedVersions(Collection<Long> periodIds) {
+        if (periodIds.isEmpty()) {
+            return List.of();
+        }
+        return entityManager.createQuery(
+                "select distinct r.period.id, t.shortName, v.versionNo"
+                        + " from InputReportSheet s join s.report r join r.publication pub"
+                        + " join s.templateVersion v join s.template t"
+                        + " where r.period.id in :periodIds and pub.status = :published"
+                        + " and r.status not in :notCurrent"
+                        + " and (r.status = :approvedStatus or (r.status = :lockedStatus and r.approvedAt is not null))",
+                Object[].class)
+                .setParameter("periodIds", periodIds)
+                .setParameter("published", PublicationStatus.PUBLISHED)
+                .setParameter("notCurrent", NOT_CURRENT)
+                .setParameter("approvedStatus", ReportStatus.APPROVED)
+                .setParameter("lockedStatus", ReportStatus.LOCKED)
+                .getResultList();
+    }
+
     /** Số đơn vị được thiết lập (giao biểu) của từng kỳ. */
     public Map<Long, Long> assignedUnitCounts(Collection<Long> periodIds) {
         Map<Long, Long> result = new HashMap<>();

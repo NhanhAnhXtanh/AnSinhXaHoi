@@ -32,6 +32,7 @@ public record TemplateResponse(
         Instant lockedAt,
         String lockedBy,
         Instant createdAt,
+        String createdBy,
         Instant updatedAt) {
 
     /** Khai báo riêng, không dùng lại {@code TemplateSetResponse}, theo luật của base. */
@@ -62,6 +63,7 @@ public record TemplateResponse(
                 template.getLockedAt(),
                 template.getLockedBy(),
                 template.getCreatedAt(),
+                template.getCreatedBy(),
                 template.getUpdatedAt());
     }
 }

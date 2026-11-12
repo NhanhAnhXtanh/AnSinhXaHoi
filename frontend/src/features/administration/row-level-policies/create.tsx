@@ -1,5 +1,4 @@
 import { useForm } from "@refinedev/react-hook-form";
-import { useNavigate } from "react-router";
 
 import { CreateView } from "@/shared/components/views/create-view";
 import { Button } from "@/shared/ui/button";
@@ -13,9 +12,11 @@ import { useManagedResources } from "./use-managed-resources";
 import { AdminPageHeader } from "../record-actions";
 import { errorDescription } from "../labels";
 import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
+import { useBackOr } from "@/shared/hooks/use-back-or";
 
 export const RowLevelPolicyCreate = () => {
-  const navigate = useNavigate();
+  // Huỷ: về trang trước trong app; mở thẳng / sau F5 thì về danh sách (navigate(-1) đứng yên).
+  const goBack = useBackOr("/row-level-policies");
   const resources = useManagedResources();
 
   const {
@@ -56,7 +57,7 @@ export const RowLevelPolicyCreate = () => {
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Đang tạo..." : "Tạo phạm vi"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+            <Button type="button" variant="outline" onClick={goBack}>
               Huỷ
             </Button>
           </FormSectionActions>

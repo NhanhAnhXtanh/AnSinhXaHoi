@@ -100,6 +100,19 @@ class LoginLockoutTest {
     }
 
     @Test
+    @DisplayName("Tài khoản bị quản trị khoá: đúng mật khẩu thì báo đã khoá, sai mật khẩu vẫn báo chung")
+    void inactiveAccountSaysLockedOnlyWithRightPassword() {
+        jdbc.update("update users set status = 'INACTIVE' where id = ?", userId);
+
+        BadCredentialsException locked = assertThrows(BadCredentialsException.class,
+                () -> auth.login(new LoginRequest(username, PASSWORD)));
+        assertTrue(locked.getMessage().startsWith("Tài khoản của bạn đã bị khoá."));
+
+        assertEquals("Tên đăng nhập hoặc mật khẩu không đúng.", wrong().getMessage(),
+                "sai mật khẩu thì không lộ tài khoản có bị khoá hay không");
+    }
+
+    @Test
     @DisplayName("Hết khoá: đăng nhập đúng được và đếm lại từ đầu")
     void expiredLockAllowsLoginAndResets() {
         for (int i = 0; i < 5; i++) wrong();

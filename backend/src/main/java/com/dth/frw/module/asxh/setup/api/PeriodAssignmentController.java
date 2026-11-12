@@ -1,6 +1,7 @@
 package com.dth.frw.module.asxh.setup.api;
 
 import com.dth.frw.domain.asxh.report.PeriodAssignment;
+import com.dth.frw.module.asxh.notification.service.AsxhNotifier;
 import com.dth.frw.module.asxh.setup.api.dto.CopySetupRequest;
 import com.dth.frw.module.asxh.setup.api.dto.CopySetupResponse;
 import com.dth.frw.module.asxh.setup.api.dto.MatrixChangeRequest;
@@ -40,9 +41,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class PeriodAssignmentController {
 
     private final PeriodAssignmentService service;
+    // Báo cho tài khoản các đơn vị SAU khi đợt bổ sung đã phát xong (không nằm trong giao dịch của service).
+    private final AsxhNotifier notifier;
 
-    public PeriodAssignmentController(PeriodAssignmentService service) {
+    public PeriodAssignmentController(PeriodAssignmentService service, AsxhNotifier notifier) {
         this.service = service;
+        this.notifier = notifier;
     }
 
     @GetMapping
@@ -72,6 +76,10 @@ public class PeriodAssignmentController {
     public MatrixChangeResponse saveMatrix(@Valid @RequestBody MatrixChangeRequest request) {
         PeriodAssignmentService.MatrixResult result = service.applyMatrix(
                 request.periodId(), cells(request.add()), cells(request.remove()));
+        // Kỳ đang mở thì lưu ma trận phát luôn một đợt bổ sung: báo cho các đơn vị được thêm biểu.
+        if (result.publication() != null) {
+            notifier.publicationOpened(result.publication());
+        }
         return new MatrixChangeResponse(
                 result.period().getId(),
                 result.period().getStatus(),

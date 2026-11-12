@@ -68,6 +68,7 @@ const FIELD_PART_LABELS: Record<string, string> = {
   period: "Kỳ báo cáo",
   template: "Biểu mẫu",
   report: "Phiếu nhập",
+  publication: "Đợt báo cáo",
 };
 
 export function fieldLabel(path: string): string {
@@ -84,7 +85,10 @@ export function fieldLabel(path: string): string {
 
 const CONTEXT_LABELS: Record<string, string> = {
   "user.id": "tài khoản đang đăng nhập",
-  "user.organizationId": "đơn vị của tài khoản đang đăng nhập",
+  // Tài khoản đơn vị báo cáo (ASXH) lưu đơn vị ở `reportUnitId`; `organizationId` là cột của khung
+  // gốc và để trống với các tài khoản đó — đặt phạm vi phiếu theo `organizationId` sẽ không khớp dòng nào.
+  "user.reportUnitId": "đơn vị báo cáo của tài khoản đang đăng nhập",
+  "user.organizationId": "tổ chức (khung gốc) của tài khoản đang đăng nhập",
   "user.departmentId": "phòng ban của tài khoản đang đăng nhập",
   "user.roleCodes": "vai trò của tài khoản đang đăng nhập",
   today: "ngày hôm nay",
@@ -130,4 +134,48 @@ export function readConditionVi(node: ScopeNode | undefined | null): string {
     return `${field} ${op} ${literal}`;
   }
   return `${field} ${op}`;
+}
+
+const COMPILED_LEAF =
+  /\b([A-Za-z]\w*(?:\.\w+)+)\s+(eq|ne|in|notIn|lt|lte|gt|gte|between|like|notLike|isNull|isNotNull)\b(?:\s+([^\s()]+))?/g;
+
+/**
+ * Điều kiện máy chủ đã biên dịch (`((unit.id eq user.organizationId)) AND …`) thành chữ cho cán bộ:
+ * tên trường, phép so sánh và giá trị lấy từ tài khoản đọc bằng nhãn tiếng Việt; AND / OR / NOT
+ * thành và / hoặc / không. Phần máy chủ đã viết sẵn bằng tiếng Việt giữ nguyên.
+ */
+export function readCompiledVi(text: string | null | undefined): string {
+  if (!text) return "—";
+  return text
+    .replace(COMPILED_LEAF, (_match, field: string, op: string, value?: string) => {
+      const label = fieldLabel(field);
+      const shown = value === undefined ? "" : ` ${CONTEXT_LABELS[value] ?? value}`;
+      return `${label} ${operatorLabelVi(op)}${shown}`;
+    })
+    .replace(/\bAND\b/g, "và")
+    .replace(/\bOR\b/g, "hoặc")
+    .replace(/\bNOT\b/g, "không phải")
+    .replace(/\beverything\b/g, "mọi dòng")
+    .replace(/\bnothing\b/g, "không dòng nào");
+}
+
+/**
+ * Câu "vì sao" máy chủ trả cho kết quả kiểm tra một dòng (tiếng Anh) thành câu cho cán bộ đọc. Câu lạ thì
+ * giữ nguyên chữ nhận được, không để trống.
+ */
+export function becauseVi(text: string | null | undefined): string {
+  if (!text) return "";
+  if (text === "no scope grants this account access to this row") {
+    return "Không phạm vi nào cho phép tài khoản này thấy dòng này.";
+  }
+  if (text === "the policies could not be evaluated against this row") {
+    return "Chưa đánh giá được các phạm vi với dòng này.";
+  }
+  const empty = /^(.+) is null, so the condition is UNKNOWN/.exec(text);
+  if (empty) {
+    return `${fieldLabel(empty[1])} đang để trống nên điều kiện không xác định — và không xác định thì dòng bị từ chối.`;
+  }
+  const unmet = /^(.+) does not satisfy the condition$/.exec(text);
+  if (unmet) return `${fieldLabel(unmet[1])} không thỏa điều kiện của phạm vi.`;
+  return text;
 }

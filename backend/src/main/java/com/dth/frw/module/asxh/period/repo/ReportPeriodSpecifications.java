@@ -3,6 +3,7 @@ package com.dth.frw.module.asxh.period.repo;
 import com.dth.frw.domain.asxh.period.PeriodKind;
 import com.dth.frw.domain.asxh.period.PeriodStatus;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -48,10 +49,10 @@ public final class ReportPeriodSpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("code")), pattern),
-                    cb.like(cb.lower(root.get("name")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("code")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("name")), pattern));
         }));
 
         List<Long> ids = params.ids();

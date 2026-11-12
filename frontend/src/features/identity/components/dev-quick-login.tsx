@@ -11,6 +11,7 @@ import {
   CommandList,
 } from "@/shared/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import { includesFolded } from "@/shared/lib/fold-vi";
 
 /**
  * TẠM, CHỈ KHI PHÁT TRIỂN: ô chọn có tìm kiếm, chọn một tài khoản là đăng nhập
@@ -26,9 +27,9 @@ const DEV_ACCOUNTS = [
   { username: "so.duyet", password: "User@123", name: "Nguyễn Thị Thu", role: "Sở · Duyệt phiếu" },
   { username: "so.tonghop", password: "User@123", name: "Đặng Thanh Hà", role: "Sở · Tổng hợp, nộp năm" },
   { username: "ubnd.duyet", password: "User@123", name: "Lê Quốc Bảo", role: "UBND · Duyệt báo cáo năm" },
-  { username: "viewer", password: "User@123", name: "Viewer", role: "Nhiều vai Sở + UBND" },
-  { username: "admin", password: "Admin@123", name: "System Administrator", role: "Quản trị hệ thống" },
-  { username: "manager", password: "Manager@123", name: "Content Manager", role: "Manager" },
+  { username: "viewer", password: "User@123", name: "Người xem", role: "Nhiều vai Sở + UBND" },
+  { username: "admin", password: "Admin@123", name: "Quản trị hệ thống", role: "Quản trị hệ thống" },
+  { username: "manager", password: "Manager@123", name: "Quản lý nội dung", role: "Quản lý nội dung" },
 ] as const;
 
 export function DevQuickLogin({
@@ -63,7 +64,12 @@ export function DevQuickLogin({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-(--radix-popover-trigger-width) p-0">
-          <Command>
+          {/* Tìm không phân biệt dấu: gõ "tong hop" vẫn ra "Tổng hợp". */}
+          <Command
+            filter={(value, search, keywords) =>
+              includesFolded(`${value} ${(keywords ?? []).join(" ")}`, search) ? 1 : 0
+            }
+          >
             <CommandInput placeholder="Tìm theo vai, tên hoặc tên đăng nhập..." />
             <CommandList>
               <CommandEmpty>Không có tài khoản nào khớp.</CommandEmpty>

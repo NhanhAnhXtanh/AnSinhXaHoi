@@ -4,7 +4,6 @@ import type { PropsWithChildren } from "react";
 
 import { ArrowLeftIcon } from "lucide-react";
 import {
-  useBack,
   useNavigation,
   useResourceParams,
   useUserFriendlyName,
@@ -15,6 +14,7 @@ import { RefreshButton } from "@/shared/components/buttons/refresh";
 import { cn } from "@/shared/lib/utils";
 import { DeleteButton } from "@/shared/components/buttons/delete";
 import { EditButton } from "@/shared/components/buttons/edit";
+import { useBackToList } from "@/shared/hooks/use-back-or";
 
 type ShowViewProps = PropsWithChildren<{
   className?: string;
@@ -51,7 +51,8 @@ export const ShowViewHeader = ({
   wrapperClassName,
   headerClassName,
 }: ShowViewHeaderProps) => {
-  const back = useBack();
+  // Quay lại: trang trước trong app, mở thẳng / sau F5 thì về danh sách (useBack = navigate(-1)).
+  const back = useBackToList();
   const { list } = useNavigation();
 
   const getUserFriendlyName = useUserFriendlyName();

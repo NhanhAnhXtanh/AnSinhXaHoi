@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useForm } from "@refinedev/react-hook-form";
-import { useNavigate } from "react-router";
 
 import { EditView } from "@/shared/components/views/edit-view";
 import { Button } from "@/shared/ui/button";
@@ -36,6 +35,9 @@ import { AdminPageHeader } from "../record-actions";
 import { errorDescription, formatDateTimeVi } from "../labels";
 import type { User } from "@/domains/user/types";
 import { useWarnWhenChanged } from "@/shared/components/form/use-warn-when-changed";
+import { useBackOr } from "@/shared/hooks/use-back-or";
+import { UsernameAvailabilityHint } from "./username-availability";
+import { USERNAME_TAKEN_MESSAGE, useUsernameAvailability } from "./use-username-availability";
 
 /**
  * Rút đơn vị báo cáo về dạng `{ id }` API đọc, giữ nguyên ba trạng thái API phân biệt.
@@ -59,7 +61,8 @@ function toRef(value: unknown): { id: number | null } | null {
  * khác và đăng xuất cán bộ khỏi mọi máy, nên nó không phải một ô của form.
  */
 export const UserEdit = () => {
-  const navigate = useNavigate();
+  // Huỷ: về trang trước trong app; mở thẳng / sau F5 thì về danh sách (navigate(-1) đứng yên).
+  const goBack = useBackOr("/users");
 
   const {
     refineCore: { onFinish, query },
@@ -83,6 +86,9 @@ export const UserEdit = () => {
 
   const user = query?.data?.data as User | undefined;
   const userId = user?.id;
+  // Đổi tên đăng nhập sang tên đã có người dùng: báo ngay dưới ô như form Thêm (tên cũ của chính
+  // tài khoản này không tính).
+  const usernameState = useUsernameAvailability(form.watch("username"), user?.username);
 
   /**
    * Đổ bản ghi vào form một lần.
@@ -99,6 +105,10 @@ export const UserEdit = () => {
   }, [user, reset]);
 
   function onSubmit(values: Record<string, unknown>) {
+    if (usernameState === "taken") {
+      form.setError("username", { type: "server", message: USERNAME_TAKEN_MESSAGE });
+      return;
+    }
     // `roles` về từ API là đối tượng đầy đủ, gửi lại dạng `{ id }`.
     const roles = Array.isArray(values.roles)
       ? (values.roles as { id: number }[]).map((role) => ({ id: role.id }))
@@ -197,9 +207,13 @@ export const UserEdit = () => {
                     <FormControl>
                       <Input {...field} value={field.value ?? ""} />
                     </FormControl>
-                    <FormDescription>
-                      Dùng để đăng nhập. Không được trùng với tài khoản khác.
-                    </FormDescription>
+                    {usernameState === "idle" ? (
+                      <FormDescription>
+                        Dùng để đăng nhập. Không được trùng với tài khoản khác.
+                      </FormDescription>
+                    ) : (
+                      <UsernameAvailabilityHint state={usernameState} />
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -298,7 +312,7 @@ export const UserEdit = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate(-1)}
+                onClick={goBack}
               >
                 Huỷ
               </Button>

@@ -1,11 +1,13 @@
 package com.dth.frw.module.asxh.inputreport.repo;
 
+import com.dth.frw.domain.asxh.period.PeriodStatus;
 import com.dth.frw.domain.asxh.period.ReportPeriod;
 import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.shared.data.SecuredRepository;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +38,16 @@ public interface InputReportRepository extends SecuredRepository<InputReport, Lo
             + "order by r.createdAt asc, r.id asc")
     List<InputReport> findByPeriodAndStatuses(@Param("periodId") Long periodId,
                                               @Param("statuses") Collection<ReportStatus> statuses);
+
+    /**
+     * Phiếu còn phải nhập (nháp / bị trả lại) của các kỳ ĐANG MỞ có hạn nộp rơi vào một trong các
+     * ngày cho trước — cho việc nhắc hạn hằng ngày.
+     */
+    @Query("select r from InputReport r where r.status in :statuses and r.period.status = :periodStatus "
+            + "and r.period.deadline in :dates order by r.period.id asc, r.unit.id asc, r.id asc")
+    List<InputReport> findEditableDueOn(@Param("statuses") Collection<ReportStatus> statuses,
+                                        @Param("periodStatus") PeriodStatus periodStatus,
+                                        @Param("dates") Collection<LocalDate> dates);
 
     /** Tên đơn vị có phiếu ở trạng thái cho trước trong kỳ — cho câu báo "còn N đơn vị chờ duyệt". */
     @Query("select distinct u.name from InputReport r join r.unit u where r.period.id = :periodId "

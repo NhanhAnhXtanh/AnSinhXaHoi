@@ -80,6 +80,10 @@ public class Template {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /** Tên đăng nhập người tạo; {@code null} với bản ghi có từ trước khi có cột này. */
+    @Column(name = "created_by", length = 255)
+    private String createdBy;
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 
@@ -190,6 +194,14 @@ public class Template {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
     }
 
     public Instant getUpdatedAt() {

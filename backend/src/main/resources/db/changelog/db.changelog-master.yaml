@@ -115,3 +115,13 @@ databaseChangeLog:
       file: db/changelog/changes/182-tonghop-01-tien-dien-1o.sql
   - include:
       file: db/changelog/changes/183-1o-muc-tien-dien-theo-nam.sql
+  - include:
+      file: db/changelog/changes/184-viet-hoa-vai-tro-he-thong.sql
+  - include:
+      file: db/changelog/changes/185-ghi-nguoi-tao-bo-mau.sql
+  - include:
+      file: db/changelog/changes/186-nam-ky-trong-tieu-de-bieu-nhap.sql
+  - include:
+      file: db/changelog/changes/187-tong-cong-co-dau-tonghop.sql
+  - include:
+      file: db/changelog/changes/188-nam-ky-tieu-de-man-tong-hop.sql

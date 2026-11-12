@@ -89,7 +89,10 @@ export function NotificationBell() {
             Chưa có thông báo nào.
           </p>
         ) : (
-          <ScrollArea className="max-h-96">
+          // Giới hạn chiều cao ở VÙNG CUỘN (viewport) chứ không ở khung ngoài: viewport của Radix cao
+          // 100% nên max-h ở khung ngoài không chặn được — danh sách dài tràn đè lên link "Xem tất cả
+          // thông báo" ở chân khung và bấm vào link lại mở thông báo nằm đè.
+          <ScrollArea className="overflow-hidden [&>[data-slot=scroll-area-viewport]]:max-h-96">
             <ul className="flex flex-col">
               {notifications.map((notification) => (
                 <NotificationRow

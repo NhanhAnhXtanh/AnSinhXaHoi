@@ -1,6 +1,7 @@
 package com.dth.frw.module.asxh.ledger.repo;
 
 import com.dth.frw.domain.asxh.ledger.LedgerEntry;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import jakarta.persistence.criteria.Path;
 import java.util.ArrayList;
@@ -42,10 +43,10 @@ public final class LedgerEntrySpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("indicatorCode")), pattern),
-                    cb.like(cb.lower(root.get("indicatorName")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("indicatorCode")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("indicatorName")), pattern));
         }));
 
         List<Long> ids = params.ids();

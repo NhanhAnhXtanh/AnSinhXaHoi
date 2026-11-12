@@ -189,6 +189,7 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
       const sheetCode = resolveSheetCode(scriptContext);
       const report = resolveReport(scriptContext?.report);
       const scriptMessages: string[] = [];
+      const apiErrors: string[] = [];
 
       // Script dựng SAU khi workbook ở trạng thái cuối — onLoad thấy đúng thứ người dùng sắp thấy.
       let engine: ScriptHookEngine | undefined;
@@ -199,6 +200,10 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
           report,
           shared,
           onMessage: (message) => scriptMessages.push(message),
+          onApiError: (failure) => {
+            apiErrors.push(failure.message ?? `HTTP ${failure.status}`);
+            console.warn("Script của mẫu gọi máy chủ không thành công:", failure);
+          },
         });
         engine = new ScriptHookEngine(handle);
         engine.load(parseScriptText(text), sheetCode);
@@ -232,6 +237,8 @@ export default function SpreadWorkbookImpl(props: SpreadWorkbookProps) {
         latestRef.current.onScriptResult?.({
           ok: !issues.some((issue) => issue.severity === "ERROR") && !engine.didTimeOut,
           messages,
+          apiErrors,
+          timedOut: engine.didTimeOut,
         });
         // Biểu chưa chạy xong phần tự động thì không cho dùng (ô khoá / số tự điền có thể thiếu).
         // Bảng ngầm (kiểm tra trước khi nộp) vẫn đi tiếp: bước kiểm tra tự báo lỗi của nó.

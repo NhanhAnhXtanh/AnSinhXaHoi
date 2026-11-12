@@ -5,6 +5,7 @@ import com.dth.frw.domain.asxh.report.InputReport;
 import com.dth.frw.domain.asxh.report.InputReportSheet;
 import com.dth.frw.domain.asxh.report.ReportStatus;
 import com.dth.frw.domain.asxh.unit.ReportBlock;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -68,11 +69,11 @@ public final class InputReportSpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("unit").get("name")), pattern),
-                    cb.like(cb.lower(root.get("unit").get("budgetCode")), pattern),
-                    cb.like(cb.lower(root.get("period").get("name")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("unit").get("name")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("unit").get("budgetCode")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("period").get("name")), pattern));
         }));
 
         List<Long> ids = params.ids();

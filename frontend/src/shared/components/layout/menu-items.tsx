@@ -2,6 +2,7 @@ import { usePermissions, type TreeMenuItem } from "@refinedev/core";
 import { ListIcon } from "lucide-react";
 import React from "react";
 
+import { getAuthorities } from "@/shared/api/session";
 import { permissionFor } from "@/shared/lib/permissions";
 
 /*
@@ -9,6 +10,9 @@ import { permissionFor } from "@/shared/lib/permissions";
  * (`command-palette.tsx`). Để riêng một file vì một file chỉ nên xuất component
  * thì fast refresh mới chạy.
  */
+
+/** Một mảng cố định — mảng mới mỗi lần vẽ sẽ làm useMemo bên dưới tính lại liên tục. */
+const EMPTY_PERMISSIONS: string[] = [];
 
 export function getDisplayName(item: TreeMenuItem): string {
   return item.meta?.label ?? item.label ?? item.name;
@@ -41,7 +45,19 @@ export function getIcon(item: TreeMenuItem) {
  * màn menu đang hiện — không hơn, không kém.
  */
 export function useAccessibleMenuItems(items: TreeMenuItem[]): TreeMenuItem[] {
-  const { data: permissions } = usePermissions<string[]>({});
+  const { data: loaded, isPending } = usePermissions<string[]>({});
+  // Quyền của phiên hiện tại đọc thẳng từ bộ nhớ phiên (đăng nhập ghi xong rồi mới vào app),
+  // nên đúng tài khoản đang đăng nhập ngay từ lần vẽ đầu. Truy vấn usePermissions lúc mới tải
+  // thì trống, đổi tài khoản thì có thể còn quyền của tài khoản trước — trước đây tài khoản ít
+  // quyền thấy đủ 13 mục của quản trị trong chốc lát rồi mới bị cắt, bấm nhanh vào được trang
+  // 403. Chưa có bộ nhớ phiên: đang tải thì coi như chưa có quyền nào (chỉ còn Trang chủ); tải
+  // xong mà không có dữ liệu (app không bật phân quyền) thì giữ nguyên cây như cũ.
+  const sessionKey = (getAuthorities()?.permissions ?? null)?.join("|") ?? null;
+  const fallback = isPending ? EMPTY_PERMISSIONS : loaded;
+  const permissions = React.useMemo(
+    () => (sessionKey === null ? fallback : sessionKey === "" ? EMPTY_PERMISSIONS : sessionKey.split("|")),
+    [sessionKey, fallback]
+  );
 
   return React.useMemo(() => {
     if (!permissions) return items;

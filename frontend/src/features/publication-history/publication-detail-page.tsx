@@ -66,6 +66,7 @@ import {
   type ApiPublication,
   type RowStatus,
 } from "./model";
+import { includesFolded } from "@/shared/lib/fold-vi";
 
 const LIST_PATH = "/publication-history";
 const PAGE_SIZES = [20, 50, 100] as const;
@@ -164,7 +165,7 @@ function DetailScreen({ publication: p }: { publication: ApiPublication }) {
   // Gõ tìm: chờ người dùng dừng tay rồi mới lọc (bảng có thể tới cả nghìn dòng).
   useEffect(() => {
     const t = window.setTimeout(() => {
-      setSearch(searchText.trim().toLocaleLowerCase("vi"));
+      setSearch(searchText.trim());
       setPage(0);
     }, 250);
     return () => window.clearTimeout(t);
@@ -188,7 +189,7 @@ function DetailScreen({ publication: p }: { publication: ApiPublication }) {
         (i) =>
           (block === "all" || i.unit.block === block) &&
           (templateId === "all" || String(i.template.id) === templateId) &&
-          (search === "" || (i.unit.name ?? "").toLocaleLowerCase("vi").includes(search))
+          includesFolded(i.unit.name, search)
       ),
     [items, block, templateId, search]
   );

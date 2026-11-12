@@ -20,6 +20,7 @@ import { resources } from "./resources";
 import { AppRoutes } from "./router/routes";
 import { Landmark } from "lucide-react";
 import { ReportYearProvider } from "@/shared/components/asxh";
+import { isDeletedRecordNotification } from "@/shared/lib/deleted-records";
 // The `@font-face` behind `"Inter Variable"` in `--font-sans`. Without it the
 // name resolves only where Inter happens to be installed.
 import "@fontsource-variable/inter";
@@ -39,6 +40,8 @@ function useAppNotificationProvider(): NotificationProvider {
     ...base,
     open: (params) => {
       if (params.key === "login-error") return;
+      // Lỗi tải lại bản ghi vừa xoá (màn Sửa còn đang theo dõi nó): bỏ, đã có "Đã xoá".
+      if (params.type === "error" && isDeletedRecordNotification(params.key)) return;
       base.open?.(params);
     },
   };
@@ -55,11 +58,19 @@ function useAppNotificationProvider(): NotificationProvider {
  *
  * Để ở cấp module: Refine dựng QueryClient một lần theo object này.
  */
+const APP_NAME = "Quyết toán ASXH";
+
 const NO_RETRY_STATUSES = new Set([400, 401, 403, 404, 409, 410, 422]);
 const reactQueryClientConfig = {
   defaultOptions: {
     queries: {
+      // Mặc định ("online") react-query TẠM DỪNG truy vấn khi trình duyệt báo mất mạng: màn hình
+      // hiện khung chờ mãi, không bao giờ tới trạng thái lỗi "Máy tính đang mất kết nối mạng".
+      // "always" cho truy vấn chạy và hỏng ngay; có mạng lại thì tự tải lại (refetchOnReconnect).
+      networkMode: "always" as const,
       retry: (failureCount: number, error: unknown) => {
+        // Mất mạng: thử lại chỉ kéo dài khung chờ — báo ngay để người dùng kiểm tra mạng.
+        if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
         const status =
           error && typeof error === "object" && "statusCode" in error
             ? Number((error as { statusCode?: unknown }).statusCode)
@@ -98,7 +109,7 @@ function App() {
               // Drives the sidebar brand block and the document title.
               title: {
                 icon: <Landmark />,
-                text: "Quyết toán ASXH",
+                text: APP_NAME,
               },
             }}
           >
@@ -111,7 +122,16 @@ function App() {
             <Toaster />
             {/* Ô tìm kiếm Ctrl K nằm ở `layout/header.tsx` (`CommandPalette`). */}
             <AuthoritiesSync />
-            <DocumentTitleHandler />
+            <DocumentTitleHandler
+              // Mặc định của Refine ghi "… | Refine" (và tên tiếng Anh của resource). Tiêu đề thẻ:
+              // "{tên màn} | Quyết toán ASXH", tên màn lấy từ nhãn tiếng Việt của resource.
+              handler={({ resource, action }) => {
+                const label = resource?.meta?.label;
+                if (typeof label !== "string" || label === "") return APP_NAME;
+                const prefix = action === "create" ? "Thêm " : action === "edit" ? "Sửa " : "";
+                return `${prefix}${prefix ? label.toLowerCase() : label} | ${APP_NAME}`;
+              }}
+            />
           </Refine>
           <DevtoolsPanel />
         </DevtoolsProvider>

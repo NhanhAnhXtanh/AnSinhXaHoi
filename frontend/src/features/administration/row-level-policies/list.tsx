@@ -256,6 +256,7 @@ export const RowLevelPolicyList = () => {
       />
       <DataTable
         table={table}
+        itemLabel="phạm vi dữ liệu"
         toolbar={
           <>
             <ListToolbar

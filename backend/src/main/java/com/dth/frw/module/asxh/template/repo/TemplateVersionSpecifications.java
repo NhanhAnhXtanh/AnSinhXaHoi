@@ -3,6 +3,7 @@ package com.dth.frw.module.asxh.template.repo;
 import com.dth.frw.domain.asxh.template.TemplateKind;
 import com.dth.frw.domain.asxh.template.TemplateStatus;
 import com.dth.frw.domain.asxh.template.TemplateVersion;
+import com.dth.frw.shared.data.TextFold;
 import com.dth.frw.shared.web.ListParams;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,10 +46,10 @@ public final class TemplateVersionSpecifications {
         }
 
         params.search().ifPresent(term -> specs.add((root, query, cb) -> {
-            String pattern = ListParams.likePattern(term);
+            String pattern = TextFold.likePattern(term);
             return cb.or(
-                    cb.like(cb.lower(root.get("template").get("shortName")), pattern),
-                    cb.like(cb.lower(root.get("template").get("name")), pattern));
+                    cb.like(TextFold.fold(cb, root.get("template").get("shortName")), pattern),
+                    cb.like(TextFold.fold(cb, root.get("template").get("name")), pattern));
         }));
 
         List<Long> ids = params.ids();

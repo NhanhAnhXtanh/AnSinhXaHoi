@@ -27,6 +27,7 @@ import { Textarea } from "@/shared/ui/textarea";
 import { FormSection } from "@/shared/components/form/form-section";
 import { ScopeBuilder } from "./scope-builder";
 import { KIND_LABELS, KIND_OPTION_LABELS } from "./labels";
+import { scopeCompleteMessage } from "./policy-values";
 import { actionLabel, resourceLabel } from "../labels";
 import {
   ACTIONS,
@@ -472,6 +473,7 @@ export function PolicyForm({
           <FormField
             control={form.control}
             name="scope"
+            rules={{ validate: scopeCompleteMessage }}
             render={({ field }) => (
               <FormItem>
                 <FormControl>
@@ -505,6 +507,7 @@ export function PolicyForm({
           <FormField
             control={form.control}
             name="checkScope"
+            rules={{ validate: scopeCompleteMessage }}
             render={({ field }) => (
               <FormItem className="space-y-4 md:col-span-12">
                 <div className="flex items-start gap-3">

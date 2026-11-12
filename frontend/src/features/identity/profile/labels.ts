@@ -26,6 +26,18 @@ const RESOURCE_LABELS: Record<string, string> = {
   tasks: "Công việc",
   blog_posts: "Bài viết",
   categories: "Danh mục",
+  // Mã tài nguyên của quyền ở máy chủ (khác tên màn ở trên).
+  annual_reports: "Báo cáo năm",
+  indicator_measures: "Bản chất chỉ tiêu",
+  ledger_entries: "Số liệu đã duyệt",
+  input_report_sheets: "Biểu trong phiếu nhập",
+  input_report_attachments: "File đính kèm phiếu nhập",
+  period_assignments: "Thiết lập biểu cho đơn vị",
+  publications: "Đợt báo cáo đã mở",
+  report_calendars: "Lịch báo cáo",
+  report_periods: "Kỳ báo cáo",
+  template_sets: "Bộ mẫu",
+  template_versions: "Phiên bản mẫu",
 };
 
 function fallbackLabel(resource: string): string {

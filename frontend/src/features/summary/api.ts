@@ -4,6 +4,7 @@ import { API_URL } from "@/shared/api/constants";
 import { customResult } from "@/shared/hooks/use-custom-result";
 import type { StatusTone } from "@/shared/components/asxh";
 import type { PeriodKind } from "@/shared/components/asxh";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 /**
  * Hình dạng dữ liệu của `/api/summary/*`, `/api/dept_reports/*`, `/api/dept_years/*` (xem
@@ -165,8 +166,12 @@ export type DeptReportDetail = {
   sourceStale: boolean;
   yearLock: string | null;
   canEdit: boolean;
+  /** Lần lưu ĐẦU của kỳ. */
   createdAt: string;
   createdBy: string | null;
+  /** Giờ và người lưu phiên bản HIỆN HÀNH (null khi chưa có lịch sử). */
+  savedAt?: string | null;
+  savedBy?: string | null;
   sheets: DeptSheetInfo[];
 };
 
@@ -316,6 +321,8 @@ export type YearOverview = {
   sheets: SheetOption[];
   periods: DeptYearPeriod[];
   unfinishedSheets: string[];
+  /** Biểu nhập đã đổi phiên bản giữa các kỳ của năm, ví dụ "1e: bản 1 (Quý I), bản 3 (Quý III)". */
+  versionNotes?: string[];
 };
 
 export type YearSheet = {
@@ -426,11 +433,9 @@ export function useApiArray<T>(url: string | null, query: Query | undefined): Ap
 
 /** Câu lỗi tiếng Việt máy chủ trả (`ApiExceptionHandler`), hoặc câu dự phòng. */
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    if (message !== "" && /[À-ỹ]/.test(message)) return message;
-  }
-  return fallback;
+  // Câu tiếng Việt của máy chủ nếu có; mất mạng và thiếu quyền (403) có câu riêng thay cho
+  // `fallback` (trước đây 403 cũng hiện thành "mạng có thể đang chập chờn").
+  return loadErrorText(error, fallback);
 }
 
 // ---------------------------------------------------------------- nhãn

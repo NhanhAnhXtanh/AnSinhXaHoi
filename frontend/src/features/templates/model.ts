@@ -47,6 +47,14 @@ export function formLabel(form: Pick<TemplateForm, "name">): string {
 }
 
 /**
+ * Giữa câu: "biểu KT2" — chữ "Biểu" viết thường nhưng TÊN biểu giữ nguyên chữ hoa (`formLabel(...)
+ * .toLowerCase()` làm "kt2", "1A" thành "1a" trong thông báo).
+ */
+export function formLabelInline(form: Pick<TemplateForm, "name">): string {
+  return `biểu ${form.name}`;
+}
+
+/**
  * Trạng thái điều hướng gửi kèm khi mở Thiết kế mẫu: tên biểu biết trước, để
  * vòng quay đầu tiên (đang tải phiên bản) đã ghi đúng tên biểu.
  */
@@ -101,6 +109,7 @@ export function toSet(api: ApiTemplateSet): TemplateSet {
     name: api.name,
     description: api.description ?? undefined,
     createdAt: api.createdAt,
+    createdBy: api.createdBy,
     updatedAt: api.updatedAt ?? api.createdAt,
     templateCount: api.templateCount,
     inUse: api.inUse,
@@ -116,6 +125,7 @@ export function toForm(api: ApiTemplate): TemplateForm {
     kind: KIND_FROM_API[api.kind],
     sortOrder: api.sortOrder,
     createdAt: api.createdAt,
+    createdBy: api.createdBy,
     latestVersionId: api.latestVersion ? String(api.latestVersion.id) : null,
     locked: api.locked,
     lockedAt: api.lockedAt,
@@ -133,6 +143,7 @@ export function formOfVersion(api: ApiTemplateVersion): TemplateForm {
     kind: KIND_FROM_API[api.template.kind],
     sortOrder: 0,
     createdAt: api.createdAt,
+    createdBy: null,
     latestVersionId: null,
     locked: api.template.locked,
     lockedAt: null,
@@ -154,6 +165,7 @@ export function toVersion(api: ApiTemplateVersion): TemplateVersion {
     revokedAt: api.revokedAt,
     revokedBy: api.revokedBy,
     createdAt: api.createdAt,
+    createdBy: api.createdBy,
   };
 }
 
@@ -296,7 +308,7 @@ export function buildChangeLog(
     {
       id: `set-${set.id}`,
       at: set.createdAt,
-      actor: null,
+      actor: set.createdBy,
       content: `Tạo bộ mẫu “${set.name}”`,
     },
   ];
@@ -304,16 +316,16 @@ export function buildChangeLog(
     entries.push({
       id: `form-${form.id}`,
       at: form.createdAt,
-      actor: null,
-      content: `Tạo ${formLabel(form).toLowerCase()}`,
+      actor: form.createdBy,
+      content: `Tạo ${formLabelInline(form)}`,
     });
   }
   for (const v of versions) {
     const form = byId.get(v.formId);
     if (!form) continue;
-    const of = `${versionLabel(v).toLowerCase()} của ${formLabel(form).toLowerCase()}`;
+    const of = `${versionLabel(v).toLowerCase()} của ${formLabelInline(form)}`;
     if (v.number > 1) {
-      entries.push({ id: `v-${v.id}-c`, at: v.createdAt, actor: null, content: `Tạo ${of}` });
+      entries.push({ id: `v-${v.id}-c`, at: v.createdAt, actor: v.createdBy, content: `Tạo ${of}` });
     }
     if (v.publishedAt) {
       entries.push({ id: `v-${v.id}-p`, at: v.publishedAt, actor: v.approver, content: `Ban hành ${of}` });

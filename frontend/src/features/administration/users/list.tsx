@@ -27,7 +27,7 @@ import {
   type User,
 } from "@/domains/user/types";
 import { Plus } from "lucide-react";
-import { formatDateTimeVi, USER_STATUS_FILTER_OPTIONS } from "../labels";
+import { formatDateTimeVi, USER_STATUS_FILTER_OPTIONS, userStatusLabel } from "../labels";
 import {
   ActionsCell,
   ActionsHeader,
@@ -107,6 +107,8 @@ export const UserList = () => {
         id: "placement",
         enableResizing: true,
         header: "Đơn vị công tác",
+        // Xuất tệp: tên đơn vị báo cáo (ô hiện thêm dòng "Tài khoản cấp …").
+        meta: { exportValue: (user: User) => user.reportUnit?.name ?? "" },
         // Không sắp xếp được: API không nhận `_sort=reportUnit`, cho bấm tiêu đề thì
         // thành một lần sắp xếp không làm gì. Dùng ô lọc Đơn vị thay vào.
         enableSorting: false,
@@ -132,12 +134,15 @@ export const UserList = () => {
       columnHelper.accessor("status", {
         id: "status",
         header: "Trạng thái",
+        // Xuất tệp: nhãn tiếng Việt như trên màn hình, không phải mã `active`.
+        meta: { exportValue: (user: User) => userStatusLabel(user.status) },
         enableSorting: true,
         cell: ({ getValue }) => <UserStatusBadge status={getValue()} />,
       }),
       columnHelper.display({
         id: "roles",
         header: "Vai trò",
+        meta: { exportValue: (user: User) => user.roles.map((role) => role.name).join("; ") },
         // Not sortable: the value is a collection, and sorting a row by "its
         // roles" has no meaning the API could implement.
         enableSorting: false,
@@ -154,6 +159,10 @@ export const UserList = () => {
       columnHelper.accessor("lastLoginAt", {
         id: "lastLoginAt",
         header: "Đăng nhập gần nhất",
+        // Xuất tệp: ngày giờ Việt Nam, không phải chuỗi ISO của máy chủ.
+        meta: {
+          exportValue: (user: User) => (user.lastLoginAt ? formatDateTimeVi(user.lastLoginAt) : "Chưa đăng nhập"),
+        },
         enableSorting: true,
         cell: ({ getValue }) => {
           const value = getValue();
@@ -274,6 +283,7 @@ export const UserList = () => {
       />
       <DataTable
         table={table}
+        itemLabel="người dùng"
         toolbar={
           <>
             <ListToolbar

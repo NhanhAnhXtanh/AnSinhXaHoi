@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleAlert, Clock, Eye, EyeOff, Landmark, LoaderCircle } from "lucide-react";
+import { CircleAlert, Clock, Eye, EyeOff, Landmark, LoaderCircle, X } from "lucide-react";
 import { useLogin, useNotification } from "@refinedev/core";
 import { useSearchParams } from "react-router";
 
@@ -158,14 +158,28 @@ export const LoginForm = () => {
                 </button>
               </div>
               {error && (
-                <p
+                // Một dòng báo lỗi có nút ✕: đóng để nhập tài khoản khác ngay trên màn này (kể cả khi
+                // tài khoản đang nhập bị khoá).
+                <div
                   id="login-error"
                   role="alert"
                   className="flex items-start gap-1.5 text-sm font-medium text-destructive-text"
                 >
                   <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  {error}
-                </p>
+                  <span className="min-w-0 flex-1">{error}</span>
+                  <button
+                    type="button"
+                    aria-label="Đóng thông báo"
+                    onClick={() => setError(null)}
+                    className={cn(
+                      "-me-1 flex size-6 shrink-0 items-center justify-center rounded-sm",
+                      "text-destructive-text/70 transition-colors hover:text-destructive-text",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    )}
+                  >
+                    <X className="size-4" aria-hidden />
+                  </button>
+                </div>
               )}
             </div>
 

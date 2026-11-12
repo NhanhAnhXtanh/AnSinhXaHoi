@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
 
 import type { UnitOption } from "./api";
+import { includesFolded } from "@/shared/lib/fold-vi";
 
 const BLOCK_LABEL: Record<string, string> = {
   tinh: "Khối tỉnh",
@@ -56,8 +57,7 @@ export function ScopePicker({
     "Toàn tỉnh";
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase("vi");
-    return q ? units.filter((u) => u.name.toLocaleLowerCase("vi").includes(q)) : units;
+    return query.trim() ? units.filter((u) => includesFolded(u.name, query)) : units;
   }, [units, query]);
 
   const pick = (key: string) => {

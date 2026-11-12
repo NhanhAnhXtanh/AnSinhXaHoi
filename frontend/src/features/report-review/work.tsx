@@ -51,6 +51,7 @@ import { TreasuryDialog } from "./components/treasury-dialog";
 import { VersionHistoryDialog } from "./components/version-history-dialog";
 import { NO_DATA_REASON, badgeOf, hasNoData, reviewStatus } from "./model";
 import { useReportExport } from "./use-report-export";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 const LIST_PATH = "/report-review";
 
@@ -179,9 +180,13 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
     errorNotification: false,
   });
   const current = content !== undefined && content.id === sheetId ? content : undefined;
+  const savedWorkbook = useMemo(() => (current ? parseWorkbook(current.dataJson) : null), [current]);
+  // Có số liệu đã lưu mà không đọc được: báo lỗi, KHÔNG thay bằng khung mẫu trống — Sở sẽ tưởng
+  // đơn vị nộp phiếu trống và duyệt nhầm.
+  const corrupt = current !== undefined && savedWorkbook === null && (current.dataJson ?? "").trim() !== "";
   const workbook = useMemo(
-    () => (current ? (parseWorkbook(current.dataJson) ?? parseWorkbook(current.templateWorkbookJson)) : null),
-    [current]
+    () => (current ? (savedWorkbook ?? parseWorkbook(current.templateWorkbookJson)) : null),
+    [current, savedWorkbook]
   );
 
   const [approveOpen, setApproveOpen] = useState(false);
@@ -327,7 +332,7 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
         <EmptyState
           icon={TriangleAlert}
           title="Chưa mở được biểu"
-          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          description={loadErrorText(sheetsQuery.error ?? contentQuery.error, "Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây.")}
           action={
             <Button
               type="button"
@@ -348,6 +353,20 @@ function ReviewScreen({ report }: { report: InputReportRecord }) {
     }
     if (!current || sheetId === undefined) {
       return <LoadingState label="Đang mở phiếu…" />;
+    }
+    if (corrupt) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Không mở được bảng tính"
+          description="Số liệu đã lưu của biểu này bị lỗi nên chưa hiển thị được. Vui lòng tải lại trang. Nếu vẫn không được, hãy báo cho quản trị hệ thống trước khi phê duyệt."
+          action={
+            <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+              Tải lại trang
+            </Button>
+          }
+        />
+      );
     }
     return (
       <div className="flex min-h-0 flex-1 flex-col">

@@ -145,7 +145,7 @@ public class SummaryReportService {
      */
     public record YearOverview(int year, int ledgerVersion, String source, int savedPeriods, int totalPeriods,
                                String lockReason, List<SheetOption> sheets, List<DeptYearPeriod> periods,
-                               List<String> unfinishedSheets) {
+                               List<String> unfinishedSheets, List<String> versionNotes) {
     }
 
     /** Một biểu tổng hợp năm. {@code a}/{@code b} = năm cho script cũ ({@code ctx.shared.a/b}, a = b = năm). */
@@ -288,7 +288,50 @@ public class SummaryReportService {
         int saved = (int) periods.stream().filter(period -> period.deptReportId() != null).count();
         List<SheetOption> sheets = yearSheets(year);
         return new YearOverview(year, version, saved > 0 ? "DEPT" : "LIVE", saved, periods.size(),
-                yearLockService.lockReason(year).orElse(null), sheets, periods, deptYearData.unfinishedSheets(year));
+                yearLockService.lockReason(year).orElse(null), sheets, periods, deptYearData.unfinishedSheets(year),
+                versionNotes(year));
+    }
+
+    /**
+     * Biểu nhập đã đổi phiên bản giữa các kỳ của năm — số của các kỳ cùng được cộng theo mã chỉ tiêu, nên
+     * nếu bản mới đổi hoặc bỏ một mã thì số của kỳ dùng bản cũ có thể không còn dòng nào trong khung năm.
+     * Chỉ để báo cho người tổng hợp biết mà kiểm tra; không chặn gì.
+     */
+    private List<String> versionNotes(int year) {
+        List<ReportPeriod> periods = queries.periodsOfYear(year).stream()
+                .filter(period -> period.getStatus() != PeriodStatus.CANCELLED)
+                .toList();
+        Map<Long, String> names = new HashMap<>();
+        for (ReportPeriod period : periods) {
+            names.put(period.getId(), period.getName());
+        }
+        return describeVersionDrift(queries.approvedPinnedVersions(names.keySet()), names);
+    }
+
+    /**
+     * Từ các dòng {@code [periodId, tên biểu, số phiên bản]} lập câu cho từng biểu có từ hai phiên bản trở lên,
+     * ví dụ {@code "1e: bản 1 (Quý I, Quý II), bản 3 (Quý III)"}. Biểu xếp theo tên, bản theo số.
+     */
+    static List<String> describeVersionDrift(List<Object[]> rows, Map<Long, String> periodNames) {
+        Map<String, java.util.TreeMap<Integer, java.util.TreeSet<String>>> byTemplate = new java.util.TreeMap<>();
+        for (Object[] row : rows) {
+            String template = String.valueOf(row[1]);
+            int versionNo = ((Number) row[2]).intValue();
+            String period = periodNames.getOrDefault((Long) row[0], "kỳ " + row[0]);
+            byTemplate.computeIfAbsent(template, key -> new java.util.TreeMap<>())
+                    .computeIfAbsent(versionNo, key -> new java.util.TreeSet<>())
+                    .add(period);
+        }
+        List<String> notes = new ArrayList<>();
+        byTemplate.forEach((template, versions) -> {
+            if (versions.size() < 2) {
+                return;
+            }
+            List<String> parts = new ArrayList<>();
+            versions.forEach((versionNo, periods) -> parts.add("bản " + versionNo + " (" + String.join(", ", periods) + ")"));
+            notes.add(template + ": " + String.join(", ", parts));
+        });
+        return notes;
     }
 
     /**

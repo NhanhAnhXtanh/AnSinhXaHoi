@@ -49,6 +49,7 @@ import {
   type AnnualYearStatus,
   type SubmitYearInput,
 } from "./submit-year-dialog";
+import { scriptApiErrorText } from "./period-text";
 import { joinVi, summaryExportName } from "./utils";
 import { SubmitBlockedDialog, YearHistoryDialog } from "./year-dialogs";
 
@@ -288,6 +289,17 @@ function YearPanel({ year }: { year: number }) {
   if (resubmit && latest) {
     meta = `${meta} · UBND ${latest.reopened ? "mở lại" : "trả lại"} ${formatDate(latest.decidedAt ?? "")} · Lý do: ${latest.returnReason ?? "—"}`;
   }
+  const versionNotes = overview.versionNotes ?? [];
+  if (versionNotes.length > 0 && !data?.borrowedEarliest) {
+    meta = (
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate">{meta}</span>
+        <span className="text-warning-text truncate" title={versionNotes.join("; ")}>
+          Biểu đổi phiên bản giữa các kỳ ({versionNotes.join("; ")}) — kiểm tra mã chỉ tiêu có khớp không.
+        </span>
+      </span>
+    );
+  }
   if (data?.borrowedEarliest) {
     meta = (
       <span className="flex min-w-0 flex-col">
@@ -336,7 +348,9 @@ function YearPanel({ year }: { year: number }) {
             apiRef.current = api;
           }}
           onScriptResult={(result) => {
-            if (!result.ok) {
+            if (result.apiErrors && result.apiErrors.length > 0) {
+              toast.error(scriptApiErrorText(data.shortName, result.apiErrors));
+            } else if (!result.ok) {
               console.warn("Script tổng hợp năm báo lỗi:", result.messages);
               toast.warning(
                 `Một số ô của biểu ${data.shortName} chưa đổ được số liệu. Vui lòng báo người quản trị mẫu biểu kiểm tra.`

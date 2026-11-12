@@ -14,13 +14,14 @@ import type { HomeDashboard } from "./types";
  *
  * Lỗi không bật thông báo nổi: màn tự hiện khối lỗi kèm nút "Thử lại".
  */
-export function useHomeDashboard(year: number, units: boolean) {
+export function useHomeDashboard(year: number, units: boolean, enabled = true) {
   const { result, query } = useCustom<HomeDashboard, HttpError>({
     url: `${API_URL}/asxh_dashboard`,
     method: "get",
     config: { query: units ? { year, units: true } : { year } },
     errorNotification: false,
-    queryOptions: { refetchOnMount: "always" },
+    // Tài khoản không có quyền xem phiếu thì không gọi (máy chủ chỉ trả 403).
+    queryOptions: { refetchOnMount: "always", enabled },
   });
 
   // `useCustom` trả một object rỗng (truthy) khi chưa có dữ liệu — đọc qua

@@ -68,6 +68,7 @@ import { RevisionHistoryDialog } from "./revision-history-dialog";
 import { SheetValidator, type ValidationJob } from "./sheet-validator";
 import { TreasurySubmitDialog } from "./treasury-submit-dialog";
 import { CheckErrorsDialog, SubmitConfirmDialog, type SheetIssue } from "./work-dialogs";
+import { loadErrorText } from "@/shared/lib/user-message";
 
 /** Đủ rộng cho mọi biểu của một phiếu (bộ mẫu thật ≈10 biểu). */
 const MAX_SHEETS = 200;
@@ -134,7 +135,11 @@ export function InputReportWork() {
 }
 
 /** Bảng tính đang hiện: biểu nào, nạp từ JSON nào, có đóng dấu khoá ô của khung mẫu không. */
-type Pane = { sheetId: number; workbook: WorkbookJson | null; stampLocks: boolean };
+/**
+ * `corrupt`: biểu CÓ số liệu đã lưu nhưng không đọc được. Không được lặng lẽ mở khung mẫu trống —
+ * người dùng tưởng mất số, bấm Lưu là ghi đè số cũ; màn báo lỗi và khoá các nút ghi.
+ */
+type Pane = { sheetId: number; workbook: WorkbookJson | null; stampLocks: boolean; corrupt?: boolean };
 
 type Busy = "save" | "complete" | "no-data" | "reopen" | "validate" | "submit" | null;
 
@@ -209,6 +214,9 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const [dirty, setDirty] = useState<ReadonlySet<number>>(new Set());
   const [pane, setPane] = useState<Pane | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
+  // Phần tự động của biểu bị dừng vì chạy quá lâu (khung "Không tải được đầy đủ biểu mẫu"): các nút
+  // Lưu / Kiểm tra & hoàn tất mờ — trước đây vẫn bấm được và không có phản hồi nào.
+  const [timedOutSheet, setTimedOutSheet] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -231,11 +239,17 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   if (content && content.id === sheetId && pane?.sheetId !== sheetId) {
     const draft = drafts.current.get(sheetId) ?? saved.current.get(sheetId);
     const data = draft ?? parseWorkbook(content.dataJson);
-    setPane({
-      sheetId,
-      workbook: data ?? parseWorkbook(content.templateWorkbookJson),
-      stampLocks: data === null,
-    });
+    const corrupt = data === null && (content.dataJson ?? "").trim() !== "";
+    if (corrupt) {
+      console.error(`Số liệu đã lưu của biểu (sheet ${sheetId}) không đọc được.`);
+      setPane({ sheetId, workbook: null, stampLocks: false, corrupt: true });
+    } else {
+      setPane({
+        sheetId,
+        workbook: data ?? parseWorkbook(content.templateWorkbookJson),
+        stampLocks: data === null,
+      });
+    }
   }
 
   // ------------------------------------------------------------ trạng thái màn
@@ -248,7 +262,9 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
   const remaining = sheets.filter((s) => !isSheetDone(s.completion));
   const isDirty = sheetId !== undefined && dirty.has(sheetId);
   const scriptText = content?.id === sheetId ? (content?.scriptText ?? "") : "";
-  const paneReady = pane !== null && pane.sheetId === sheetId;
+  const paneReady = pane !== null && pane.sheetId === sheetId && !pane.corrupt;
+  const scriptTimedOut = timedOutSheet !== null && timedOutSheet === sheetId;
+  const paneCorrupt = pane !== null && pane.sheetId === sheetId && pane.corrupt === true;
 
   const scriptContext = useMemo(
     () => ({
@@ -401,8 +417,8 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
       const submitLabel = report.status === "RETURNED" ? "Nộp lại phiếu" : "Nộp phiếu";
       toast.success(
         left.length === 0
-          ? `Đã đánh dấu biểu ${code} là nhập xong. Mọi biểu đã xong — bạn bấm ${submitLabel} để gửi Sở.`
-          : `Đã đánh dấu biểu ${code} là nhập xong. Biểu chuyển sang chỉ xem; bấm "Sửa lại" nếu cần nhập tiếp.`
+          ? `Biểu ${code} đã nhập xong (chỉ xem). Mọi biểu đã xong, bạn bấm ${submitLabel} để gửi Sở.`
+          : `Biểu ${code} đã nhập xong (chỉ xem).`
       );
     } finally {
       setBusy((b) => (b === "complete" ? null : b));
@@ -621,9 +637,13 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
     secondary = [{ label: `Sửa lại biểu ${code}`, icon: Pencil, onClick: () => void reopen() }];
   }
 
-  if (!paneReady || busy !== null) {
-    // Đang mở biểu / đang gửi: các nút hiện nhưng mờ (Figma 310:56441).
-    primary = primary && { ...primary, disabled: true, reason: undefined };
+  if (!paneReady || busy !== null || scriptTimedOut) {
+    // Đang mở biểu / đang gửi / phần tự động của biểu chưa chạy xong: các nút hiện nhưng mờ (Figma 310:56441).
+    primary = primary && {
+      ...primary,
+      disabled: true,
+      reason: scriptTimedOut ? "Biểu chưa tải đầy đủ — bấm Tải lại ở khung bảng tính." : undefined,
+    };
     secondary = secondary.map((a) => ({ ...a, disabled: true }));
     items = items.map((i) => ({ ...i, disabled: true }));
   }
@@ -678,7 +698,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
         <EmptyState
           icon={TriangleAlert}
           title="Chưa mở được biểu"
-          description="Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây."
+          description={loadErrorText(sheetsQuery.error ?? contentQuery.error, "Mạng có thể đang chập chờn. Bạn bấm Thử lại sau ít giây.")}
           action={
             <Button
               type="button"
@@ -703,6 +723,20 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
         />
       );
     }
+    if (paneCorrupt) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Không mở được bảng tính"
+          description={`Số liệu đã lưu của biểu ${code} bị lỗi nên chưa mở được; biểu không mở khung trống để tránh ghi đè số cũ. Vui lòng tải lại trang. Nếu vẫn không được, hãy báo cho quản trị hệ thống.`}
+          action={
+            <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+              Tải lại trang
+            </Button>
+          }
+        />
+      );
+    }
     if (!paneReady || !pane || sheetId === undefined) {
       return <LoadingState label="Đang mở phiếu…" />;
     }
@@ -717,6 +751,7 @@ function WorkScreen({ report }: { report: InputReportRecord }) {
           stampInputLocks={pane.stampLocks}
           scriptText={scriptText}
           scriptContext={scriptContext}
+          onScriptResult={(result) => setTimedOutSheet(result.timedOut === true ? paneSheetId : null)}
           onDirtyChange={(d) => {
             if (!d) return;
             editSeq.current += 1;

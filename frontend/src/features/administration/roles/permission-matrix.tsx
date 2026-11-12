@@ -17,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
+import { includesFolded } from "@/shared/lib/fold-vi";
 import {
   PERMISSION_ACTIONS,
   splitPermissionCode,
@@ -218,9 +219,9 @@ export function PermissionMatrix({
     if (term) {
       subject = subject.filter(
         (row) =>
-          row.label.toLowerCase().includes(term) ||
-          row.resource.toLowerCase().includes(term) ||
-          row.all.some((p) => p.code.toLowerCase().includes(term))
+          includesFolded(row.label, term) ||
+          includesFolded(row.resource, term) ||
+          row.all.some((p) => includesFolded(p.code, term))
       );
     }
     if (grantedOnly) {

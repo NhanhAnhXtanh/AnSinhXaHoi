@@ -6,6 +6,7 @@ import { Input } from "@/shared/ui/input";
 import { cn } from "@/shared/lib/utils";
 
 import type { TemplateSet } from "../types";
+import { includesFolded } from "@/shared/lib/fold-vi";
 
 /**
  * Cột trái của Bộ biểu mẫu: tiêu đề + số bộ, ô tìm, danh sách thẻ bộ mẫu
@@ -27,9 +28,8 @@ export function SetListPanel({
   const [query, setQuery] = useState("");
 
   const shown = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase("vi");
-    if (!q) return sets;
-    return sets.filter((s) => s.name.toLocaleLowerCase("vi").includes(q));
+    if (!query.trim()) return sets;
+    return sets.filter((s) => includesFolded(s.name, query));
   }, [sets, query]);
 
   return (

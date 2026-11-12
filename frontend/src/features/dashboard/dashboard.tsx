@@ -10,13 +10,44 @@ import {
   formatDate,
   useReportYear,
 } from "@/shared/components/asxh";
+import { getAuthorities } from "@/shared/api/session";
 import { Button } from "@/shared/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
 import { cn } from "@/shared/lib/utils";
 
 import { BySheetView } from "./by-sheet-view";
 import { ByUnitView } from "./by-unit-view";
+import { Panel, PanelHeader } from "./parts";
+import { QuickLinkGrid } from "./quick-link-grid";
+import { NEUTRAL_QUICK_LINKS, useQuickLinks } from "./quick-links";
 import { useHomeDashboard } from "./use-home-dashboard";
+
+/** Quyền máy chủ đòi cho số liệu trang chủ (`HomeDashboardPermissions.READ`). */
+const INPUT_REPORTS_READ = "input_reports:read";
+
+/**
+ * Trang chủ của tài khoản không xem phiếu (lãnh đạo UBND, vai trò hệ thống): chỉ lối tắt tới các
+ * màn tài khoản mở được, không có số liệu phiếu và không có câu báo lỗi quyền.
+ */
+function NeutralHome() {
+  const links = useQuickLinks(NEUTRAL_QUICK_LINKS);
+  if (links.length === 0) {
+    return (
+      <EmptyState
+        icon={Lock}
+        variant="page"
+        title="Tài khoản chưa được giao màn hình nào"
+        description="Bạn liên hệ quản trị hệ thống để được cấp quyền theo công việc."
+      />
+    );
+  }
+  return (
+    <Panel className="max-w-3xl">
+      <PanelHeader title="Truy cập nhanh" />
+      <QuickLinkGrid links={links} />
+    </Panel>
+  );
+}
 
 type Mode = "sheet" | "unit";
 
@@ -55,7 +86,16 @@ function errorText(message: string | undefined): string {
 export const Dashboard = () => {
   const { year } = useReportYear();
   const [mode, setMode] = useState<Mode>("sheet");
-  const { data, isLoading, isFetching, error, refetch } = useHomeDashboard(year, mode === "unit");
+  // Số liệu trang chủ cần quyền xem phiếu nhập. Tài khoản không có (lãnh đạo UBND, vai trò hệ
+  // thống) trước đây vẫn gọi API, nhận 403 rồi thấy câu báo lỗi ngay trang đầu sau đăng nhập; nay
+  // không gọi mà hiện trang chủ chỉ có lối tắt (NeutralHome).
+  const permissions = getAuthorities()?.permissions;
+  const canReadReports = !permissions || permissions.includes(INPUT_REPORTS_READ);
+  const { data, isLoading, isFetching, error, refetch } = useHomeDashboard(
+    year,
+    mode === "unit",
+    canReadReports
+  );
 
   // Nhớ quyền xem "Theo đơn vị" qua các lần nạp: lúc chuyển chế độ, truy vấn
   // mới chưa về thì nút chuyển không được nhấp nháy.
@@ -75,7 +115,9 @@ export const Dashboard = () => {
   };
 
   let content: ReactNode;
-  if (isLoading) {
+  if (!canReadReports) {
+    content = <NeutralHome />;
+  } else if (isLoading) {
     content = <LoadingState label="Đang tải số liệu…" hint="Mạng chậm, bạn chờ thêm một chút." />;
   } else if (error && error.statusCode === 403) {
     content = (
@@ -110,13 +152,16 @@ export const Dashboard = () => {
     <AsxhPage
       title="Trang chủ"
       description={
-        mode === "sheet"
-          ? `${todayLabel()} · Tổng quan phiếu báo cáo năm ${year}`
-          : `Tiến độ nộp của từng đơn vị, năm ${year}`
+        !canReadReports
+          ? `${todayLabel()} · Chọn việc bạn cần làm`
+          : mode === "sheet"
+            ? `${todayLabel()} · Tổng quan phiếu báo cáo năm ${year}`
+            : `Tiến độ nộp của từng đơn vị, năm ${year}`
       }
       actions={
         <>
-          <YearSelect />
+          {/* Không có số liệu phiếu thì ô năm không có gì để đổi. */}
+          {canReadReports && <YearSelect />}
           {canViewUnits && (
             <ToggleGroup
               type="single"

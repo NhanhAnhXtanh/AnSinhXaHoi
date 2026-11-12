@@ -46,6 +46,7 @@ import {
 } from "./api";
 import { CompleteDialog } from "./complete-dialog";
 import { HistoryCompareDialog } from "./history-compare-dialog";
+import { scriptApiErrorText } from "./period-text";
 import { ScopePicker } from "./scope-picker";
 import { SheetBody, SheetError, SheetFrame } from "./sheet-frame";
 import { joinVi, summaryExportName } from "./utils";
@@ -330,6 +331,12 @@ export function DeptPeriodView({
       label: "Lịch sử và so sánh",
       icon: GitCompare,
       onSelect: () => setDialog("history"),
+      // Đang sửa dở: khôi phục / so sánh lúc này có thể đè lên số đang sửa.
+      disabled: busy !== null || editing || dirty || pendingSheets.length > 0,
+      reason:
+        editing || dirty || pendingSheets.length > 0
+          ? "Lưu hoặc bỏ các số đang sửa trước đã."
+          : undefined,
     },
     ...(canEdit && (pendingSheets.length > 0 || dirty)
       ? [
@@ -354,7 +361,11 @@ export function DeptPeriodView({
             : pendingSheets.length > 0
               ? ` · Biểu ${joinVi(pendingSheets)} đang sửa dở, chưa Lưu`
               : " · Đang sửa"
-          : ` · Lưu ${formatDateTime(detail.createdAt)}${detail.createdBy ? ` · ${detail.createdBy}` : ""}`
+          // Giờ và người lưu phiên bản HIỆN HÀNH (`savedAt` / `savedBy`). Máy chủ cũ chưa trả hai trường
+          // này thì lùi về lần lưu ĐẦU của kỳ và ghi rõ "Lưu lần đầu" để không tưởng đó là của bản mới nhất.
+          : detail.savedAt
+            ? ` · Lưu ${formatDateTime(detail.savedAt)}${detail.savedBy ? ` · ${detail.savedBy}` : ""}`
+            : ` · ${detail.ledgerVersion > 1 ? "Lưu lần đầu" : "Lưu"} ${formatDateTime(detail.createdAt)}${detail.createdBy ? ` · ${detail.createdBy}` : ""}`
       }${yearLock ? ` · ${yearLock}` : ""}`
     : "Số liệu tổng hợp";
   if (detail?.sourceStale) {
@@ -420,7 +431,9 @@ export function DeptPeriodView({
             apiRef.current = api;
           }}
           onScriptResult={(result) => {
-            if (!result.ok) {
+            if (result.apiErrors && result.apiErrors.length > 0) {
+              toast.error(scriptApiErrorText(runtime.shortName, result.apiErrors));
+            } else if (!result.ok) {
               console.warn("Script số liệu tổng hợp báo lỗi:", result.messages);
               toast.warning(
                 `Một số ô của biểu ${runtime.shortName} chưa đổ được số liệu. Vui lòng báo người quản trị mẫu biểu kiểm tra.`
